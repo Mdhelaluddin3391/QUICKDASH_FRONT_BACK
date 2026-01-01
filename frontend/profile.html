@@ -1,16 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Dashboard - QuickDash</title>
-    
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="./assets/css/base.css">
     <link rel="stylesheet" href="./assets/css/components.css">
     <link rel="stylesheet" href="./assets/css/layout.css">
     <link rel="stylesheet" href="./assets/css/pages/account.css">
 </head>
+
 <body>
     <div id="navbar-placeholder"></div>
 
@@ -23,11 +25,12 @@
                         <h4 id="user-name" style="font-size:1rem; margin-bottom:2px;">User</h4>
                         <p id="user-phone" class="text-muted small">...</p>
                     </div>
-                    <button id="edit-profile-btn" class="btn btn-sm btn-outline" style="padding: 5px 10px;" title="Edit Profile">
+                    <button id="edit-profile-btn" class="btn btn-sm btn-outline" style="padding: 5px 10px;"
+                        title="Edit Profile">
                         <i class="fas fa-pen"></i>
                     </button>
                 </div>
-                
+
                 <nav>
                     <a href="profile.html" class="sidebar-link active"><i class="fas fa-th-large"></i> Dashboard</a>
                     <a href="orders.html" class="sidebar-link"><i class="fas fa-box"></i> My Orders</a>
@@ -86,7 +89,7 @@
                     <label class="form-label">Email Address</label>
                     <input type="email" id="edit-email" class="form-control" placeholder="name@example.com">
                 </div>
-                
+
                 <div class="d-flex justify-between mt-4">
                     <button type="button" class="btn btn-outline" onclick="closeProfileModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -97,12 +100,17 @@
 
     <div id="footer-placeholder"></div>
 
-    <script src="./assets/js/config.js" defer></script>
-    <script src="./assets/js/utils/asset-resolver.js" defer></script>
-    <script src="./assets/js/utils/formatters.js" defer></script>
-    <script src="./assets/js/utils/toast.js" defer></script>
-    <script src="./assets/js/services/api.service.js" defer></script>
-    <script src="./assets/js/layout/main-layout.js" defer></script>
-    <script src="./assets/js/pages/profile.js" defer></script>
+<script src="./assets/js/config.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/formatters.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+<script src="./assets/js/services/cart.service.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
 </body>
+
 </html>

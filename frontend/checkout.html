@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Checkout - QuickDash</title>
-    
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="./assets/css/base.css?v=1.0.0">
     <link rel="stylesheet" href="./assets/css/components.css?v=1.0.0">
@@ -13,6 +14,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
+
 <body>
     <div id="navbar-placeholder"></div>
 
@@ -20,18 +22,18 @@
         <div class="mb-3">
             <a href="cart.html" class="text-muted"><i class="fas fa-arrow-left"></i> Back to Cart</a>
         </div>
-        
+
         <h1 class="mb-4">Checkout</h1>
 
         <div class="checkout-layout">
             <div class="checkout-steps">
-                
+
                 <div class="card step-card mb-4">
                     <div class="step-header">
                         <span class="step-number">1</span>
                         <h3>Delivery Address</h3>
                     </div>
-                    
+
                     <div id="address-list" class="address-grid mt-3">
                         <div class="loader-spinner"></div>
                     </div>
@@ -73,9 +75,9 @@
                 <div class="card summary-card sticky-top">
                     <h3>Order Summary</h3>
                     <div id="mini-cart-list" class="mini-cart mb-3"></div>
-                    
+
                     <hr>
-                    
+
                     <div class="summary-row">
                         <span>Subtotal</span>
                         <span id="summ-subtotal">...</span>
@@ -106,7 +108,8 @@
 
                 <div class="form-group">
                     <label class="form-label">Full Address</label>
-                    <input type="text" id="addr-text" class="form-control" placeholder="House No, Street, Area" required>
+                    <input type="text" id="addr-text" class="form-control" placeholder="House No, Street, Area"
+                        required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">City</label>
@@ -114,7 +117,8 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">Pincode</label>
-                    <input type="text" id="addr-pin" class="form-control" placeholder="6-digit Pincode" maxlength="6" required>
+                    <input type="text" id="addr-pin" class="form-control" placeholder="6-digit Pincode" maxlength="6"
+                        required>
                 </div>
                 <div class="form-group">
                     <label class="form-label">Type</label>
@@ -124,7 +128,7 @@
                         <option value="OTHER">Other</option>
                     </select>
                 </div>
-                
+
                 <div class="d-flex justify-between mt-4">
                     <button type="button" class="btn btn-outline" onclick="closeAddressModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Save Address</button>
@@ -135,12 +139,19 @@
 
     <div id="footer-placeholder"></div>
 
-    <script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
-    <script src="./assets/js/config.js?v=1.0.0" defer></script>
-    <script src="./assets/js/utils/formatters.js?v=1.0.0" defer></script>
-    <script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
-    <script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
-    <script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
-    <script src="./assets/js/pages/checkout.js?v=1.0.0" defer></script>
+ <script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
+
+<script src="./assets/js/config.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/utils/formatters.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script> 
+
+<script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/pages/checkout.js?v=1.0.0" defer></script>
 </body>
+
 </html>

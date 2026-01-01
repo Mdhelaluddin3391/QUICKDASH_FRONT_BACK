@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>All Categories - QuickDash</title>
-    
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="./assets/css/base.css?v=1.0.0">
     <link rel="stylesheet" href="./assets/css/components.css?v=1.0.0">
     <link rel="stylesheet" href="./assets/css/layout.css?v=1.0.0">
-    
+
     <style>
         .cat-grid-page {
             display: grid;
@@ -17,6 +18,7 @@
             gap: 20px;
             margin-top: 20px;
         }
+
         .cat-card-lg {
             background: #fff;
             border-radius: 12px;
@@ -31,25 +33,30 @@
             align-items: center;
             justify-content: center;
         }
+
         .cat-card-lg:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.08);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
             border-color: var(--primary);
         }
+
         .cat-icon-lg {
-            width: 80px; height: 80px;
+            width: 80px;
+            height: 80px;
             object-fit: contain;
             margin-bottom: 15px;
             background: #f8f9fa;
             border-radius: 50%;
             padding: 10px;
         }
+
         .cat-title-lg {
             font-weight: 600;
             color: var(--text-main);
         }
     </style>
 </head>
+
 <body>
     <div id="navbar-placeholder"></div>
 
@@ -66,10 +73,14 @@
 
     <div id="footer-placeholder"></div>
 
-    <script src="./assets/js/config.js?v=1.0.0" defer></script>
-    <script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
-    <script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
-    
+   <script src="./assets/js/config.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script> 
+
+<script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+
     <script defer>
         (async () => {
             const grid = document.getElementById('cat-grid');
@@ -78,7 +89,7 @@
                 // Isse agar user ka token expired bhi hai, tab bhi categories load hongi
                 const baseUrl = window.APP_CONFIG ? window.APP_CONFIG.API_BASE_URL : "http://localhost:5000/api/v1";
                 const response = await fetch(`${baseUrl}/catalog/categories/`);
-                
+
                 if (!response.ok) {
                     throw new Error(`API Error: ${response.status}`);
                 }
@@ -102,7 +113,7 @@
                         <div class="cat-title-lg">${c.name}</div>
                     </div>
                 `).join('');
-                
+
             } catch (e) {
                 console.error("Category Load Error:", e);
                 grid.innerHTML = `
@@ -114,4 +125,5 @@
         })();
     </script>
 </body>
+
 </html>

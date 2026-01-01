@@ -70,12 +70,16 @@
         </div>
     </main>
 
-    <script src="./assets/js/config.js" defer></script>
-    <script src="./assets/js/utils/asset-resolver.js" defer></script>
-    <script src="./assets/js/utils/toast.js" defer></script>
-    <script src="./assets/js/utils/formatters.js" defer></script>
-    <script src="./assets/js/services/api.service.js" defer></script>
-    <script src="./assets/js/layout/main-layout.js" defer></script>
+<script src="./assets/js/config.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/formatters.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
 
     <script defer>
         async function loadMapsScript() {
@@ -112,7 +116,7 @@
 
         let map, marker, riderMarker, orderId, socket;
         let reconnectInterval = 1000;
-        
+
 
         window.initMap = function () {
             try {
@@ -184,7 +188,7 @@
 
         /* Inside track_order.html script tag */
 
-        
+
 
         async function connectTrackingSocket(retryCount = 0) {
             try {

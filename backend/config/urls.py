@@ -35,6 +35,8 @@ urlpatterns = [
     path('api/config/', AppConfigAPIView.as_view()),
 
     # API V1 Routes
+    path('api/v1/customers/', include('apps.customers.urls')),
+
     path('api/v1/auth/', include('apps.accounts.urls')),
     path('api/v1/auth/customer/', include('apps.customers.urls')), # Customer Profile/Addresses
     
@@ -50,6 +52,9 @@ urlpatterns = [
     path('api/v1/notifications/', include('apps.notifications.urls')),
     path('api/v1/audit/', include('apps.audit.urls')),
     path('api/v1/assistant/', include('apps.assistant.urls')),
+
+
+    
 
     # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

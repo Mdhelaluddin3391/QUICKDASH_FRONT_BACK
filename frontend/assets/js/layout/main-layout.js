@@ -6,6 +6,12 @@
     const STORAGE_KEYS = window.APP_CONFIG?.STORAGE_KEYS || {};
     const EVENTS = window.APP_CONFIG?.EVENTS || {};
 
+
+    function isLoggedIn() {
+        const tokenKey = (window.APP_CONFIG?.STORAGE_KEYS?.TOKEN) || 'auth_token';
+        return !!localStorage.getItem(tokenKey);
+    }
+
     /**
      * Component Loader: HTML Partials (Nav/Footer)
      */
@@ -43,7 +49,7 @@
             let linkPath = href;
             try {
                 linkPath = new URL(href, window.location.href).pathname;
-            } catch (e) {}
+            } catch (e) { }
 
             if (
                 linkPath === currentPath ||
@@ -75,15 +81,15 @@
         `;
 
         const icon = box.querySelector('i.fas.fa-map-marker-alt') || box.querySelector('i.fas.fa-map-pin');
-        
+
         if (display.type === 'DELIVERY') {
             box.classList.add("active-delivery");
-            if(icon) icon.className = 'fas fa-map-marker-alt text-primary';
+            if (icon) icon.className = 'fas fa-map-marker-alt text-primary';
         } else if (display.type === 'SERVICE') {
             box.classList.add("active-service");
-            if(icon) icon.className = 'fas fa-map-pin text-danger';
+            if (icon) icon.className = 'fas fa-map-pin text-danger';
         } else {
-            if(icon) icon.className = 'fas fa-search-location text-muted';
+            if (icon) icon.className = 'fas fa-search-location text-muted';
         }
     }
 
@@ -91,37 +97,137 @@
         if (document.body.dataset.navLocBound === "1") return;
         document.body.dataset.navLocBound = "1";
 
-        document.addEventListener('click', (e) => {
+        document.addEventListener('click', async (e) => {
             let node = e.target;
             if (node && node.nodeType !== 1) node = node.parentElement;
 
             const box = (node && typeof node.closest === 'function') ? node.closest('#navbar-location-box') : null;
             if (!box) return;
 
+            // Prevent double opening
+            if (document.querySelector('.address-switcher-modal')) return;
             const modal = document.getElementById('loc-picker-modal');
             if (modal && modal.classList.contains('active')) return;
 
-            if (window.LocationPicker && typeof window.LocationPicker.open === 'function') {
-                try { window.LocationPicker.open('SERVICE'); } catch (err) { }
+            // 1. Check if Logged In
+            if (isLoggedIn()) {
+                // User -> Show Address Switcher
+                await openAddressSwitcher();
+            } else {
+                // Guest -> Open Map Picker
+                openMapPickerFallback();
+            }
+        }, false);
+    }
+
+    async function openAddressSwitcher() {
+        try {
+            if (!window.ApiService) {
+                console.error("ApiService not found");
+                openMapPickerFallback();
                 return;
             }
 
-            try {
-                const scriptId = 'loc-picker-script';
-                if (!document.getElementById(scriptId)) {
-                    const s = document.createElement('script');
-                    s.id = scriptId;
-                    s.async = true;
-                    s.src = (window.Asset && typeof window.Asset.url === 'function') ? window.Asset.url('assets/js/utils/location_picker.js') : '/assets/js/utils/location_picker.js';
-                    s.onload = () => {
-                        if (window.LocationPicker && typeof window.LocationPicker.open === 'function') {
-                            try { window.LocationPicker.open('SERVICE'); } catch (err) { }
-                        }
-                    };
-                    document.body.appendChild(s);
-                }
-            } catch (err) {}
-        }, false);
+            const res = await window.ApiService.get('/customers/addresses/');
+            const addresses = Array.isArray(res) ? res : (res.results || []);
+            createAndShowAddressModal(addresses);
+
+        } catch (err) {
+            console.error("Failed to fetch addresses:", err);
+            openMapPickerFallback();
+        }
+    }
+
+    function createAndShowAddressModal(addresses) {
+        const existing = document.querySelector('.address-switcher-modal');
+        if (existing) existing.remove();
+
+        const backdrop = document.createElement('div');
+        backdrop.className = 'address-switcher-backdrop';
+
+        const modal = document.createElement('div');
+        modal.className = 'address-switcher-modal';
+
+        let listHtml = '';
+        if (addresses.length === 0) {
+            listHtml = `<div class="empty-addr">No saved addresses found.</div>`;
+        } else {
+            listHtml = addresses.map(addr => `
+                <div class="addr-item" data-json='${JSON.stringify(addr).replace(/'/g, "&#39;")}'>
+                    <div class="icon"><i class="fas fa-home"></i></div>
+                    <div class="details">
+                        <div class="label">${addr.label || 'Address'}</div>
+                        <div class="text">${addr.address_line || addr.google_address_text || ''}</div>
+                    </div>
+                    <div class="action"><i class="fas fa-check-circle"></i></div>
+                </div>
+            `).join('');
+        }
+
+        modal.innerHTML = `
+            <div class="addr-header">
+                <h3>Select Location</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="addr-list">
+                ${listHtml}
+            </div>
+            <div class="addr-footer">
+                <button class="btn-gps"><i class="fas fa-crosshairs"></i> Use Current Location</button>
+                <button class="btn-add"><i class="fas fa-plus"></i> Add New Address</button>
+            </div>
+        `;
+
+        document.body.appendChild(backdrop);
+        document.body.appendChild(modal);
+
+        const close = () => { backdrop.remove(); modal.remove(); };
+        backdrop.onclick = close;
+        modal.querySelector('.close-btn').onclick = close;
+
+        modal.querySelectorAll('.addr-item').forEach(item => {
+            item.onclick = () => {
+                try {
+                    const data = JSON.parse(item.getAttribute('data-json'));
+                    if (window.LocationManager) {
+                        window.LocationManager.setDeliveryAddress(data);
+                        window.location.reload();
+                    }
+                } catch (e) { console.error(e); }
+                close();
+            };
+        });
+
+        modal.querySelector('.btn-gps').onclick = () => {
+            close();
+            openMapPickerFallback();
+        };
+
+        modal.querySelector('.btn-add').onclick = () => {
+            window.location.href = 'addresses.html';
+        };
+    }
+
+    function openMapPickerFallback() {
+        if (window.LocationPicker && typeof window.LocationPicker.open === 'function') {
+            try { window.LocationPicker.open('SERVICE'); } catch (err) { }
+            return;
+        }
+        try {
+            const scriptId = 'loc-picker-script';
+            if (!document.getElementById(scriptId)) {
+                const s = document.createElement('script');
+                s.id = scriptId;
+                s.async = true;
+                s.src = (window.Asset && typeof window.Asset.url === 'function') ? window.Asset.url('assets/js/utils/location_picker.js') : '/assets/js/utils/location_picker.js';
+                s.onload = () => {
+                    if (window.LocationPicker && typeof window.LocationPicker.open === 'function') {
+                        try { window.LocationPicker.open('SERVICE'); } catch (err) { }
+                    }
+                };
+                document.body.appendChild(s);
+            }
+        } catch (err) { }
     }
 
     function initializeGlobalEvents() {
@@ -145,75 +251,68 @@
         ]);
 
         initializeGlobalEvents();
+        fetchAndRenderNav();
+    });
 
-        // [FIXED] Fetch ONLY Parent Categories for Navbar
-        async function fetchAndRenderNav() {
-            const navEl = document.getElementById('dynamic-navbar');
-            if (!navEl) return;
+    async function fetchAndRenderNav() {
+        const navEl = document.getElementById('dynamic-navbar');
+        if (!navEl) return;
 
-            // Updated Endpoint: /categories/parents/
-            const API_URL = `${window.APP_CONFIG.API_BASE_URL}/catalog/categories/parents/`;
-            const CACHE_KEY = 'nav_parents_cache';
-            const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+        const API_URL = `${window.APP_CONFIG.API_BASE_URL}/catalog/categories/parents/`;
+        const CACHE_KEY = 'nav_parents_cache';
+        const CACHE_TTL = 60 * 60 * 1000;
 
-            // 1. Try Local Storage Cache
-            try {
-                const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-                const now = Date.now();
-                if (cached && (now - cached.ts) < CACHE_TTL && Array.isArray(cached.data)) {
-                    renderNav(cached.data);
-                    return;
-                }
-            } catch (e) { }
-
-            // 2. Fetch Live Data
-            try {
-                const resp = await fetch(API_URL);
-                
-                // Safe JSON parsing to prevent "Error: 0: <"
-                let data = [];
-                const contentType = resp.headers.get("content-type");
-                if (contentType && contentType.indexOf("application/json") !== -1) {
-                    data = await resp.json();
-                } else {
-                    throw new Error("API returned non-JSON response");
-                }
-
-                if (Array.isArray(data)) {
-                    // Update Cache
-                    try {
-                        localStorage.setItem(
-                            CACHE_KEY,
-                            JSON.stringify({ ts: Date.now(), data: data })
-                        );
-                    } catch (e) { }
-                    
-                    renderNav(data);
-                }
-            } catch (err) {
-                console.warn('Failed to fetch navbar categories:', err);
+        try {
+            const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+            const now = Date.now();
+            if (cached && (now - cached.ts) < CACHE_TTL && Array.isArray(cached.data)) {
+                renderNav(cached.data);
+                return;
             }
+        } catch (e) { }
+
+        try {
+            const resp = await fetch(API_URL);
+            let data = [];
+            const contentType = resp.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                data = await resp.json();
+            } else {
+                throw new Error("API returned non-JSON response");
+            }
+
+            if (Array.isArray(data)) {
+                try {
+                    localStorage.setItem(
+                        CACHE_KEY,
+                        JSON.stringify({ ts: Date.now(), data: data })
+                    );
+                } catch (e) { }
+
+                renderNav(data);
+            }
+        } catch (err) {
+            console.warn('Failed to fetch navbar categories:', err);
         }
+    }
 
-        function renderNav(categories) {
-            const navEl = document.getElementById('dynamic-navbar');
-            if (!navEl) return;
+    function renderNav(categories) {
+        const navEl = document.getElementById('dynamic-navbar');
+        if (!navEl) return;
 
-            const items = [];
-
-            items.push(
-                `<a href="index.html" class="nav-item">
+        const items = [];
+        items.push(
+            `<a href="index.html" class="nav-item">
                     <i class="fas fa-fire"></i> Trending
                  </a>`
-            );
+        );
 
-            categories.forEach(c => {
-                const slug = c.slug || (c.name || '').toLowerCase().replace(/\s+/g, '-');
-                const name = escapeHtml(c.name || 'Category');
-
-                let imgHtml = '';
-                if (c.icon_url) {
-                    imgHtml = `
+        categories.forEach(c => {
+            const slug = c.slug || (c.name || '').toLowerCase().replace(/\s+/g, '-');
+            const name = escapeHtml(c.name || 'Category');
+            let imgHtml = '';
+            if (c.icon_url) {
+                imgHtml = `
                         <img
                             src="${escapeHtml(c.icon_url)}"
                             alt="${name}"
@@ -222,30 +321,26 @@
                                    vertical-align:middle;"
                         >
                     `;
-                }
-
-                items.push(
-                    `<a href="search_results.html?slug=${encodeURIComponent(slug)}"
+            }
+            items.push(
+                `<a href="search_results.html?slug=${encodeURIComponent(slug)}"
                         class="nav-item" title="${name}">
                         ${imgHtml}${name}
                     </a>`
-                );
-            });
+            );
+        });
 
-            navEl.innerHTML = items.join('');
-            highlightActiveLink(navEl);
-        }
+        navEl.innerHTML = items.join('');
+        highlightActiveLink(navEl);
+    }
 
-        function escapeHtml(str) {
-            return String(str).replace(/[&<>"']/g, function (m) {
-                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
-            });
-        }
+    function escapeHtml(str) {
+        return String(str).replace(/[&<>"']/g, function (m) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+        });
+    }
 
-        fetchAndRenderNav();
-    });
-
-    window.logout = async function() {
+    window.logout = async function () {
         try {
             if (window.ApiService && typeof window.ApiService.post === 'function') {
                 try { await window.ApiService.post('/auth/logout/', {}); } catch (e) { }

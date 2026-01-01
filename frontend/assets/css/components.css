@@ -193,3 +193,46 @@
     border-top: 1px solid #eee;
     z-index: 10;
 }
+
+
+
+/* Address Switcher Modal Styles */
+.address-switcher-backdrop {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); z-index: 9998;
+}
+.address-switcher-modal {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 90%; max-width: 400px; background: #fff; border-radius: 12px;
+    z-index: 9999; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    overflow: hidden; display: flex; flex-direction: column;
+}
+.addr-header {
+    padding: 15px 20px; border-bottom: 1px solid #eee; display: flex;
+    justify-content: space-between; align-items: center; background: #f8f9fa;
+}
+.addr-header h3 { margin: 0; font-size: 1.1rem; font-weight: 600; color: #333; }
+.close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; }
+
+.addr-list { max-height: 300px; overflow-y: auto; padding: 10px; }
+.addr-item {
+    display: flex; align-items: center; padding: 12px; margin-bottom: 8px;
+    border: 1px solid #eee; border-radius: 8px; cursor: pointer;
+    transition: all 0.2s;
+}
+.addr-item:hover { border-color: var(--primary, #007bff); background: #f0f7ff; }
+.addr-item .icon { width: 30px; color: #555; font-size: 1.1rem; }
+.addr-item .details { flex: 1; overflow: hidden; }
+.addr-item .details .label { font-weight: 600; font-size: 0.9rem; color: #333; }
+.addr-item .details .text { font-size: 0.8rem; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.addr-item .action { color: var(--primary, #007bff); display: none; }
+.addr-item:hover .action { display: block; }
+
+.addr-footer { padding: 15px; border-top: 1px solid #eee; display: flex; gap: 10px; flex-direction: column; }
+.addr-footer button {
+    border: none; padding: 10px; border-radius: 6px; font-weight: 500; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem;
+}
+.btn-gps { background: #e9ecef; color: #333; }
+.btn-add { background: var(--primary, #007bff); color: #fff; }
+.empty-addr { text-align: center; padding: 20px; color: #888; font-size: 0.9rem; }

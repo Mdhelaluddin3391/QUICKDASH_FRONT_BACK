@@ -152,9 +152,9 @@
 
 
         <section class="ticket-history-section container mt-5" id="history-section" style="display:none;">
-    <h3 class="mb-3">My Support Tickets</h3>
-    <div id="ticket-list" class="d-grid gap-3"></div>
-</section>
+            <h3 class="mb-3">My Support Tickets</h3>
+            <div id="ticket-list" class="d-grid gap-3"></div>
+        </section>
 
         <div class="contact-section mb-5">
             <h3 class="text-center">Still need help?</h3>
@@ -179,76 +179,80 @@
 
     <div id="footer-placeholder"></div>
 
-    <script src="./assets/js/config.js" defer></script>
-    <script src="./assets/js/utils/asset-resolver.js" defer></script>
-    <script src="./assets/js/utils/formatters.js" defer></script>
-    <script src="./assets/js/utils/toast.js" defer></script>
-    <script src="./assets/js/services/api.service.js" defer></script>
-    <script src="./assets/js/layout/main-layout.js" defer></script>
+    <script src="./assets/js/config.js?v=1.0.0" defer></script>
 
-   <script defer>
-    document.addEventListener('DOMContentLoaded', async () => {
-        const orderSelect = document.getElementById('ticket-order');
-        loadTicketHistory(); // Load history
+<script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/formatters.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
 
-        if (!localStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN)) {
-            orderSelect.innerHTML = '<option value="">Login to see orders</option>';
-            return;
-        }
+<script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
 
-        try {
-            const res = await ApiService.get('/orders/my/');
-            const orders = res.results || res;
-            if (orders.length === 0) {
-                orderSelect.innerHTML = '<option value="">No orders found</option>';
-            } else {
-                orderSelect.innerHTML = '<option value="">Select an order</option>' + 
-                    orders.map(o => `<option value="${o.id}">Order #${o.id.substring(0,8).toUpperCase()} (${Formatters.date(o.created_at)})</option>`).join('');
+<script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+
+    <script defer>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const orderSelect = document.getElementById('ticket-order');
+            loadTicketHistory(); // Load history
+
+            if (!localStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN)) {
+                orderSelect.innerHTML = '<option value="">Login to see orders</option>';
+                return;
             }
-        } catch (e) { orderSelect.innerHTML = '<option value="">Error loading orders</option>'; }
-    });
 
-    document.getElementById('ticket-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = document.getElementById('submit-ticket-btn');
-        const originalText = btn.innerText;
-        
-        const payload = {
-            order_id: document.getElementById('ticket-order').value,
-            issue_type: document.getElementById('ticket-issue').value,
-            description: document.getElementById('ticket-desc').value
-        };
+            try {
+                const res = await ApiService.get('/orders/my/');
+                const orders = res.results || res;
+                if (orders.length === 0) {
+                    orderSelect.innerHTML = '<option value="">No orders found</option>';
+                } else {
+                    orderSelect.innerHTML = '<option value="">Select an order</option>' +
+                        orders.map(o => `<option value="${o.id}">Order #${o.id.substring(0, 8).toUpperCase()} (${Formatters.date(o.created_at)})</option>`).join('');
+                }
+            } catch (e) { orderSelect.innerHTML = '<option value="">Error loading orders</option>'; }
+        });
 
-        if(!payload.order_id) return Toast.warning("Please select an order");
+        document.getElementById('ticket-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submit-ticket-btn');
+            const originalText = btn.innerText;
 
-        btn.disabled = true;
-        btn.innerText = "Submitting...";
+            const payload = {
+                order_id: document.getElementById('ticket-order').value,
+                issue_type: document.getElementById('ticket-issue').value,
+                description: document.getElementById('ticket-desc').value
+            };
 
-        try {
-            await ApiService.post('/auth/customer/tickets/', payload);
-            Toast.success("Ticket raised successfully!");
-            e.target.reset();
-            loadTicketHistory(); // Refresh list
-        } catch (err) {
-            Toast.error(err.message || "Failed to submit ticket");
-        } finally {
-            btn.disabled = false;
-            btn.innerText = originalText;
-        }
-    });
+            if (!payload.order_id) return Toast.warning("Please select an order");
 
-    async function loadTicketHistory() {
-        if(!localStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN)) return;
-        const container = document.getElementById('ticket-list');
-        const section = document.getElementById('history-section');
+            btn.disabled = true;
+            btn.innerText = "Submitting...";
 
-        try {
-            const res = await ApiService.get('/auth/customer/tickets/history/');
-            const tickets = res.results || res;
+            try {
+                await ApiService.post('/auth/customer/tickets/', payload);
+                Toast.success("Ticket raised successfully!");
+                e.target.reset();
+                loadTicketHistory(); // Refresh list
+            } catch (err) {
+                Toast.error(err.message || "Failed to submit ticket");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
+        });
 
-            if (tickets.length > 0) {
-                section.style.display = 'block';
-                container.innerHTML = tickets.map(t => `
+        async function loadTicketHistory() {
+            if (!localStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN)) return;
+            const container = document.getElementById('ticket-list');
+            const section = document.getElementById('history-section');
+
+            try {
+                const res = await ApiService.get('/auth/customer/tickets/history/');
+                const tickets = res.results || res;
+
+                if (tickets.length > 0) {
+                    section.style.display = 'block';
+                    container.innerHTML = tickets.map(t => `
                     <div class="card p-3">
                         <div class="d-flex justify-between align-center mb-2">
                             <span class="badge ${t.status === 'resolved' ? 'status-delivered' : 'status-pending'}">${t.status.toUpperCase()}</span>
@@ -260,10 +264,10 @@
                         ${t.resolution ? `<div class="mt-2 p-2 bg-light small"><strong>Resolution:</strong> ${t.resolution}</div>` : ''}
                     </div>
                 `).join('');
-            }
-        } catch (e) { console.warn("Failed to load tickets", e); }
-    }
-</script>
+                }
+            } catch (e) { console.warn("Failed to load tickets", e); }
+        }
+    </script>
 </body>
 
 </html>

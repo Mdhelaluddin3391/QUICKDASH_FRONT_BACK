@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,7 +19,13 @@
             text-align: center;
             padding: 20px;
         }
-        .error-img { width: 200px; margin-bottom: 30px; opacity: 0.8; }
+
+        .error-img {
+            width: 200px;
+            margin-bottom: 30px;
+            opacity: 0.8;
+        }
+
         .location-box {
             background: #fff3cd;
             color: #856404;
@@ -31,20 +38,21 @@
         }
     </style>
 </head>
+
 <body>
     <div id="navbar-placeholder"></div>
 
     <main class="container">
         <div class="error-wrapper">
             <img src="https://cdn-icons-png.flaticon.com/512/10632/10632613.png" class="error-img" alt="No Service">
-            
+
             <div id="loc-display" class="location-box">
                 <i class="fas fa-map-marker-alt"></i> Checking location...
             </div>
 
             <h1 class="mb-3">We're not there yet! 😔</h1>
             <p class="text-muted mb-4" style="max-width: 500px;">
-                Sorry, we currently do not deliver to your selected location. 
+                Sorry, we currently do not deliver to your selected location.
                 We are expanding fast and hope to serve you soon.
             </p>
 
@@ -56,31 +64,37 @@
             </div>
         </div>
     </main>
-    
-    <script src="./assets/js/config.js" defer></script>
-    <script src="./assets/js/utils/asset-resolver.js" defer></script>
-    <script src="./assets/js/services/api.service.js" defer></script>
-    <script src="./assets/js/utils/toast.js" defer></script>
-    <script src="./assets/js/utils/location_picker.js" defer></script>
-    <script src="./assets/js/layout/main-layout.js" defer></script>
+
+<script src="./assets/js/config.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/utils/maps_loader.js?v=1.0.0" defer></script> 
+<script src="./assets/js/utils/location_picker.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
 
     <script defer>
         document.addEventListener('DOMContentLoaded', () => {
             const loc = localStorage.getItem('user_address_text');
             const display = document.getElementById('loc-display');
-            if(loc) display.innerHTML = `<i class="fas fa-map-marker-alt"></i> ${loc}`;
+            if (loc) display.innerHTML = `<i class="fas fa-map-marker-alt"></i> ${loc}`;
             else display.style.display = 'none';
         });
 
         function changeLocation() {
             // Open global picker
-            if(window.LocationPicker) {
+            if (window.LocationPicker) {
                 LocationPicker.open((data) => {
                     // Save new location
                     localStorage.setItem('user_lat', data.lat);
                     localStorage.setItem('user_lng', data.lng);
                     localStorage.setItem('user_address_text', data.address);
-                    
+
                     // Redirect to home to re-check serviceability
                     window.location.href = './index.html';
                 });
@@ -90,4 +104,5 @@
         }
     </script>
 </body>
+
 </html>

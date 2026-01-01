@@ -1,15 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">    <title>My Orders - QuickDash</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Orders - QuickDash</title>
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="./assets/css/base.css">
     <link rel="stylesheet" href="./assets/css/components.css">
     <link rel="stylesheet" href="./assets/css/layout.css">
     <link rel="stylesheet" href="./assets/css/pages/account.css">
 </head>
+
 <body>
     <div id="navbar-placeholder"></div>
 
@@ -37,12 +40,16 @@
 
     <div id="footer-placeholder"></div>
 
-    <script src="./assets/js/config.js" defer></script>
-    <script src="./assets/js/utils/asset-resolver.js" defer></script>
-    <script src="./assets/js/utils/formatters.js" defer></script>
-    <script src="./assets/js/services/api.service.js" defer></script>
-    <script src="./assets/js/layout/main-layout.js" defer></script>
-    
+<script src="./assets/js/config.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/formatters.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/toast.js?v=1.0.0" defer></script> <script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
             const container = document.getElementById('orders-list');
@@ -64,7 +71,7 @@
                     <div class="order-card">
                         <div>
                             <div class="d-flex align-center gap-2">
-                                <strong>Order #${o.id.slice(0,8).toUpperCase()}</strong>
+                                <strong>Order #${o.id.slice(0, 8).toUpperCase()}</strong>
                                 <span class="status-badge status-${o.status.toLowerCase()}">${o.status}</span>
                             </div>
                             <p class="text-muted small mt-1">
@@ -83,4 +90,5 @@
         });
     </script>
 </body>
+
 </html>
