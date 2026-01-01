@@ -1,0 +1,6 @@
+{
+  "keys": {
+    "google_maps": "REPLACE_WITH_YOUR_GOOGLE_MAPS_KEY"
+  },
+  "info": "Local fallback config for dev. Rename or edit to include real keys."
+}

@@ -1,0 +1,75 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: quickdash_db
+    env_file: .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: quickdash_redis
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    container_name: quickdash_backend
+    env_file: .env
+    environment:
+      - RUN_GUNICORN=1  # ✅ यह लाइन बहुत ज़रूरी है सर्वर स्टार्ट करने के लिए
+    ports:
+      - "5000:5000"   # Backend 5000 पर चलेगा
+    volumes:
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  celery_worker:
+    build: ./backend
+    container_name: quickdash_celery_worker
+    command: celery -A config.celery worker -l info
+    env_file: .env
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  celery_beat:
+    build: ./backend
+    container_name: quickdash_celery_beat
+    command: celery -A config.celery beat -l info
+    env_file: .env
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: quickdash_frontend
+    ports:
+      - "8000:80"   # Frontend 8000 पर चलेगा
+    environment:
+      - API_BASE_URL=http://localhost:5000/api/v1 # ✅ Frontend को बताएं कि Backend कहां है
+    volumes:
+      - static_volume:/usr/share/nginx/html/static
+      - media_volume:/usr/share/nginx/html/media
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
