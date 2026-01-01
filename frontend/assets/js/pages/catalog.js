@@ -9,12 +9,15 @@ let currentEndpointBase = '';
 document.addEventListener('DOMContentLoaded', async () => {
     // 1. Pehle Brands load karein
     await loadBrandFilters();
+    await loadSubCategories();
     
     // 2. Infinite Scroll setup karein
     setupInfiniteScroll();
     
     // 3. First Load trigger karein
     applyFilters(true);
+
+    
 });
 
 // --- 1. Infinite Scroll Setup ---
@@ -41,6 +44,57 @@ function setupInfiniteScroll() {
 
     observer.observe(sentinel);
 }
+
+
+
+async function loadSubCategories() {
+    const params = new URLSearchParams(window.location.search);
+    const currentSlug = params.get('slug');
+    const container = document.getElementById('sub-category-pills');
+
+    if (!currentSlug || !container) return;
+
+    try {
+        // 1. Fetch ALL Categories (Assuming we have an endpoint, or utilize list api)
+        // Hum '/catalog/categories/' use kar rahe hain jo saari active categories laata hai
+        const res = await ApiService.get('/catalog/categories/');
+        const allCats = res.results || res;
+
+        // 2. Find Current Category ID
+        const currentCat = allCats.find(c => c.slug === currentSlug);
+        
+        if (!currentCat) return;
+
+        // 3. Find Children (Categories jinka parent == currentCat.id)
+        // Note: Aapke backend model field 'parent' ya 'parent_id' ho sakta hai. 
+        // Agar response mein 'parent' object hai to 'c.parent.id' check karein, agar ID hai to direct.
+        const children = allCats.filter(c => {
+            if (typeof c.parent === 'object' && c.parent !== null) {
+                return c.parent.id === currentCat.id;
+            }
+            return c.parent === currentCat.id;
+        });
+
+        // 4. Render Pills
+        if (children.length > 0) {
+            container.classList.remove('d-none'); // Show container
+            container.style.display = 'flex'; // Force flex
+            
+            container.innerHTML = children.map(child => `
+                <a href="./search_results.html?slug=${child.slug}" 
+                   class="btn btn-sm btn-outline-secondary" 
+                   style="border-radius: 20px; font-size: 0.85rem; padding: 5px 15px;">
+                   ${child.name}
+                </a>
+            `).join('');
+        }
+
+    } catch (e) {
+        console.warn("Sub-categories load failed", e);
+    }
+}
+
+
 
 // --- 2. Build URL & Apply Filters (FIXED LOGIC) ---
 window.applyFilters = async (reset = true) => {

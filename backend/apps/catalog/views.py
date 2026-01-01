@@ -136,6 +136,16 @@ class SkuListAPIView(generics.ListAPIView):
             )
         )
 
+
+
+        category_slug = self.request.query_params.get('category__slug')
+        if category_slug:
+            # Hum check karenge ki product ki category YA product ki parent category match kare
+            qs = qs.filter(
+                Q(category__slug=category_slug) | 
+                Q(category__parent__slug=category_slug)
+            )
+
         # Brand Filter
         brands = self.request.query_params.get('brand')
         if brands:

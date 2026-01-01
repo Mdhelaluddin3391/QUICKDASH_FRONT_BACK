@@ -56,8 +56,12 @@
         </section>
 
         <section class="mb-5">
-            <div class="section-head">
-                <h3>Popular Brands</h3>
+            <div class="section-head"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                <h3 style="margin:0;">Popular Brands</h3>
+                <a href="brands.html" style="color: var(--primary); text-decoration: none; font-weight: 600;">
+                    See All <i class="fas fa-arrow-right"></i>
+                </a>
             </div>
             <div id="brand-scroller" class="d-flex gap-3"
                 style="overflow-x:auto; padding-bottom:10px; scrollbar-width:none;">
@@ -92,13 +96,13 @@
 
 
 
-    
+
 
 
 
     <script>
         // Initialize Popup after DOM is ready so deferred scripts (including service-check.js) have executed
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             if (window.ServiceCheck && typeof window.ServiceCheck.init === 'function') {
                 window.ServiceCheck.init();
             } else {

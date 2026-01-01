@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Brands - QuickDash</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./assets/css/base.css">
+    <link rel="stylesheet" href="./assets/css/layout.css">
+    <link rel="stylesheet" href="./assets/css/components.css">
+    <style>
+        .brands-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 20px;
+            padding: 20px 0;
+        }
+        .brand-card {
+            border: 1px solid #eee;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            transition: transform 0.2s;
+            cursor: pointer;
+        }
+        .brand-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--primary);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+        .brand-logo {
+            width: 80px; height: 80px;
+            object-fit: contain;
+            margin-bottom: 10px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <div id="navbar-placeholder"></div>
+
+    <main class="container">
+        <h1 class="text-center my-4">Our Brands</h1>
+        <div id="brands-container" class="brands-grid">
+            <div class="loader-spinner"></div>
+        </div>
+    </main>
+
+    <div id="footer-placeholder"></div>
+
+    <script src="./assets/js/config.js"></script>
+    <script src="./assets/js/services/api.service.js"></script>
+    <script src="./assets/js/layout/main-layout.js"></script>
+    <script>
+        // Inline script to fetch and render brands
+        document.addEventListener('DOMContentLoaded', async () => {
+            const container = document.getElementById('brands-container');
+            try {
+                // Fetch all brands
+                const res = await ApiService.get('/catalog/brands/');
+                const brands = res.results || res;
+
+                if(brands.length === 0) {
+                    container.innerHTML = '<p class="text-center w-100">No brands found.</p>';
+                    return;
+                }
+
+                container.innerHTML = brands.map(b => `
+                    <div class="brand-card" onclick="window.location.href='./search_results.html?brand=${b.id}'">
+                        <img src="${b.logo_url || 'https://via.placeholder.com/80'}" class="brand-logo" alt="${b.name}">
+                        <div style="font-weight:600; font-size:0.9rem;">${b.name}</div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                container.innerHTML = '<p class="text-danger text-center w-100">Failed to load brands.</p>';
+            }
+        });
+    </script>
+</body>
+</html>
