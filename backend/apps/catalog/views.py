@@ -10,7 +10,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.db import connection
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
-
+from django.db.models import Case, When, F # Ensure these imports exist if needed, usually Q and OuterRef are enough based on your existing code.
 from .models import Category, Product, Banner, Brand, FlashSale
 from .serializers import (
     CategorySerializer, ProductSerializer, BannerSerializer, 
@@ -66,44 +66,6 @@ class HomeCategoryAPIView(APIView):
     
 
 
-class CatalogListAPIView(APIView):
-    """
-    High-Traffic Endpoint: Returns Category Tree.
-    Implements Read-Aside Cache with Non-Blocking Fallback.
-    """
-    permission_classes = [AllowAny]
-    authentication_classes = []  # <--- FIX: Ignore Bad Tokens
-
-    def get(self, request):
-        city = request.query_params.get('city', 'default')
-        
-        # 1. Versioning Strategy
-        version = cache.get("catalog_version", 1)
-        cache_key = f"catalog_public:{city}:v{version}"
-        lock_key = f"{cache_key}:lock"
-
-        # 2. Try Cache (Fast Path)
-        data = cache.get(cache_key)
-        if data:
-            return Response(data)
-
-        # 3. Cache Miss - Lock Strategy
-        if cache.add(lock_key, "1", timeout=10):
-            try:
-                queryset = Category.objects.filter(is_active=True).prefetch_related('products')
-                serializer = CategorySerializer(queryset, many=True, context={'request': request})
-                data = serializer.data
-                
-                cache.set(cache_key, data, timeout=86400)
-                return Response(data)
-            finally:
-                cache.delete(lock_key)
-        else:
-            # Fallback to DB if locked
-            queryset = Category.objects.filter(is_active=True).prefetch_related('products')
-            return Response(CategorySerializer(queryset, many=True, context={'request': request}).data)
-
-
 class SkuListAPIView(generics.ListAPIView):
     permission_classes = [AllowAny]
     authentication_classes = [] 
@@ -115,54 +77,112 @@ class SkuListAPIView(generics.ListAPIView):
     ordering_fields = ['effective_price', 'created_at']
 
     def get_queryset(self):
+        # 1. Base Query - Lightweight
         qs = Product.objects.filter(is_active=True).select_related('category')
         
-        # Warehouse Pricing Logic
-        warehouse_id = self.request.query_params.get('warehouse_id')
-        if warehouse_id:
-            price_subquery = InventoryItem.objects.filter(
-                sku=OuterRef('sku'),
-                bin__rack__aisle__zone__warehouse_id=warehouse_id
-            ).values('price')[:1]
-        else:
-            price_subquery = InventoryItem.objects.filter(
-                sku=OuterRef('sku')
-            ).values('price')[:1]
-
-        qs = qs.annotate(
-            effective_price=Subquery(
-                price_subquery, 
-                output_field=DecimalField(max_digits=10, decimal_places=2)
-            )
-        )
-
-
-
+        # 2. Basic Filters (Category & Brand)
+        # Filters pehle lagayein taaki database ko kam data scan karna pade
         category_slug = self.request.query_params.get('category__slug')
         if category_slug:
-            # Hum check karenge ki product ki category YA product ki parent category match kare
             qs = qs.filter(
                 Q(category__slug=category_slug) | 
                 Q(category__parent__slug=category_slug)
             )
 
-        # Brand Filter
         brands = self.request.query_params.get('brand')
         if brands:
             brand_ids = [b for b in brands.split(',') if b.strip().isdigit()]
             if brand_ids:
                 qs = qs.filter(brand_id__in=brand_ids)
 
-        # Sorting
+        # 3. PERFORMANCE OPTIMIZATION LOGIC
+        # Hum heavy Price Calculation sirf tab karenge jab user PRICE se sort kar raha ho.
         ordering = self.request.query_params.get('ordering')
-        if ordering == 'price_asc':
-            qs = qs.order_by('effective_price')
-        elif ordering == 'price_desc':
-            qs = qs.order_by('-effective_price')
+        warehouse_id = self.request.query_params.get('warehouse_id')
+
+        if ordering in ['price_asc', 'price_desc', 'effective_price', '-effective_price']:
+            # Heavy Path: Sorting ke liye DB level par price calculate karna zaroori hai
+            if warehouse_id:
+                price_subquery = InventoryItem.objects.filter(
+                    sku=OuterRef('sku'),
+                    bin__rack__aisle__zone__warehouse_id=warehouse_id
+                ).values('price')[:1]
+            else:
+                price_subquery = InventoryItem.objects.filter(
+                    sku=OuterRef('sku')
+                ).values('price')[:1]
+
+            qs = qs.annotate(
+                effective_price=Subquery(
+                    price_subquery, 
+                    output_field=DecimalField(max_digits=10, decimal_places=2)
+                )
+            )
+            
+            if ordering in ['price_asc', 'effective_price']:
+                qs = qs.order_by('effective_price')
+            else:
+                qs = qs.order_by('-effective_price')
+                
         elif ordering == 'newest':
+            qs = qs.order_by('-created_at')
+        else:
+            # Default sorting (Fastest path)
             qs = qs.order_by('-created_at')
             
         return qs
+
+    def list(self, request, *args, **kwargs):
+        """
+        Overridden List Method:
+        Agar database level par price calculate nahi kiya gaya (kyunki fast path liya),
+        toh hum pagination hone ke BAAD sirf visible 20 items ka price inject karenge.
+        """
+        response = super().list(request, *args, **kwargs)
+        
+        ordering = request.query_params.get('ordering')
+        
+        # Agar price sorting use nahi hui, toh manual injection karein
+        if ordering not in ['price_asc', 'price_desc', 'effective_price', '-effective_price']:
+            self._inject_warehouse_prices(response.data, request)
+            
+        return response
+
+    def _inject_warehouse_prices(self, data, request):
+        """
+        Helper function to fetch prices for just the paginated results efficiently.
+        """
+        warehouse_id = request.query_params.get('warehouse_id')
+        
+        # Pagination structure check (DRF usually returns dict with 'results')
+        results = data.get('results') if isinstance(data, dict) else data
+        
+        if not results or not warehouse_id:
+            return
+
+        # 1. Get SKUs from the current page only (Max 20 SKUs)
+        skus = [item.get('sku') for item in results]
+
+        if not skus:
+            return
+
+        # 2. Fetch prices for these specific SKUs in one fast query
+        inventory_prices = InventoryItem.objects.filter(
+            sku__in=skus,
+            bin__rack__aisle__zone__warehouse_id=warehouse_id
+        ).values('sku', 'price')
+        
+        # Create a dictionary for O(1) lookup: {'SKU123': 100.00, ...}
+        price_map = {item['sku']: item['price'] for item in inventory_prices}
+
+        # 3. Update the response data directly
+        for item in results:
+            sku = item.get('sku')
+            if sku in price_map:
+                real_price = price_map[sku]
+                item['effective_price'] = real_price
+                # Agar frontend 'sale_price' use kar raha hai toh usse bhi update karein
+                item['sale_price'] = real_price
 
 class SkuDetailAPIView(generics.RetrieveAPIView):
     permission_classes = [AllowAny]
