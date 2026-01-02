@@ -1,7 +1,5 @@
-/* assets/js/utils/location_picker.js */
+/* frontend/assets/js/utils/location_picker.js */
 
-// [FIX] Assign directly to window to avoid 'const' re-declaration errors
-// and ensure main-layout.js can detect it.
 window.LocationPicker = {
     mode: 'SERVICE', 
     map: null,
@@ -13,20 +11,33 @@ window.LocationPicker = {
 
     /**
      * Entry point to open the map modal.
+     * Use: open('SERVICE') OR open(callbackFunction)
      */
-    async open(mode = 'SERVICE', cb = null) {
-        this.mode = mode;
-        this.callback = cb;
+    async open(arg1 = 'SERVICE', arg2 = null) {
+        // [FIX 2] Argument Handling: Agar function pass kiya hai toh usse callback set karo
+        if (typeof arg1 === 'function') {
+            this.mode = 'PICKER';
+            this.callback = arg1;
+        } else {
+            this.mode = arg1;
+            this.callback = arg2;
+        }
         
         // 1. Inject UI
         this.injectModal();
         const modal = document.getElementById('loc-picker-modal');
         if(modal) modal.classList.add('active');
 
+        // [FIX 1] Hide "Manage Addresses" for Guest Users
+        const manageBtn = document.getElementById('lp-manage-addrs');
+        if (manageBtn) {
+            const token = localStorage.getItem(window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token');
+            // Agar token nahi hai toh button chhupa do
+            manageBtn.style.display = token ? 'block' : 'none';
+        }
+
         // 2. Determine Initial Center
         let storedCoords = null;
-        
-        // Priority: Context > Legacy > Default
         try {
             const serviceCtx = JSON.parse(localStorage.getItem(APP_CONFIG.STORAGE_KEYS.SERVICE_CONTEXT) || 'null');
             if (serviceCtx && serviceCtx.lat) {
@@ -36,35 +47,27 @@ window.LocationPicker = {
 
         if(storedCoords) this.tempCoords = storedCoords;
 
-        // 3. Load Map Engine (Google Maps) — deferred to avoid blocking click handlers
+        // 3. Load Map Engine (Google Maps)
         try {
             if (window.MapsLoader) {
-                // Defer heavy network/map init to next tick so click handler returns quickly.
                 setTimeout(async () => {
                     try {
                         await window.MapsLoader.load();
                         this.initMap();
                     } catch (innerErr) {
-                        console.error("Maps load failed (deferred):", innerErr);
-                        try { alert("Unable to load Google Maps. Please check your connection."); } catch(e) {}
+                        console.error("Maps load failed:", innerErr);
                         this.close();
                     }
                 }, 0);
-            } else {
-                console.error("MapsLoader missing");
             }
-        } catch (e) {
-            console.error("Failed to schedule maps load", e);
-            // fallback - close modal to avoid leaving it open in an inconsistent state
-            this.close();
-        }
+        } catch (e) { this.close(); }
     },
 
     close() {
         const modal = document.getElementById('loc-picker-modal');
         if (modal) modal.classList.remove('active');
-        // Reset state
         this.tempAddressData = null;
+        this.callback = null; // Callback reset karna zaroori hai
     },
 
     injectModal() {
@@ -139,7 +142,6 @@ window.LocationPicker = {
             });
         }
 
-        // Manage addresses button (SERVICE mode)
         const manageBtn = document.getElementById('lp-manage-addrs');
         if (manageBtn) {
             manageBtn.addEventListener('click', () => {
@@ -153,7 +155,6 @@ window.LocationPicker = {
             const mapEl = document.getElementById('lp-map');
             if(!mapEl) return;
             
-            // Google Maps Initialization
             this.map = new google.maps.Map(mapEl, {
                 center: this.tempCoords,
                 zoom: 17,
@@ -211,8 +212,30 @@ window.LocationPicker = {
     confirmPin() {
         const res = this.tempAddressData || {};
         
+        // [FIX 2] Callback Support: Agar addresses.html ne function pass kiya hai, toh usse data bhejo
+        if (this.callback) {
+            let city = '';
+            let pincode = '';
+            if (res.address_components) {
+                res.address_components.forEach(c => {
+                    if (c.types.includes('locality')) city = c.long_name;
+                    if (c.types.includes('postal_code')) pincode = c.long_name;
+                });
+            }
+
+            this.callback({
+                lat: this.tempCoords.lat,
+                lng: this.tempCoords.lng,
+                address: res.formatted_address || '',
+                city: city || '',
+                pincode: pincode || ''
+            });
+            this.close();
+            return;
+        }
+
+        // Standard Service Mode (Browsing)
         if (this.mode === 'SERVICE') {
-            // --- MODE: SERVICE (BROWSING) ---
             let city = 'Unknown';
             let area = 'Pinned Location';
 
@@ -225,7 +248,6 @@ window.LocationPicker = {
                 });
             }
 
-            // USE THE MANAGER (Single Source of Truth)
             if (window.LocationManager) {
                 window.LocationManager.setServiceLocation({
                     lat: this.tempCoords.lat,
@@ -235,11 +257,10 @@ window.LocationPicker = {
                     formatted_address: res.formatted_address
                 });
             }
-
             this.close();
             
         } else {
-            // --- MODE: ADDRESS (SAVING) ---
+            // Standard Address Saving Mode (internal)
             this.close();
             const addrModal = document.getElementById('address-details-modal');
             if (addrModal) {
@@ -262,7 +283,7 @@ window.LocationPicker = {
         const payload = {
             latitude: document.getElementById('d-lat').value,
             longitude: document.getElementById('d-lng').value,
-            google_address_text: this.tempAddressData ? this.tempAddressData.formatted_address : document.getElementById('d-area').value,
+            google_address_text: document.getElementById('d-area').value,
             house_no: document.getElementById('d-house').value,
             apartment_name: document.getElementById('d-area').value,
             landmark: document.getElementById('d-landmark').value,
@@ -274,15 +295,12 @@ window.LocationPicker = {
             Toast.success("Address Saved Successfully");
             document.getElementById('address-details-modal').classList.add('d-none');
             
-            // Refresh address list if callback exists
-            if (this.callback) this.callback();
+            if (this.callback) this.callback(); // Refresh logic if passed
             
         } catch (e) {
             console.error(e);
             let msg = "Failed to save address";
-            if (e.responseJSON) {
-               msg = JSON.stringify(e.responseJSON);
-            }
+            if (e.responseJSON) msg = JSON.stringify(e.responseJSON);
             Toast.error(msg);
         }
     }
