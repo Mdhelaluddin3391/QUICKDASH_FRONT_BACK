@@ -236,3 +236,140 @@
 .btn-gps { background: #e9ecef; color: #333; }
 .btn-add { background: var(--primary, #007bff); color: #fff; }
 .empty-addr { text-align: center; padding: 20px; color: #888; font-size: 0.9rem; }
+
+
+
+
+/* ============================
+   Toast Notifications Styling
+   ============================ */
+
+/* Container for all toasts - Top Right Positioning */
+#toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000; /* Modal se upar dikhna chahiye */
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    pointer-events: none; /* Container click block na kare */
+}
+
+/* Individual Toast Card */
+.toast {
+    background: #fff;
+    min-width: 300px;
+    max-width: 400px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    pointer-events: auto; /* Toast clickable ho */
+    overflow: hidden;
+    position: relative;
+    
+    /* Initial State for Animation */
+    transform: translateX(120%);
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); /* Bouncy slide effect */
+    border-left: 5px solid #ccc;
+}
+
+/* Active State (Shown via JS) */
+.toast.show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+/* Inner Content Layout */
+.toast-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Icons Styling */
+.toast-icon {
+    font-size: 1.4rem;
+    display: flex;
+    align-items: center;
+}
+
+/* Message Styling */
+.toast-msg {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #333;
+    line-height: 1.4;
+}
+
+/* Close Button */
+.toast-close {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: #aaa;
+    cursor: pointer;
+    margin-left: 10px;
+    margin-top: -5px;
+    transition: color 0.2s;
+}
+
+.toast-close:hover {
+    color: #333;
+}
+
+/* ============================
+   Toast Types (Colors)
+   ============================ */
+
+/* Success - Green */
+.toast-success {
+    border-left-color: #22c55e;
+}
+.toast-success .toast-icon {
+    color: #22c55e;
+}
+
+/* Error - Red */
+.toast-error {
+    border-left-color: #ef4444;
+}
+.toast-error .toast-icon {
+    color: #ef4444;
+}
+
+/* Warning - Orange */
+.toast-warning {
+    border-left-color: #f59e0b;
+}
+.toast-warning .toast-icon {
+    color: #f59e0b;
+}
+
+/* Info - Blue */
+.toast-info {
+    border-left-color: #3b82f6;
+}
+.toast-info .toast-icon {
+    color: #3b82f6;
+}
+
+/* Mobile Responsive */
+@media (max-width: 480px) {
+    #toast-container {
+        right: 10px;
+        left: 10px; /* Full width on mobile */
+        top: 10px;
+        align-items: center;
+    }
+    
+    .toast {
+        width: 100%;
+        min-width: auto;
+    }
+}

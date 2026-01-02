@@ -28,12 +28,11 @@ window.LocationPicker = {
         const modal = document.getElementById('loc-picker-modal');
         if(modal) modal.classList.add('active');
 
-        // [FIX 1] Hide "Manage Addresses" for Guest Users
+        // [UPDATED LOGIC] Manage Addresses button ab sabko dikhega (Guest ko bhi)
+        // Lekin click karne par login maangega (niche injectModal mein logic hai)
         const manageBtn = document.getElementById('lp-manage-addrs');
         if (manageBtn) {
-            const token = localStorage.getItem(window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token');
-            // Agar token nahi hai toh button chhupa do
-            manageBtn.style.display = token ? 'block' : 'none';
+            manageBtn.style.display = 'block';
         }
 
         // 2. Determine Initial Center
@@ -142,11 +141,29 @@ window.LocationPicker = {
             });
         }
 
+        // [UPDATED] Manage Address Click Handler
         const manageBtn = document.getElementById('lp-manage-addrs');
         if (manageBtn) {
-            manageBtn.addEventListener('click', () => {
-                window.location.href = 'addresses.html';
-            });
+            manageBtn.onclick = () => {
+                // Check if User is Logged In
+                const token = localStorage.getItem(window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token');
+                
+                if (token) {
+                    // Logged In: Go to Addresses Page
+                    window.location.href = 'addresses.html';
+                } else {
+                    // Guest: Show warning and redirect to Login
+                    if (window.Toast) {
+                        Toast.info("Please login to manage addresses");
+                    } else {
+                        alert("Please login first");
+                    }
+                    
+                    setTimeout(() => {
+                        window.location.href = window.APP_CONFIG?.ROUTES?.LOGIN || 'auth.html';
+                    }, 500);
+                }
+            };
         }
     },
 
