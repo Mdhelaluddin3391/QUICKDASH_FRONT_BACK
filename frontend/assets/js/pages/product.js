@@ -50,7 +50,12 @@ async function loadProduct(skuCode) {
         content.classList.remove('d-none');
 
     } catch (e) {
-        loader.innerHTML = '<p class="text-center text-danger">Product not found</p>';
+        loader.className = 'w-100 py-5'; 
+        loader.innerHTML = `
+            <div class="text-center">
+                <p class="text-danger mb-3">Product details could not be loaded.</p>
+                <button onclick="location.reload()" class="btn btn-sm btn-outline-primary">Retry</button>
+            </div>`;
         console.error(e);
     }
 }
