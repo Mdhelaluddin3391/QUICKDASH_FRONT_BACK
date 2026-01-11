@@ -4,13 +4,150 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Saved Addresses - QuickDash</title>
+    <title>Manage Addresses - QuickDash</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="./assets/css/base.css?v=1.0.0">
     <link rel="stylesheet" href="./assets/css/components.css?v=1.0.0">
     <link rel="stylesheet" href="./assets/css/layout.css?v=1.0.0">
     <link rel="stylesheet" href="./assets/css/pages/account.css?v=1.0.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <style>
+        /* --- Enhanced Modal Styles (Center Popup) --- */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-box {
+            background: #fff;
+            width: 90%;
+            max-width: 550px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border-radius: 16px;
+            padding: 0;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            transform: translateY(20px);
+            transition: transform 0.3s ease;
+            position: relative;
+        }
+
+        .modal-overlay.active .modal-box {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            font-size: 1.25rem;
+            color: var(--text-main);
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+            background: #f9fafb;
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+            position: sticky;
+            bottom: 0;
+        }
+
+        /* Form Grid Layout */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        @media (max-width: 600px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .close-icon {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: #999;
+            padding: 5px;
+        }
+
+        .close-icon:hover {
+            color: var(--danger);
+        }
+
+        .map-preview-text {
+            background: #f0fdf4;
+            border: 1px solid #dcfce7;
+            color: #166534;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: start;
+            gap: 10px;
+        }
+        
+        .address-type-selector input[type="radio"] {
+            display: none;
+        }
+        .address-type-selector label {
+            border: 1px solid #ddd;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #666;
+            transition: 0.2s;
+            display: inline-block;
+        }
+        .address-type-selector input[type="radio"]:checked + label {
+            background: var(--primary-light);
+            border-color: var(--primary);
+            color: var(--primary-dark);
+            font-weight: 600;
+        }
+    </style>
 </head>
 
 <body>
@@ -34,7 +171,7 @@
                 <div class="d-flex justify-between align-center mb-4">
                     <h2>Saved Addresses</h2>
                     <button class="btn btn-primary btn-sm" onclick="openAddressModal()">
-                        <i class="fas fa-plus"></i> Add New
+                        <i class="fas fa-plus"></i> Add New Address
                     </button>
                 </div>
 
@@ -46,37 +183,99 @@
         </div>
     </main>
 
-    <div id="address-modal" class="modal-overlay d-none">
+    <div id="address-modal" class="modal-overlay">
         <div class="modal-box">
-            <h3>Add Address</h3>
+            <div class="modal-header">
+                <h3>Add New Address</h3>
+                <button type="button" class="close-icon" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
             <form id="address-form">
-                <input type="hidden" id="a-lat">
-                <input type="hidden" id="a-lng">
+                <div class="modal-body">
+                    <input type="hidden" id="a-lat">
+                    <input type="hidden" id="a-lng">
+                    <input type="hidden" id="a-google-text">
 
-                <div class="form-group">
-                    <label>Full Address</label>
-                    <input type="text" id="a-text" class="form-control" required>
-                </div>
-                <div class="form-group">
-                    <label>City</label>
-                    <input type="text" id="a-city" class="form-control" required>
-                </div>
-                <div class="form-group">
-                    <label>Pincode</label>
-                    <input type="text" id="a-pin" class="form-control" required>
-                </div>
-                <div class="d-flex justify-between mt-3">
-                    <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Address Type</label>
-                    <div class="d-flex gap-3">
-                        <label><input type="radio" name="atype" value="HOME" checked> Home</label>
-                        <label><input type="radio" name="atype" value="WORK"> Work</label>
-                        <label><input type="radio" name="atype" value="OTHER"> Other</label>
+                    <div class="map-preview-text">
+                        <i class="fas fa-map-marker-alt mt-1"></i>
+                        <div>
+                            <strong style="display:block; margin-bottom:2px;">Selected Location (from Map):</strong>
+                            <span id="display-map-address">...</span>
+                        </div>
                     </div>
+
+                    <h5 class="mb-3 text-muted" style="font-size:0.9rem; text-transform:uppercase; letter-spacing:0.5px;">Contact Details</h5>
+                    <div class="form-grid">
+                        <div class="form-group mb-0">
+                            <label class="form-label small">Receiver Name</label>
+                            <input type="text" id="a-name" class="form-control" placeholder="e.g. Rahul Sharma" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label small">Receiver Phone</label>
+                            <input type="tel" id="a-phone" class="form-control" placeholder="10-digit Mobile" maxlength="10" required>
+                        </div>
+                    </div>
+
+                    <hr style="margin: 20px 0; border:0; border-top:1px dashed #eee;">
+
+                    <h5 class="mb-3 text-muted" style="font-size:0.9rem; text-transform:uppercase; letter-spacing:0.5px;">Address Details</h5>
+                    
+                    <div class="form-grid mb-3">
+                        <div class="form-group mb-0">
+                            <label class="form-label small">House / Flat No *</label>
+                            <input type="text" id="a-house" class="form-control" placeholder="e.g. Flat 401" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label small">Floor No (Optional)</label>
+                            <input type="text" id="a-floor" class="form-control" placeholder="e.g. 4th Floor">
+                        </div>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="form-label small">Apartment / Building Name *</label>
+                        <input type="text" id="a-building" class="form-control" placeholder="e.g. Galaxy Apartments" required>
+                    </div>
+
+                    <div class="form-group mb-3">
+                        <label class="form-label small">Nearby Landmark (Optional)</label>
+                        <input type="text" id="a-landmark" class="form-control" placeholder="e.g. Near Metro Station">
+                    </div>
+
+                    <div class="form-grid mb-3">
+                        <div class="form-group mb-0">
+                            <label class="form-label small">City *</label>
+                            <input type="text" id="a-city" class="form-control" required readonly style="background:#f9f9f9;">
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="form-label small">Pincode *</label>
+                            <input type="text" id="a-pin" class="form-control" required readonly style="background:#f9f9f9;">
+                        </div>
+                    </div>
+
+                    <div class="form-group mb-0">
+                        <label class="form-label small mb-2">Save As</label>
+                        <div class="address-type-selector d-flex gap-2">
+                            <div>
+                                <input type="radio" id="type-home" name="atype" value="HOME" checked>
+                                <label for="type-home"><i class="fas fa-home"></i> Home</label>
+                            </div>
+                            <div>
+                                <input type="radio" id="type-work" name="atype" value="WORK">
+                                <label for="type-work"><i class="fas fa-briefcase"></i> Work</label>
+                            </div>
+                            <div>
+                                <input type="radio" id="type-other" name="atype" value="OTHER">
+                                <label for="type-other"><i class="fas fa-map-pin"></i> Other</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="min-width: 150px;">Save Address</button>
                 </div>
             </form>
         </div>
@@ -84,102 +283,189 @@
 
     <div id="footer-placeholder"></div>
 
-    <script src="./assets/js/config.js?v=1.0.0" defer></script>
-
+    <script src="./assets/js/config.js?v=1.0.1" defer></script>
     <script src="./assets/js/utils/maps_loader.js?v=1.0.0" defer></script>
     <script src="./assets/js/utils/location_picker.js?v=1.0.1" defer></script>
-
     <script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
     <script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
-
     <script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
-
     <script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
 
-
-
-
-
     <script defer>
-        loadAddresses();
+        let isEditMode = false;
+        let editAddressId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAddresses();
+        });
 
         async function loadAddresses() {
             const grid = document.getElementById('addr-grid');
+            if(!localStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN)){
+                window.location.href = 'auth.html';
+                return;
+            }
+
             try {
                 const res = await ApiService.get('/auth/customer/addresses/');
                 const list = res.results || res;
 
                 if (list.length === 0) {
-                    grid.innerHTML = '<p class="text-muted">No addresses saved.</p>';
+                    grid.innerHTML = `
+                        <div class="text-center w-100 py-5" style="grid-column: 1/-1;">
+                            <img src="https://cdn-icons-png.flaticon.com/512/3710/3710297.png" width="80" style="opacity:0.5; margin-bottom:15px;">
+                            <p class="text-muted">No saved addresses found.</p>
+                        </div>`;
                     return;
                 }
 
                 grid.innerHTML = list.map(a => `
-    <div class="card" style="padding:20px;">
-        <div class="d-flex justify-between mb-2">
-            <span class="badge" ...>${a.label}</span>  <button ...><i class="fas fa-trash"></i></button>
-        </div>
-        <p class="mb-0 text-muted">${a.address_line}</p> <p class="text-muted small">${a.city} - ${a.pincode}</p>
-    </div>
-`).join('');
-            } catch (e) { grid.innerHTML = 'Error loading addresses'; }
+                    <div class="card p-3 h-100 d-flex flex-column" style="border:1px solid ${a.is_default ? 'var(--primary)' : '#eee'};">
+                        <div class="d-flex justify-between align-start mb-2">
+                            <div>
+                                <span class="badge ${a.label === 'HOME' ? 'bg-green' : 'bg-blue'}" 
+                                      style="background:${a.label==='HOME'?'#dcfce7':'#dbeafe'}; color:${a.label==='HOME'?'#16a34a':'#2563eb'};">
+                                    ${a.label}
+                                </span>
+                                ${a.is_default ? '<span class="text-primary small ml-2"><i class="fas fa-check-circle"></i> Default</span>' : ''}
+                            </div>
+                            <button onclick="deleteAddress(${a.id})" class="text-danger border-0 bg-transparent" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                        
+                        <h5 class="mb-1">${a.receiver_name || 'User'}</h5>
+                        <p class="text-muted small mb-1">${a.receiver_phone || ''}</p>
+                        
+                        <div class="mt-2 pt-2 border-top flex-grow-1">
+                            <p class="mb-0 text-dark small" style="line-height:1.5;">
+                                ${a.house_no}, ${a.apartment_name}<br>
+                                ${a.landmark ? `Near ${a.landmark}, ` : ''}${a.city} - ${a.pincode}
+                            </p>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error(e);
+                grid.innerHTML = '<p class="text-danger">Failed to load addresses</p>';
+            }
         }
 
+        // 1. Open Map First
         window.openAddressModal = () => {
-            // 1. Open Map First to get accurate pin
             if (window.LocationPicker) {
+                // Open Map in 'PICKER' mode to get Lat/Lng
                 LocationPicker.open((data) => {
-                    // 2. Map Close hone ke baad, Modal open karo with Pre-filled Data
-                    const modal = document.getElementById('address-modal');
-                    modal.classList.remove('d-none');
-
-                    document.getElementById('a-lat').value = data.lat;
-                    document.getElementById('a-lng').value = data.lng;
-                    document.getElementById('a-text').value = data.address;
-                    document.getElementById('a-city').value = data.city;
-                    document.getElementById('a-pin').value = data.pincode;
+                    // Map close hone ke baad ye function chalega
+                    showFormModal(data);
                 });
             } else {
-                alert("Location Picker loading...");
+                Toast.error("Map Service not loaded");
             }
         };
 
+        // 2. Show the Form with Map Data
+        function showFormModal(mapData) {
+            const modal = document.getElementById('address-modal');
+            const form = document.getElementById('address-form');
+            
+            // Reset form
+            form.reset();
+            
+            // Pre-fill Data from Map
+            document.getElementById('a-lat').value = mapData.lat;
+            document.getElementById('a-lng').value = mapData.lng;
+            document.getElementById('a-google-text').value = mapData.address; // Full formatted address from Google
+            document.getElementById('a-city').value = mapData.city;
+            document.getElementById('a-pin').value = mapData.pincode;
+            
+            // Display Map Address for verification
+            document.getElementById('display-map-address').innerText = mapData.address || "Pinned Location";
+
+            // Pre-fill user phone if available
+            try {
+                const user = JSON.parse(localStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER) || '{}');
+                if(user.phone) document.getElementById('a-phone').value = user.phone.replace('+91', '');
+                if(user.first_name) document.getElementById('a-name').value = user.first_name + ' ' + (user.last_name || '');
+            } catch(e){}
+
+            // Show Modal
+            modal.classList.add('active');
+        }
+
         window.closeModal = () => {
-            document.getElementById('address-modal').classList.add('d-none');
+            document.getElementById('address-modal').classList.remove('active');
         }
 
         document.getElementById('address-form').addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            // Strict Validation
+            // Validation
             const lat = document.getElementById('a-lat').value;
-            if (!lat) { Toast.error("Invalid Location Data"); return; }
+            const house = document.getElementById('a-house').value;
+            const building = document.getElementById('a-building').value;
+            
+            if (!lat) { Toast.error("Location invalid. Please pick from map again."); return; }
+            if (!house || !building) { Toast.error("House No & Building Name are required."); return; }
 
             const payload = {
-                address_line: document.getElementById('a-text').value,
-                label: document.querySelector('input[name="atype"]:checked').value,
+                // Geo Data
+                latitude: lat,
+                longitude: document.getElementById('a-lng').value,
+                
+                // Address Details (L2)
+                house_no: house,
+                floor_no: document.getElementById('a-floor').value,
+                apartment_name: building,
+                landmark: document.getElementById('a-landmark').value,
+                
+                // Auto-filled from Map
                 city: document.getElementById('a-city').value,
                 pincode: document.getElementById('a-pin').value,
-                latitude: lat,
-                longitude: document.getElementById('a-lng').value
+                google_address_text: document.getElementById('a-google-text').value, // L1 Reference
+                
+                // Contact
+                receiver_name: document.getElementById('a-name').value,
+                receiver_phone: document.getElementById('a-phone').value,
+                
+                // Label
+                label: document.querySelector('input[name="atype"]:checked').value
             };
+
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalText = btn.innerText;
+            btn.disabled = true;
+            btn.innerText = "Saving...";
+
             try {
                 await ApiService.post('/auth/customer/addresses/', payload);
-                Toast.success("Address Added");
+                Toast.success("Address Added Successfully");
                 closeModal();
                 loadAddresses();
-            } catch (e) { Toast.error("Failed to add"); }
+                
+                // Update Local Context if needed
+                if(window.LocationManager) {
+                    // Optionally refresh context
+                }
+            } catch (err) {
+                console.error(err);
+                let msg = err.message || "Failed to save address";
+                if(err.responseJSON && err.responseJSON.label) msg = err.responseJSON.label[0];
+                Toast.error(msg);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
         });
 
         window.deleteAddress = async (id) => {
-            if (!confirm("Delete this address?")) return;
+            if (!confirm("Are you sure you want to delete this address?")) return;
             try {
                 await ApiService.delete(`/auth/customer/addresses/${id}/`);
                 loadAddresses();
-                Toast.success("Deleted");
+                Toast.success("Address Deleted");
             } catch (e) { Toast.error("Failed to delete"); }
         }
     </script>
 </body>
-
 </html>

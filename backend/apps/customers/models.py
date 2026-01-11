@@ -33,16 +33,21 @@ class CustomerAddress(models.Model):
     latitude = models.DecimalField(max_digits=9, decimal_places=6)
     longitude = models.DecimalField(max_digits=9, decimal_places=6)
     
-    # 2. Structured Address (Rider Navigation)
+    # 2. Structured Address (For Rider Navigation)
     house_no = models.CharField(max_length=50, help_text="Flat/House No")
     floor_no = models.CharField(max_length=50, blank=True, help_text="Floor (Optional)")
     apartment_name = models.CharField(max_length=100, blank=True, help_text="Building/Apartment Name")
     landmark = models.CharField(max_length=100, blank=True, help_text="Nearby Landmark")
     
+    # --- NEW FIELDS ADDED (Ye Missing The) ---
+    city = models.CharField(max_length=100, blank=True, help_text="City Name")
+    pincode = models.CharField(max_length=20, blank=True, help_text="Area Pincode")
+    # -----------------------------------------
+
     # Google Maps formatted text (for display only)
     google_address_text = models.TextField(help_text="Full address from Google Maps")
     
-    # 3. Meta
+    # 3. Meta (Contact Info)
     label = models.CharField(max_length=10, choices=LABEL_CHOICES, default="HOME")
     receiver_name = models.CharField(max_length=100, blank=True)
     receiver_phone = models.CharField(max_length=15, blank=True)
