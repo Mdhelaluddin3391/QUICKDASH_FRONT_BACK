@@ -1,3 +1,4 @@
+import logging  # <--- FIX 1: Added missing import
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -11,7 +12,7 @@ from .serializers import CustomerAddressSerializer, SupportTicketSerializer
 from .services import CustomerService
 
 User = get_user_model()
-
+logger = logging.getLogger(__name__)  # <--- Initialize logger at module level
 
 class CustomerProfileAPIView(APIView):
     """
@@ -69,10 +70,12 @@ class CustomerAddressCreateAPIView(APIView):
     def post(self, request):
         """Create a new address."""
         profile = CustomerService.get_or_create_profile(request.user)
-        # Log payload for debugging coordinates and ensure serializer receives lat/lng
-        logger = logging.getLogger(__name__)
+        
+        # Log payload for debugging coordinates
         logger.info(f"CustomerAddressCreateAPIView: incoming payload user={request.user.id} data_keys={list(request.data.keys())}")
-        serializer = CustomerAddressSerializer(data=request.data)
+        
+        # FIX 2: Pass context={'request': request} so validation works
+        serializer = CustomerAddressSerializer(data=request.data, context={'request': request})
         
         if serializer.is_valid():
             # Save address linked to the customer profile
@@ -100,7 +103,8 @@ class CustomerAddressUpdateAPIView(APIView):
             is_deleted=False
         )
 
-        serializer = CustomerAddressSerializer(address, data=request.data, partial=True)
+        # FIX 2: Pass context here as well
+        serializer = CustomerAddressSerializer(address, data=request.data, partial=True, context={'request': request})
         serializer.is_valid(raise_exception=True)
         serializer.save()
 
