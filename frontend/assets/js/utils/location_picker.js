@@ -45,9 +45,31 @@ window.LocationPicker = {
         const modal = document.getElementById('loc-picker-modal');
         if(modal) modal.classList.add('active');
 
-        // Show "Manage Addresses" button
+        // ---------------------------------------------------------
+        // [FIX START] Button Behavior Logic
+        // ---------------------------------------------------------
         const manageBtn = document.getElementById('lp-manage-addrs');
-        if (manageBtn) manageBtn.style.display = 'block';
+        if (manageBtn) {
+            manageBtn.style.display = 'block';
+            
+            // Check current mode
+            if (this.mode === 'PICKER') {
+                // Mode 1: Selecting location for New Address
+                // Change button to "Enter Address Manually"
+                // Clicking it will trigger confirmPin() which opens the form via callback
+                manageBtn.innerText = "Enter Address Manually";
+                manageBtn.onclick = () => this.confirmPin(); 
+            } else {
+                // Mode 2: Normal Browsing (Service Location)
+                // Change button to "Manage addresses"
+                // Clicking it redirects to addresses.html page
+                manageBtn.innerText = "Manage addresses";
+                this.bindManageButton(); // Re-bind the redirect logic
+            }
+        }
+        // ---------------------------------------------------------
+        // [FIX END]
+        // ---------------------------------------------------------
 
         // 2. Recover Last Known Location
         this.recoverLocation();
