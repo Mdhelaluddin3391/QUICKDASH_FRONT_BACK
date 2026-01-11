@@ -1,4 +1,5 @@
 # apps/orders/views.py
+
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
@@ -25,8 +26,6 @@ from .serializers import (
     CreateOrderSerializer, 
     CartSerializer
 )
-
-
 
 class ValidateCartAPIView(APIView):
     """
@@ -115,15 +114,11 @@ class ValidateCartAPIView(APIView):
             "warehouse_id": target_warehouse.id,
             "message": "All items available"
         })
-    
-
-
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = 'page_size'
     max_page_size = 100
-
 
 class CreateOrderAPIView(APIView):
     """
@@ -201,7 +196,6 @@ class CreateOrderAPIView(APIView):
         except Exception as e:
             raise e
 
-
 class MyOrdersAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = OrderListSerializer
@@ -215,7 +209,6 @@ class MyOrdersAPIView(generics.ListAPIView):
             .prefetch_related("items")\
             .order_by("-created_at")
 
-
 class OrderDetailAPIView(generics.RetrieveAPIView):
     permission_classes = [IsAuthenticated]
     serializer_class = OrderSerializer
@@ -226,7 +219,6 @@ class OrderDetailAPIView(generics.RetrieveAPIView):
             .select_related("warehouse", "delivery", "delivery__rider__user")\
             .prefetch_related("items")
 
-
 class CancelOrderAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -235,14 +227,12 @@ class CancelOrderAPIView(APIView):
         OrderService.cancel_order(order)
         return Response({"status": "order cancelled"})
 
-
 class CartAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         cart, _ = Cart.objects.get_or_create(user=request.user)
         return Response(CartSerializer(cart).data)
-
 
 class AddToCartAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -252,16 +242,14 @@ class AddToCartAPIView(APIView):
         sku_id = request.data.get('sku_id')
         qty = int(request.data.get('quantity', 1))
         warehouse_id = request.data.get('warehouse_id')
-        force_clear = request.data.get('force_clear', False)  # [FIX] New param
+        force_clear = request.data.get('force_clear', False)
 
-        # 1. Resolve Warehouse Context
         if not warehouse_id:
             return Response(
                 {"error": "Warehouse Context Missing. Please re-select your location."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # 2. Resolve SKU String from ID if needed
         if not sku_code and sku_id:
             try:
                 sku_code = InventoryItem.objects.get(id=sku_id).sku
@@ -271,7 +259,6 @@ class AddToCartAPIView(APIView):
         if not sku_code:
             return Response({"error": "SKU Required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 3. Find Correct Inventory Item for this Warehouse
         item_inventory = InventoryItem.objects.filter(
             sku=sku_code,
             bin__rack__aisle__zone__warehouse_id=warehouse_id
@@ -283,12 +270,9 @@ class AddToCartAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # 4. Get Cart
         cart, _ = Cart.objects.get_or_create(user=request.user)
 
-        # 5. [FIX] Warehouse Consistency Check
         if cart.items.exists():
-            # Check the warehouse of the first existing item
             existing_item = cart.items.select_related('sku__bin__rack__aisle__zone__warehouse').first()
             if existing_item and existing_item.sku.warehouse.id != int(warehouse_id):
                 if force_clear:
@@ -301,7 +285,6 @@ class AddToCartAPIView(APIView):
                         "action_required": "clear_cart"
                     }, status=status.HTTP_409_CONFLICT)
 
-        # 6. Update Cart
         if qty <= 0:
             CartItem.objects.filter(cart=cart, sku__sku=sku_code).delete()
             cart.refresh_from_db()
@@ -315,11 +298,7 @@ class AddToCartAPIView(APIView):
 
         return Response(CartSerializer(cart).data)
 
-
 class OrderSimulationAPIView(APIView):
-    """
-    Admin/Dev Only: Force advance order state for testing/demo.
-    """
     permission_classes = [IsAdminUser]
 
     def post(self, request, order_id):

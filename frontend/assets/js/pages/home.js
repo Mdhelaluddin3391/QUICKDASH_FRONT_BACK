@@ -1,4 +1,5 @@
-// assets/js/pages/home.js
+// frontend/assets/js/pages/home.js
+
 let feedPage = 1;
 let feedLoading = false;
 let feedHasNext = true;
@@ -19,9 +20,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (lat && lng && city) {
         await loadStorefront(lat, lng, city);
     } else {
-        // [FIXED] Load Level-1 Categories (Children) instead of generic parents
+        // Load Level-1 Categories if location not set
         await loadCategories(); 
-        setupInfiniteScroll(); // Start the progressive loader
+        setupInfiniteScroll(); 
     }
     
     startFlashTimer();
@@ -37,13 +38,16 @@ async function loadStorefront(lat, lng, city) {
     try {
         const res = await ApiService.get(`/catalog/storefront/?lat=${lat}&lon=${lng}&city=${city}`);
         
+        // --- [MAIN LOGIC CHANGE: Redirect if not serviceable] ---
         if (!res.serviceable) {
-            feedContainer.innerHTML = `
-                <div class="text-center py-5">
-                    <p class="text-muted">We aren't in your area yet!</p>
-                    <button onclick="LocationPicker.open()" class="btn btn-sm btn-primary">Change Location</button>
-                </div>`;
+            console.warn("Location not serviceable (L1), redirecting...");
+            window.location.href = 'not_serviceable.html';
             return;
+        }
+
+        // Save Warehouse ID for Cart usage
+        if (res.warehouse_id) {
+            localStorage.setItem(APP_CONFIG.STORAGE_KEYS.WAREHOUSE_ID, res.warehouse_id);
         }
 
         // Render Categories from Storefront Data
@@ -80,26 +84,20 @@ async function loadStorefront(lat, lng, city) {
 }
 
 function setupInfiniteScroll() {
-    // 1. Initial Load (Page 1)
     loadGenericFeed();
-
-    // 2. Create Sentinel (Invisible Trigger at bottom)
     const sentinel = document.createElement('div');
     sentinel.id = 'feed-sentinel';
     sentinel.style.height = "50px";
     sentinel.style.marginBottom = "50px";
     sentinel.innerHTML = '<div class="loader-spinner d-none"></div>'; 
-    
-    // Insert after the feed container
     document.getElementById('feed-container').after(sentinel);
 
-    // 3. Observer: Detects when user scrolls to bottom
     const observer = new IntersectionObserver((entries) => {
         if(entries[0].isIntersecting && !feedLoading && feedHasNext) {
             feedPage++;
-            loadGenericFeed(); // Load next batch
+            loadGenericFeed(); 
         }
-    }, { rootMargin: '200px' }); // Pre-load 200px before hitting bottom
+    }, { rootMargin: '200px' });
 
     observer.observe(sentinel);
 }
@@ -107,29 +105,24 @@ function setupInfiniteScroll() {
 // 2. Generic Fallback
 async function loadGenericFeed() {
     if (feedLoading || !feedHasNext) return;
-    
     feedLoading = true;
     const container = document.getElementById('feed-container');
     const sentinelLoader = document.querySelector('#feed-sentinel .loader-spinner');
     
     if(feedPage > 1 && sentinelLoader) sentinelLoader.classList.remove('d-none');
-    
     if(feedPage === 1) container.innerHTML = '<div class="loader-spinner"></div>';
 
     try {
         const res = await ApiService.get(`/catalog/home/feed/?page=${feedPage}`);
-        
         const sections = res.sections || [];
         feedHasNext = res.has_next;
 
         if(feedPage === 1) container.innerHTML = '';
-
         if (sections.length === 0 && feedPage === 1) {
             container.innerHTML = `<p class="text-center text-muted py-5">No products found!</p>`;
             return;
         }
 
-        // Append New Sections
         const html = sections.map(sec => `
             <section class="feed-section">
                 <div class="section-head" style="padding: 0 20px;">
@@ -141,7 +134,6 @@ async function loadGenericFeed() {
                 </div>
             </section>
         `).join('');
-
         container.insertAdjacentHTML('beforeend', html);
 
     } catch (e) {
@@ -149,9 +141,7 @@ async function loadGenericFeed() {
         if(feedPage === 1) container.innerHTML = `<p class="text-center text-muted py-5">Failed to load feed.</p>`;
     } finally {
         feedLoading = false;
-        
         if(sentinelLoader) sentinelLoader.classList.add('d-none');
-        
         if(!feedHasNext) {
             const s = document.getElementById('feed-sentinel');
             if(s) s.remove();
@@ -177,9 +167,7 @@ async function loadBanners() {
 async function loadCategories() {
     const container = document.getElementById('category-grid');
     try {
-        // [FIXED] Use Children Endpoint (Level 1 Categories) for Shop by Category
         const cats = await ApiService.get('/catalog/categories/children/');
-        
         if (Array.isArray(cats) && cats.length > 0) {
             container.innerHTML = cats.slice(0, 8).map(c => `
                 <div class="cat-card" onclick="window.location.href='./search_results.html?slug=${c.slug}'">
@@ -190,9 +178,7 @@ async function loadCategories() {
                 </div>
             `).join('');
         }
-    } catch (e) {
-        console.warn('Category grid load failed:', e);
-    }
+    } catch (e) { console.warn('Category grid load failed:', e); }
 }
 
 async function loadBrands() {
@@ -237,7 +223,6 @@ async function loadFlashSales() {
 
 function createProductCard(p) {
     const imageSrc = p.image_url || p.image || 'https://via.placeholder.com/150?text=No+Image';
-
     return `
         <div class="card product-card" style="padding:10px; border:1px solid #eee; box-shadow:none;">
             <a href="./product.html?code=${p.sku || p.id}">

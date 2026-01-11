@@ -1,4 +1,4 @@
-/* assets/js/pages/checkout.js */
+// frontend/assets/js/pages/checkout.js
 
 let selectedAddressId = null;
 let paymentMethod = 'COD';
@@ -17,7 +17,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await Promise.all([loadAddresses(), loadSummary()]);
     document.getElementById('place-order-btn').addEventListener('click', placeOrder);
     
-    // Check if we already have a context to resolve warehouse immediately
     const deliveryCtx = JSON.parse(localStorage.getItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT) || 'null');
     if (deliveryCtx) {
         resolveWarehouse(deliveryCtx.lat, deliveryCtx.lng, deliveryCtx.city);
@@ -75,31 +74,20 @@ async function loadAddresses() {
             </div>
         `).join('');
 
-        // Auto-select logic
         const def = addresses.find(a => a.is_default) || addresses[0];
         const storedCtx = JSON.parse(localStorage.getItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT) || 'null');
         
         let initialSelect = def;
         if (storedCtx) {
             const match = addresses.find(a => a.id == storedCtx.id);
-            if (match) {
-                initialSelect = match;
-            } else {
-                // Stored delivery address not present on server — clear stale context
+            if (match) initialSelect = match;
+            else {
                 localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT);
-                // Notify rest of app to update navbar and dependent logic
                 window.dispatchEvent(new CustomEvent(APP_CONFIG.EVENTS.LOCATION_CHANGED, { detail: { source: 'ADDRESS_CLEANUP' } }));
-
-                if (window.Toast && typeof window.Toast.info === 'function') {
-                    Toast.info('Saved delivery address not found; please select a new address.');
-                } else {
-                    console.warn('Stored delivery address not found; cleared local delivery context.');
-                }
             }
         }
 
         if (initialSelect) {
-            selectedAddressId = initialSelect.id;
             const defEl = container.querySelector(`.address-card[data-id="${initialSelect.id}"]`);
             if (defEl) {
                 document.querySelectorAll('.address-card').forEach(c => c.classList.remove('active'));
@@ -123,27 +111,17 @@ function updateContextAndResolve(id, lat, lng, city, el) {
     selectedAddressId = id;
     let label = 'Delivery';
     let fullText = 'Selected Address';
-    
     if (el) {
         label = el.querySelector('strong').innerText;
         const p = el.querySelector('p');
         if(p) fullText = p.innerText.split('\n')[0];
     }
     
-    // USE MANAGER TO SET L2 (Delivery Context)
-    // This locks the cart to this specific address ID
     if (window.LocationManager) {
         window.LocationManager.setDeliveryAddress({
-            id: id,
-            label: label,
-            address_line: fullText,
-            city: city,
-            latitude: lat,
-            longitude: lng
+            id: id, label: label, address_line: fullText, city: city, latitude: lat, longitude: lng
         });
     }
-
-    // Resolve Warehouse for this L2 context
     resolveWarehouse(lat, lng, city);
 }
 
@@ -159,11 +137,7 @@ async function resolveWarehouse(lat, lng, city) {
     placeOrderBtn.innerText = "Checking Availability...";
 
     try {
-        const res = await ApiService.post('/warehouse/find-serviceable/', {
-            latitude: lat,
-            longitude: lng,
-            city: city || 'Bengaluru'
-        });
+        const res = await ApiService.post('/warehouse/find-serviceable/', { latitude: lat, longitude: lng, city: city || 'Bengaluru' });
 
         if (res.serviceable && res.warehouse && res.warehouse.id) {
             resolvedWarehouseId = res.warehouse.id; 
@@ -182,41 +156,42 @@ async function resolveWarehouse(lat, lng, city) {
     }
 }
 
-// --- UPDATED PLACE ORDER LOGIC ---
+// --- STRICT PLACE ORDER LOGIC ---
 async function placeOrder() {
-    if (!selectedAddressId) return Toast.warning("Please select a delivery address");
-    if (!resolvedWarehouseId) return Toast.error("Service check failed. Please select a serviceable address.");
+    if (!selectedAddressId) {
+        Toast.warning("⚠️ Delivery Address is Required!");
+        document.querySelector('.step-header').scrollIntoView({behavior: "smooth"});
+        return;
+    }
+    if (!resolvedWarehouseId) return Toast.error("Service check failed. Please refresh.");
 
     const btn = document.getElementById('place-order-btn');
     const originalText = btn.innerText;
     btn.disabled = true;
-    btn.innerText = "Verifying Items...";
+    btn.innerText = "Verifying Stock...";
 
     try {
-        // 1. NEW: Validate Cart Stock at this Address
+        // 1. Final Stock Validation with L2 Address ID
         const validation = await ApiService.post('/orders/validate-cart/', {
-            address_id: selectedAddressId
+            address_id: selectedAddressId 
         });
 
         if (!validation.is_valid) {
             showAvailabilityErrorModal(validation.unavailable_items);
             btn.innerText = originalText;
             btn.disabled = false;
-            return; // Stop here
+            return;
         }
 
-        // 2. Proceed to Payment/Order Creation
-        btn.innerText = "Processing...";
+        // 2. Create Order
+        btn.innerText = "Processing Order...";
         
         if (paymentMethod === 'RAZORPAY') {
-            if (typeof Razorpay === 'undefined') {
-                btn.innerText = "Loading Secure Payment...";
-                await loadRazorpayScript();
-            }
+            if (typeof Razorpay === 'undefined') await loadRazorpayScript();
         }
 
         const orderRes = await ApiService.post('/orders/create/', {
-            delivery_address_id: selectedAddressId,
+            delivery_address_id: selectedAddressId, // Mandatory
             warehouse_id: resolvedWarehouseId,
             payment_method: paymentMethod,
             delivery_type: 'express'
@@ -232,36 +207,30 @@ async function placeOrder() {
                 throw new Error("Payment initialization failed");
             }
         }
+
     } catch (e) {
-        let msg = e.message || "Order Failed";
-        if (msg.includes("razorpay")) msg = "Payment Gateway unavailable. Please disable AdBlocker.";
-        if (msg.toLowerCase().includes("stock")) msg = "⚠️ Some items are out of stock.";
-        
+        console.error(e);
+        let msg = e.message || "Order creation failed";
         Toast.error(msg);
         btn.disabled = false;
         btn.innerText = originalText;
     }
 }
 
-// --- NEW: Error Modal for Out of Stock Items ---
 function showAvailabilityErrorModal(items) {
     const itemNames = items.map(i => `<li><strong>${i.product_name}</strong> <span class="text-danger small">(${i.reason})</span></li>`).join('');
-    
     const div = document.createElement('div');
     div.id = 'stock-error-modal';
     div.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);`;
     div.innerHTML = `
-        <div style="background:white;padding:25px;border-radius:12px;max-width:350px;width:90%;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.3);">
+        <div style="background:white;padding:25px;border-radius:12px;max-width:350px;width:90%;text-align:center;">
             <div style="color:#e74c3c;font-size:40px;margin-bottom:10px;"><i class="fas fa-exclamation-circle"></i></div>
             <h3>Items Unavailable</h3>
-            <p class="text-muted" style="font-size:0.9rem;">The following items are not available at your selected location:</p>
-            <ul style="text-align:left;background:#fff5f5;padding:15px 20px;list-style:disc;margin:15px 0;border-radius:8px;font-size:0.85rem;color:#c0392b;">
-                ${itemNames}
-            </ul>
+            <p class="text-muted">The following items are not available at your delivery location:</p>
+            <ul style="text-align:left;background:#fff5f5;padding:15px;list-style:disc;margin:15px 0;border-radius:8px;color:#c0392b;">${itemNames}</ul>
             <button onclick="window.location.href='./cart.html'" class="btn btn-primary w-100 mb-2">Go to Cart & Remove</button>
             <button onclick="document.getElementById('stock-error-modal').remove()" class="btn btn-outline-secondary w-100">Change Address</button>
-        </div>
-    `;
+        </div>`;
     document.body.appendChild(div);
 }
 
@@ -276,23 +245,9 @@ function loadRazorpayScript() {
 }
 
 function handleRazorpay(rpOrder, orderId, btn) {
-    if (!window.Razorpay) {
-        Toast.error("Payment SDK not loaded");
-        btn.disabled = false;
-        btn.innerText = "Place Order";
-        return;
-    }
-
-    const key = rpOrder.key || rpOrder.key_id;
-    if (!key) {
-        Toast.error("Payment Configuration Error");
-        btn.disabled = false;
-        btn.innerText = "Place Order";
-        return;
-    }
-
+    if (!window.Razorpay) { Toast.error("Payment SDK not loaded"); return; }
     const options = {
-        "key": key, 
+        "key": rpOrder.key || rpOrder.key_id, 
         "amount": rpOrder.amount, 
         "currency": rpOrder.currency,
         "name": "QuickDash",
@@ -309,35 +264,13 @@ function handleRazorpay(rpOrder, orderId, btn) {
                 localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT);
                 window.location.href = `/success.html?order_id=${orderId}`;
             } catch (e) {
-                console.error("Verification Error", e);
-                alert("Payment successful but verification timed out.\n\nPlease do NOT pay again. Check 'My Orders'.");
+                alert("Payment successful but verification timed out. Check 'My Orders'.");
                 window.location.href = './orders.html';
             }
         },
-        "prefill": {
-            "contact": JSON.parse(localStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER) || '{}').phone || ""
-        },
-        "theme": { "color": "#32CD32" },
-        "modal": {
-            "ondismiss": function() {
-                btn.disabled = false;
-                btn.innerText = "Place Order";
-            }
-        }
+        "modal": { "ondismiss": function() { btn.disabled = false; btn.innerText = "Place Order"; } }
     };
-
-    try {
-        const rzp1 = new Razorpay(options);
-        rzp1.open();
-        rzp1.on('payment.failed', function (response){
-            Toast.error("Payment Failed: " + response.error.description);
-            btn.disabled = false;
-            btn.innerText = "Place Order";
-        });
-    } catch (e) {
-        console.error("Razorpay Launch Error", e);
-        Toast.error("Could not launch payment gateway.");
-        btn.disabled = false;
-        btn.innerText = "Place Order";
-    }
+    const rzp1 = new Razorpay(options);
+    rzp1.open();
+    rzp1.on('payment.failed', function (response){ Toast.error("Payment Failed"); btn.disabled = false; });
 }

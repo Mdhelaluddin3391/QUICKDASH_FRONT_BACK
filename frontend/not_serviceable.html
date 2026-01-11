@@ -1,108 +1,78 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Not Available - QuickDash</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Not Serviceable - QuickDash</title>
     <link rel="stylesheet" href="./assets/css/base.css">
-    <link rel="stylesheet" href="./assets/css/components.css">
     <link rel="stylesheet" href="./assets/css/layout.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .error-wrapper {
-            min-height: 80vh;
+        body {
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
+            height: 100vh;
+            background-color: #f8f9fa;
             text-align: center;
             padding: 20px;
         }
-
-        .error-img {
-            width: 200px;
-            margin-bottom: 30px;
-            opacity: 0.8;
+        .error-container {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+            max-width: 400px;
+            width: 100%;
         }
-
-        .location-box {
-            background: #fff3cd;
-            color: #856404;
-            padding: 10px 20px;
-            border-radius: 30px;
-            display: inline-block;
+        .icon-box {
+            font-size: 60px;
+            color: #ff6b6b;
             margin-bottom: 20px;
-            font-size: 0.9rem;
-            border: 1px solid #ffeeba;
         }
+        h2 { margin-bottom: 10px; color: #333; }
+        p { color: #666; margin-bottom: 30px; line-height: 1.5; }
     </style>
 </head>
-
 <body>
-    <div id="navbar-placeholder"></div>
 
-    <main class="container">
-        <div class="error-wrapper">
-            <img src="https://cdn-icons-png.flaticon.com/512/10632/10632613.png" class="error-img" alt="No Service">
-
-            <div id="loc-display" class="location-box">
-                <i class="fas fa-map-marker-alt"></i> Checking location...
-            </div>
-
-            <h1 class="mb-3">We're not there yet! 😔</h1>
-            <p class="text-muted mb-4" style="max-width: 500px;">
-                Sorry, we currently do not deliver to your selected location.
-                We are expanding fast and hope to serve you soon.
-            </p>
-
-            <div class="d-flex gap-3">
-                <button onclick="changeLocation()" class="btn btn-primary">
-                    Change Location
-                </button>
-                <a href="index.html" class="btn btn-outline">Go Home</a>
-            </div>
+    <div class="error-container">
+        <div class="icon-box">
+            <i class="fas fa-map-marked-alt"></i>
         </div>
-    </main>
+        <h2>We aren't here yet!</h2>
+        <p>Sorry, QuickDash services are not available at your current location. Please select a different area.</p>
+        
+        <button onclick="changeLocation()" class="btn btn-primary w-100">
+            <i class="fas fa-location-arrow"></i> Change Location
+        </button>
+        
+        <a href="./index.html" class="d-block mt-3 small text-muted">Go to Home</a>
+    </div>
 
-<script src="./assets/js/config.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
-<script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/utils/maps_loader.js?v=1.0.0" defer></script> 
-<script src="./assets/js/utils/location_picker.js?v=1.0.0" defer></script>
-<script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
-
-    <script defer>
-        document.addEventListener('DOMContentLoaded', () => {
-            const loc = localStorage.getItem('user_address_text');
-            const display = document.getElementById('loc-display');
-            if (loc) display.innerHTML = `<i class="fas fa-map-marker-alt"></i> ${loc}`;
-            else display.style.display = 'none';
-        });
-
+    <script src="./assets/js/config.js"></script>
+    <script src="./assets/js/utils/location_picker.js"></script>
+    <script src="./assets/js/utils/maps_loader.js"></script>
+    <script src="./assets/js/utils/toast.js"></script>
+    <script>
         function changeLocation() {
-            // Open global picker
             if (window.LocationPicker) {
-                LocationPicker.open((data) => {
-                    // Save new location
+                // Location Picker kholne ke baad, jab user select karega
+                // to wapas index.html par bhej denge
+                window.LocationPicker.open((data) => {
                     localStorage.setItem('user_lat', data.lat);
                     localStorage.setItem('user_lng', data.lng);
-                    localStorage.setItem('user_address_text', data.address);
-
-                    // Redirect to home to re-check serviceability
+                    localStorage.setItem('user_city', data.city);
+                    localStorage.setItem('user_pincode', data.pincode);
+                    localStorage.setItem('user_address', data.address);
+                    
+                    // Force reload to Home to re-check service
                     window.location.href = './index.html';
                 });
             } else {
-                alert("Location service not loaded");
+                alert("Map service is loading... please try again in a second.");
             }
         }
     </script>
 </body>
-
 </html>
