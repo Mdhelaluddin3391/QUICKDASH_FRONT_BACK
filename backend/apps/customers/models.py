@@ -42,7 +42,7 @@ class CustomerAddress(models.Model):
     # --- NEW FIELDS ADDED (Ye Missing The) ---
     city = models.CharField(max_length=100, blank=True, help_text="City Name")
     pincode = models.CharField(max_length=20, blank=True, help_text="Area Pincode")
-    # -----------------------------------------
+    # ----------------------------------------- 
 
     # Google Maps formatted text (for display only)
     google_address_text = models.TextField(help_text="Full address from Google Maps")
