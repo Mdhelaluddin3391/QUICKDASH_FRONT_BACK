@@ -1,14 +1,13 @@
 // frontend/assets/js/services/cart.service.js
 
 window.CartService = {
-    // [FIX 4] Local Placeholder for resilience
+    // Placeholder Image
     DEFAULT_IMG: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23f0f0f0'/%3E%3Ctext x='50' y='50' font-family='Arial' font-size='14' fill='%23999' text-anchor='middle' dy='.3em'%3ENo Image%3C/text%3E%3C/svg%3E",
 
     async getCart() {
-        // [FIX 1] Prevent API call if user is not logged in
         const token = localStorage.getItem(window.APP_CONFIG.STORAGE_KEYS.TOKEN);
+        // User logged in nahi hai toh API call mat karo
         if (!token) {
-            // Return mock empty cart structure for guests
             return Promise.resolve({ items: [], total_amount: 0 });
         }
         return window.ApiService.get('/orders/cart/');
@@ -16,12 +15,14 @@ window.CartService = {
 
     async addToCart(productId, quantity = 1) {
         try {
-            // 1. Auth Check (Optional: depending on business logic, usually required for Cart API)
+            // 1. Auth Check
             const token = localStorage.getItem(window.APP_CONFIG.STORAGE_KEYS.TOKEN);
             if (!token) {
-                window.Toast.warning("Please login to add items.");
-                setTimeout(() => window.location.href = window.APP_CONFIG.ROUTES.LOGIN, 1500);
-                return;
+                // Yahan se error throw karenge taaki caller handle kare
+                // Note: Aap chahein to yahan redirect logic rakh sakte hain, par error throw karna zaruri hai
+                const err = new Error("Please login to add items.");
+                err.code = 'AUTH_REQUIRED';
+                throw err;
             }
 
             // 2. Warehouse Resolution
@@ -33,12 +34,12 @@ window.CartService = {
                 try {
                     warehouseId = await this.resolveWarehouseId();
                 } catch (resolutionError) {
-                    // [FIX 2] Bubble up specific resolution errors
+                    // Agar location issue hai toh error upar bhejo
                     throw resolutionError;
                 }
             }
 
-            // 3. Add Item
+            // 3. Add Item API Call
             const payload = { 
                 sku: productId,
                 quantity: quantity, 
@@ -46,21 +47,36 @@ window.CartService = {
             };
 
             const res = await window.ApiService.post('/orders/cart/add/', payload);
-            window.Toast.success('Item added to cart');
+            
+            // [FIX 1] REMOVED SUCCESS TOAST FROM HERE
+            // Ab 'product.js' ya 'home.js' success message dikhayega.
+            
             this.updateGlobalCount();
             return res;
 
         } catch (error) {
             console.error('Add to cart failed:', error);
-            // Show the specific error message from the backend or resolution logic
-            window.Toast.error(error.message || 'Failed to add item');
             
-            // If it's a location issue, trigger the picker
+            // [FIX 2] REMOVED ERROR TOAST FROM HERE
+            // Taaki do baar message na aaye.
+
+            // Handle Login Redirect explicitly if needed, otherwise caller handles it
+            if (error.code === 'AUTH_REQUIRED') {
+                 window.Toast.warning(error.message);
+                 setTimeout(() => window.location.href = window.APP_CONFIG.ROUTES.LOGIN, 1500);
+                 // Still throw error to stop the "Success" message on the other page
+                 throw error; 
+            }
+
+            // Location Service Trigger logic
             if (error.code === 'LOCATION_REQUIRED') {
                 if (window.ServiceCheck && window.ServiceCheck.init) {
                     window.ServiceCheck.init();
                 }
             }
+
+            // [CRITICAL FIX] Error ko wapas fekna (Throw) zaruri hai
+            throw error;
         }
     },
 
@@ -100,7 +116,7 @@ window.CartService = {
             throw new Error(`Sorry, we do not deliver to ${areaName} yet.`);
 
         } catch (e) {
-            // If it's our own error, rethrow it
+            // Agar ye "do not deliver" wala error hai, toh seedha wahi bhejo
             if (e.message && e.message.includes("not deliver")) throw e;
             
             console.warn("Could not auto-resolve warehouse:", e);
@@ -113,9 +129,8 @@ window.CartService = {
             await window.ApiService.delete(`/orders/cart/item/${itemId}/`);
             window.Toast.info('Item removed');
             this.updateGlobalCount();
-            // Refresh if on cart page
+            
             if (window.location.pathname.includes('cart.html')) {
-                // Use loadCart if available globally, else reload
                 if (typeof window.loadCart === 'function') {
                     await window.loadCart();
                 } else {
@@ -128,7 +143,6 @@ window.CartService = {
     },
 
     async updateGlobalCount() {
-        // [FIX 1] Double check here too for safety
         const token = localStorage.getItem(window.APP_CONFIG.STORAGE_KEYS.TOKEN);
         if (!token) {
             this.updateBadgeUI(0);
@@ -136,7 +150,6 @@ window.CartService = {
         }
 
         try {
-            // This now safely returns { items: [] } if token is missing/invalid
             const cart = await this.getCart();
             let count = 0;
             if (cart && cart.items) {
@@ -158,7 +171,6 @@ window.CartService = {
     },
 
     async updateItem(skuCode, qty) {
-        // Helper for cart page qty updates
         const warehouseId = localStorage.getItem(window.APP_CONFIG.STORAGE_KEYS.WAREHOUSE_ID);
         return window.ApiService.post('/orders/cart/add/', {
             sku: skuCode,
@@ -186,7 +198,6 @@ window.CartService = {
         
         let payload = {};
         
-        // Priority: Delivery Address > Service Location
         if (deliveryCtx && deliveryCtx.id) {
             payload = { address_id: deliveryCtx.id };
         } else if (serviceCtx && serviceCtx.lat) {
@@ -223,9 +234,7 @@ window.CartService = {
                     window.Toast.info("Cart cleared for new location.");
                     if (window.location.pathname.includes('cart.html')) window.location.reload();
                 })
-                .catch(() => {
-                    // Fallback manual clear logic
-                });
+                .catch(() => {});
         }
     }
 };
