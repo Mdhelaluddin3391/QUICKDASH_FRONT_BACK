@@ -235,8 +235,14 @@
         renderNavbarLocation();
         bindNavbarLocationClick();
 
-        if (window.CartService && typeof window.CartService.updateGlobalCount === 'function') {
+        // [FIX] Only update cart count if user is logged in
+        const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
+        if (token && window.CartService && typeof window.CartService.updateGlobalCount === 'function') {
             window.CartService.updateGlobalCount();
+        } else {
+            // Ensure badge is hidden for guests
+            const badges = document.querySelectorAll('.cart-count');
+            badges.forEach(el => el.style.display = 'none');
         }
     }
 

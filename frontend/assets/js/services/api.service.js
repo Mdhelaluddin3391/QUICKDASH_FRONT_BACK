@@ -6,7 +6,6 @@
  * - Centralized Error Handling
  */
 (function () {
-    // Use a plain global object to avoid class/static issues in older browsers
     const ApiService = {
         isRefreshing: false,
         refreshSubscribers: [],
@@ -26,11 +25,11 @@
             }
 
             const token = localStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN);
-            if (token) {
+            // [FIX] Strict check to avoid "Bearer null"
+            if (token && token !== 'null' && token !== 'undefined') {
                 headers['Authorization'] = `Bearer ${token}`;
             }
 
-            // [AUDIT FIX] Idempotency for mutating methods
             if (['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
                 headers['Idempotency-Key'] = ApiService.uuidv4();
             }
