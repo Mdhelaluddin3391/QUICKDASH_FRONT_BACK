@@ -35,3 +35,4 @@ drf-spectacular>=0.26
 django-prometheus>=2.3
 
 python-magic==0.4.27
+geopy>=2.4
