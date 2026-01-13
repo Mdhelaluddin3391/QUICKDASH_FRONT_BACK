@@ -1,7 +1,7 @@
 /* frontend/assets/js/utils/location_picker.js */
 
 window.LocationPicker = {
-    mode: 'SERVICE',
+    mode: 'SERVICE', // 'SERVICE' (Browsing) or 'PICKER' (Address Form Callback)
     
     // Map Instances
     googleMap: null,
@@ -46,7 +46,7 @@ window.LocationPicker = {
         if(modal) modal.classList.add('active');
 
         // ---------------------------------------------------------
-        // [FIX START] Button Behavior Logic
+        // Button Behavior Logic
         // ---------------------------------------------------------
         const manageBtn = document.getElementById('lp-manage-addrs');
         if (manageBtn) {
@@ -55,21 +55,15 @@ window.LocationPicker = {
             // Check current mode
             if (this.mode === 'PICKER') {
                 // Mode 1: Selecting location for New Address
-                // Change button to "Enter Address Manually"
-                // Clicking it will trigger confirmPin() which opens the form via callback
                 manageBtn.innerText = "Enter Address Manually";
+                // Clicking it will trigger confirmPin() which opens the form via callback
                 manageBtn.onclick = () => this.confirmPin(); 
             } else {
                 // Mode 2: Normal Browsing (Service Location)
-                // Change button to "Manage addresses"
-                // Clicking it redirects to addresses.html page
                 manageBtn.innerText = "Manage addresses";
                 this.bindManageButton(); // Re-bind the redirect logic
             }
         }
-        // ---------------------------------------------------------
-        // [FIX END]
-        // ---------------------------------------------------------
 
         // 2. Recover Last Known Location
         this.recoverLocation();
@@ -217,7 +211,6 @@ window.LocationPicker = {
                 }
             } else {
                 // --- OPENSTREETMAP STRATEGY (NOMINATIM) ---
-                // Best Practice: Send User-Agent/Email if possible, but browser limits headers.
                 const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
                 
                 const response = await fetch(url, {
@@ -327,6 +320,8 @@ window.LocationPicker = {
             }
 
             if (window.LocationManager) {
+                // IMPORTANT: This sets L1 location (Browsing Context)
+                // Does NOT wipe L2 (Delivery Context) if it exists.
                 window.LocationManager.setServiceLocation({
                     lat: this.tempCoords.lat,
                     lng: this.tempCoords.lng,
@@ -402,6 +397,7 @@ window.LocationPicker = {
 
     recoverLocation() {
         try {
+            // Try L1 context first
             const ctx = JSON.parse(localStorage.getItem(window.APP_CONFIG?.STORAGE_KEYS?.SERVICE_CONTEXT) || 'null');
             if (ctx && ctx.lat) {
                 this.tempCoords = { lat: parseFloat(ctx.lat), lng: parseFloat(ctx.lng) };

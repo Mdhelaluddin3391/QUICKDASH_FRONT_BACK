@@ -63,6 +63,9 @@
         });
     }
 
+    // ---------------------------------------------------------
+    // Location Rendering Logic (L1 vs L2)
+    // ---------------------------------------------------------
     function renderNavbarLocation() {
         const el = document.getElementById("header-location");
         const box = document.getElementById("navbar-location-box");
@@ -71,8 +74,10 @@
         if (!window.LocationManager) return;
         const display = window.LocationManager.getDisplayLocation();
 
+        // Reset Classes
         box.classList.remove("active-delivery", "active-service");
 
+        // Render Text
         el.innerHTML = `
             <div class="d-flex flex-column" style="line-height:1.2; text-align:left;">
                 <span style="font-weight:600; font-size:0.95rem;">${display.label}</span>
@@ -80,15 +85,19 @@
             </div>
         `;
 
+        // Render Icon / Color Status
         const icon = box.querySelector('i.fas.fa-map-marker-alt') || box.querySelector('i.fas.fa-map-pin');
 
         if (display.type === 'DELIVERY') {
+            // L2: Strong Green/Primary - Delivery Mode
             box.classList.add("active-delivery");
             if (icon) icon.className = 'fas fa-map-marker-alt text-primary';
         } else if (display.type === 'SERVICE') {
+            // L1: Muted/Orange - Browsing Mode
             box.classList.add("active-service");
             if (icon) icon.className = 'fas fa-map-pin text-danger';
         } else {
+            // None
             if (icon) icon.className = 'fas fa-search-location text-muted';
         }
     }
@@ -114,7 +123,7 @@
                 // User -> Show Address Switcher
                 await openAddressSwitcher();
             } else {
-                // Guest -> Open Map Picker
+                // Guest -> Open Map Picker (Service Mode)
                 openMapPickerFallback();
             }
         }, false);
@@ -185,19 +194,21 @@
         backdrop.onclick = close;
         modal.querySelector('.close-btn').onclick = close;
 
+        // Click Handler: Select Address (Sets L2 Context)
         modal.querySelectorAll('.addr-item').forEach(item => {
             item.onclick = () => {
                 try {
                     const data = JSON.parse(item.getAttribute('data-json'));
                     if (window.LocationManager) {
                         window.LocationManager.setDeliveryAddress(data);
-                        window.location.reload();
+                        window.location.reload(); // Refresh to apply context
                     }
                 } catch (e) { console.error(e); }
                 close();
             };
         });
 
+        // "Use Current Location": Switch to L1 (Service Mode)
         modal.querySelector('.btn-gps').onclick = () => {
             close();
             openMapPickerFallback();
@@ -231,16 +242,16 @@
     }
 
     function initializeGlobalEvents() {
+        // Listen for Location Changes from Manager
         window.addEventListener(EVENTS.LOCATION_CHANGED, renderNavbarLocation);
         renderNavbarLocation();
         bindNavbarLocationClick();
 
-        // [FIX] Only update cart count if user is logged in
+        // Update Cart Count
         const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
         if (token && window.CartService && typeof window.CartService.updateGlobalCount === 'function') {
             window.CartService.updateGlobalCount();
         } else {
-            // Ensure badge is hidden for guests
             const badges = document.querySelectorAll('.cart-count');
             badges.forEach(el => el.style.display = 'none');
         }
@@ -356,6 +367,8 @@
                 localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.TOKEN);
                 localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.REFRESH);
                 localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.USER);
+                // Clear Delivery Context (L2) but maybe keep Service Context (L1) for UX
+                localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT);
             } catch (e) { }
 
             const privatePages = [

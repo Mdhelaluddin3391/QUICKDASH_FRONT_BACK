@@ -21,6 +21,7 @@ async function loadCart() {
 
         if (!cart.items || cart.items.length === 0) {
             empty.classList.remove('d-none');
+            content.classList.add('d-none');
             return;
         }
 
@@ -28,9 +29,8 @@ async function loadCart() {
         document.getElementById('item-count').innerText = `${cart.items.length} Items`;
         
         // Render Items
-        // [FIX] Use item.sku (String) for changeQty calls
         list.innerHTML = cart.items.map(item => `
-            <div class="card cart-item">
+            <div class="card cart-item" id="item-card-${item.sku}">
                 <img src="${item.sku_image || 'https://via.placeholder.com/80'}" class="item-img">
                 <div class="item-details">
                     <div class="item-name">${item.sku_name}</div>
@@ -41,7 +41,7 @@ async function loadCart() {
                     <button class="qty-btn-sm" onclick="changeQty('${item.sku}', ${item.quantity - 1})">
                         ${item.quantity === 1 ? '<i class="fas fa-trash"></i>' : '-'}
                     </button>
-                    <span>${item.quantity}</span>
+                    <span id="qty-${item.sku}">${item.quantity}</span>
                     <button class="qty-btn-sm" onclick="changeQty('${item.sku}', ${item.quantity + 1})">+</button>
                 </div>
             </div>
@@ -63,12 +63,25 @@ window.changeQty = async function(skuCode, newQty) {
             if(!confirm("Remove item from cart?")) return;
         }
         
-        // Show loading state implicitly by maybe blurring content, 
-        // but for now we just wait for reload
+        // UI Feedback: Disable buttons temporarily
+        const card = document.getElementById(`item-card-${skuCode}`);
+        if(card) {
+            const btns = card.querySelectorAll('button');
+            btns.forEach(b => b.disabled = true);
+            card.style.opacity = '0.7';
+        }
+
         await CartService.updateItem(skuCode, newQty);
-        await loadCart(); // Refresh UI
+        await loadCart(); // Refresh UI to get correct totals/pricing
         
     } catch (e) {
         Toast.error("Failed to update cart");
+        // Re-enable on error
+        const card = document.getElementById(`item-card-${skuCode}`);
+        if(card) {
+            const btns = card.querySelectorAll('button');
+            btns.forEach(b => b.disabled = false);
+            card.style.opacity = '1';
+        }
     }
 };

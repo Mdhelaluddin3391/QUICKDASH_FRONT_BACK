@@ -2,7 +2,7 @@
 
 let selectedAddressId = null;
 let paymentMethod = 'COD';
-let resolvedWarehouseId = null;
+let resolvedWarehouseId = null; // Used only for UI state, not submitted
 
 document.addEventListener('DOMContentLoaded', async () => {
     if (!localStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN)) {
@@ -82,6 +82,7 @@ async function loadAddresses() {
             const match = addresses.find(a => a.id == storedCtx.id);
             if (match) initialSelect = match;
             else {
+                // Address in storage no longer exists or mismatch
                 localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT);
                 window.dispatchEvent(new CustomEvent(APP_CONFIG.EVENTS.LOCATION_CHANGED, { detail: { source: 'ADDRESS_CLEANUP' } }));
             }
@@ -117,6 +118,7 @@ function updateContextAndResolve(id, lat, lng, city, el) {
         if(p) fullText = p.innerText.split('\n')[0];
     }
     
+    // Update Global Location Manager for L2 Context
     if (window.LocationManager) {
         window.LocationManager.setDeliveryAddress({
             id: id, label: label, address_line: fullText, city: city, latitude: lat, longitude: lng
@@ -131,6 +133,7 @@ window.selectPayment = function(method, el) {
     el.classList.add('selected');
 }
 
+// UI Check ONLY. Does not affect backend validity.
 async function resolveWarehouse(lat, lng, city) {
     const placeOrderBtn = document.getElementById('place-order-btn');
     placeOrderBtn.disabled = true;
@@ -141,7 +144,7 @@ async function resolveWarehouse(lat, lng, city) {
 
         if (res.serviceable && res.warehouse && res.warehouse.id) {
             resolvedWarehouseId = res.warehouse.id; 
-            localStorage.setItem(APP_CONFIG.STORAGE_KEYS.WAREHOUSE_ID, resolvedWarehouseId);
+            // Note: We do NOT rely on local storage for warehouse ID in checkout anymore
             placeOrderBtn.disabled = false;
             placeOrderBtn.innerText = "Place Order";
         } else {
@@ -163,6 +166,7 @@ async function placeOrder() {
         document.querySelector('.step-header').scrollIntoView({behavior: "smooth"});
         return;
     }
+    // UX check
     if (!resolvedWarehouseId) return Toast.error("Service check failed. Please refresh.");
 
     const btn = document.getElementById('place-order-btn');
@@ -190,9 +194,9 @@ async function placeOrder() {
             if (typeof Razorpay === 'undefined') await loadRazorpayScript();
         }
 
+        // [SECURE] We do NOT send warehouse_id. Backend derives it from delivery_address_id.
         const orderRes = await ApiService.post('/orders/create/', {
-            delivery_address_id: selectedAddressId, // Mandatory
-            warehouse_id: resolvedWarehouseId,
+            delivery_address_id: selectedAddressId, 
             payment_method: paymentMethod,
             delivery_type: 'express'
         });

@@ -1,119 +1,68 @@
-# apps/orders/views.py
-
 from django.db import transaction
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, IsAdminUser
-from rest_framework.pagination import PageNumberPagination
-from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status, permissions, generics
 from django.conf import settings
-from django.contrib.gis.geos import Point
-from apps.customers.models import CustomerAddress
-from apps.utils.idempotency import idempotent
-from apps.utils.exceptions import BusinessLogicException
-from apps.inventory.services import InventoryService
-from apps.inventory.models import InventoryItem
-from apps.warehouse.models import Warehouse
-from apps.payments.services import PaymentService
 
+from apps.customers.models import CustomerAddress
+from apps.inventory.services import InventoryService
+from apps.warehouse.services import WarehouseService
+from apps.payments.services import PaymentService
 from .models import Order, Cart, CartItem
-from .services import OrderService, OrderSimulationService
-from .serializers import (
-    OrderSerializer, 
-    OrderListSerializer, 
-    CreateOrderSerializer, 
-    CartSerializer
-)
+from .services import OrderService
+from .serializers import CreateOrderSerializer, CartSerializer, OrderListSerializer, OrderSerializer
 
 class ValidateCartAPIView(APIView):
     """
-    Checks if cart items are available in the warehouse covering the selected location.
-    Supports both Saved Address ID (L2) and Raw Lat/Lng (L1).
+    Checks if cart items are valid for the CURRENT detected location.
+    If the user moved locations, this returns 409 Conflict.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        user = request.user
-        address_id = request.data.get('address_id')
-        lat = request.data.get('lat')
-        lng = request.data.get('lng')
+        # request.warehouse is injected by Middleware
+        current_warehouse = request.warehouse
 
-        point = None
+        if not current_warehouse:
+            return Response(
+                {"error": "Location not serviceable", "code": "LOCATION_INVALID"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-        # 1. Resolve Location Point
-        if address_id:
-            try:
-                address = CustomerAddress.objects.get(id=address_id, customer__user=user)
-                point = Point(float(address.longitude), float(address.latitude), srid=4326)
-            except CustomerAddress.DoesNotExist:
-                return Response({"error": "Address not found"}, status=status.HTTP_404_NOT_FOUND)
-        elif lat and lng:
-            try:
-                point = Point(float(lng), float(lat), srid=4326)
-            except (ValueError, TypeError):
-                return Response({"error": "Invalid Coordinates"}, status=status.HTTP_400_BAD_REQUEST)
-        else:
-            return Response({"error": "Provide address_id OR lat/lng"}, status=status.HTTP_400_BAD_REQUEST)
+        cart = Cart.objects.filter(user=request.user).first()
+        if not cart or not cart.items.exists():
+            return Response({"valid": True, "warehouse_id": current_warehouse.id})
 
-        # 2. Find Active Warehouse
-        target_warehouse = Warehouse.objects.filter(
-            delivery_zone__contains=point, 
-            is_active=True
-        ).first()
-
-        if not target_warehouse:
+        # 1. Detect Location Drift (Cart bound to WH-A, User now in WH-B)
+        if cart.warehouse_id != current_warehouse.id:
             return Response({
                 "is_valid": False,
-                "warehouse_id": None,
-                "unavailable_items": [{"product_name": "All Items", "reason": "Not serviceable"}]
-            })
+                "error": "Location changed",
+                "code": "WAREHOUSE_MISMATCH",
+                "message": "Your location changed. Cart contains items from a different store.",
+                "action_required": "clear_cart"
+            }, status=status.HTTP_409_CONFLICT)
 
-        # 3. Check Cart Compatibility
-        cart = Cart.objects.filter(user=user).first()
-        if not cart or not cart.items.exists():
-            return Response({"is_valid": True, "warehouse_id": target_warehouse.id})
-
+        # 2. Validate Stock Availability
         unavailable_items = []
-        cart_items = cart.items.select_related('sku').all()
-
-        for item in cart_items:
-            sku_code = item.sku.sku
-            qty_needed = item.quantity
-
-            # Check inventory in the TARGET warehouse
-            local_inventory = InventoryItem.objects.filter(
-                sku=sku_code,
-                bin__rack__aisle__zone__warehouse=target_warehouse
-            ).first()
-
-            if not local_inventory:
+        for item in cart.items.select_related('sku').all():
+            # Check LIVE stock in the current warehouse
+            # (Note: item.sku is an InventoryItem object)
+            if item.sku.available_stock < item.quantity:
                 unavailable_items.append({
-                    "sku": sku_code,
+                    "sku": item.sku.sku,
                     "product_name": item.sku.product_name,
-                    "reason": "Not sold at this store"
-                })
-            elif local_inventory.available_stock < qty_needed:
-                unavailable_items.append({
-                    "sku": sku_code,
-                    "product_name": item.sku.product_name,
-                    "reason": f"Only {local_inventory.available_stock} left"
+                    "reason": f"Only {item.sku.available_stock} left"
                 })
 
-        # 4. Response
         if unavailable_items:
             return Response({
                 "is_valid": False,
-                "warehouse_id": target_warehouse.id,
                 "unavailable_items": unavailable_items
             })
 
-        return Response({
-            "is_valid": True, 
-            "warehouse_id": target_warehouse.id,
-            "message": "All items available"
-        })
+        return Response({"is_valid": True, "warehouse_id": current_warehouse.id})
 
 class StandardResultsSetPagination(PageNumberPagination):
     page_size = 20
@@ -122,179 +71,181 @@ class StandardResultsSetPagination(PageNumberPagination):
 
 class CreateOrderAPIView(APIView):
     """
-    Transactional Order Creation Endpoint.
+    Secure Order Creation.
+    TRUSTS: Server-side calculated warehouse.
+    IGNORES: Client-side warehouse_id.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
 
-    @idempotent(timeout=86400)
+    @transaction.atomic
     def post(self, request):
         serializer = CreateOrderSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         
-        user = request.user
-        items_data = data.get('items')
-        should_clear_cart = False
-        
-        if not items_data:
-            cart = get_object_or_404(Cart, user=user)
-            if not cart.items.exists():
-                return Response({"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
-            
-            items_data = []
-            for cart_item in cart.items.select_related('sku').all():
-                items_data.append({
-                    "sku": cart_item.sku.sku,
-                    "quantity": cart_item.quantity
-                })
-            should_clear_cart = True
+        # 1. Resolve Address & Warehouse (Securely)
+        try:
+            address = CustomerAddress.objects.get(id=data['delivery_address_id'], customer__user=request.user)
+        except CustomerAddress.DoesNotExist:
+            return Response({"error": "Invalid Delivery Address"}, status=400)
 
-        warehouse_id = data.get('warehouse_id') 
+        # Recalculate Warehouse from Address Coordinates (Single Source of Truth)
+        warehouse = WarehouseService.find_nearest_serviceable_warehouse(
+            address.latitude, address.longitude
+        )
+
+        if not warehouse:
+            return Response(
+                {"error": "This address is not serviceable."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 2. Cart Validation (Double Check)
+        cart = get_object_or_404(Cart, user=request.user)
+        if not cart.items.exists():
+            return Response({"error": "Cart is empty"}, status=400)
+
+        if cart.warehouse_id != warehouse.id:
+            return Response(
+                {"error": "Cart mismatch. Please refresh cart."}, 
+                status=status.HTTP_409_CONFLICT
+            )
+
+        # 3. Prepare Items Data
+        items_data = []
+        for item in cart.items.select_related('sku').all():
+            items_data.append({
+                "sku": item.sku.sku,
+                "quantity": item.quantity
+            })
 
         try:
-            with transaction.atomic():
-                InventoryService.bulk_lock_and_reserve(
-                    warehouse_id=warehouse_id,
-                    items_dict={i['sku']: i['quantity'] for i in items_data},
-                    reference=f"order_{user.id}"
-                )
-                
-                order = OrderService.create_order_after_reservation(
-                    user=user,
-                    warehouse_id=warehouse_id,
-                    items_data=items_data,
-                    delivery_type=data['delivery_type'],
-                    address_id=data['delivery_address_id'],
-                    payment_method=data['payment_method']
-                )
-                
-                if data.get('max_accepted_amount'):
-                    if order.total_amount > data['max_accepted_amount']:
-                        raise BusinessLogicException(
-                            "Price changed during checkout. Please review.", 
-                            code="price_changed"
-                        )
+            # 4. Lock Inventory & Create Order
+            InventoryService.bulk_lock_and_reserve(
+                warehouse_id=warehouse.id,
+                items_dict={i['sku']: i['quantity'] for i in items_data},
+                reference=f"order_init_{request.user.id}"
+            )
+            
+            order = OrderService.create_order_after_reservation(
+                user=request.user,
+                warehouse_id=warehouse.id, # Trusted ID
+                items_data=items_data,
+                delivery_type=data['delivery_type'],
+                address_id=address.id,
+                payment_method=data['payment_method']
+            )
 
-                if should_clear_cart:
-                    cart.items.all().delete()
+            # 5. Clear Cart
+            cart.items.all().delete()
+            # Don't delete cart, just items. Keep warehouse binding until next add.
 
-                razorpay_order = None
-                if data['payment_method'] == 'RAZORPAY':
-                    payment = PaymentService.create_payment(order)
-                    razorpay_order = {
-                        "id": payment.provider_order_id,
-                        "amount": int(payment.amount * 100),
-                        "currency": "INR",
-                        "key_id": getattr(settings, 'RAZORPAY_KEY_ID', '')
-                    }
+            # 6. Payment Init
+            razorpay_order = None
+            if data['payment_method'] == 'RAZORPAY':
+                payment = PaymentService.create_payment(order)
+                razorpay_order = {
+                    "id": payment.provider_order_id,
+                    "amount": int(payment.amount * 100),
+                    "currency": "INR",
+                    "key_id": getattr(settings, 'RAZORPAY_KEY_ID', '')
+                }
 
-                return Response({
-                    "order": OrderSerializer(order).data,
-                    "razorpay_order": razorpay_order
-                }, status=status.HTTP_201_CREATED)
+            return Response({
+                "order": {"id": order.id, "status": order.status, "total": order.total_amount},
+                "razorpay_order": razorpay_order
+            }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            raise e
+            # Log error and return user friendly message
+            return Response({"error": str(e)}, status=400)
+
 
 class MyOrdersAPIView(generics.ListAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
     serializer_class = OrderListSerializer
-    pagination_class = StandardResultsSetPagination
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['status', 'payment_method']
-
     def get_queryset(self):
-        return Order.objects.filter(user=self.request.user)\
-            .select_related("warehouse")\
-            .prefetch_related("items")\
-            .order_by("-created_at")
+        return Order.objects.filter(user=self.request.user).order_by("-created_at")
 
 class OrderDetailAPIView(generics.RetrieveAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
     serializer_class = OrderSerializer
     lookup_field = 'id'
-
     def get_queryset(self):
-        return Order.objects.filter(user=self.request.user)\
-            .select_related("warehouse", "delivery", "delivery__rider__user")\
-            .prefetch_related("items")
+        return Order.objects.filter(user=self.request.user)
 
 class CancelOrderAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
+    permission_classes = [permissions.IsAuthenticated]
     def post(self, request, order_id):
         order = get_object_or_404(Order, id=order_id, user=request.user)
         OrderService.cancel_order(order)
         return Response({"status": "order cancelled"})
 
 class CartAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
+    permission_classes = [permissions.IsAuthenticated]
     def get(self, request):
         cart, _ = Cart.objects.get_or_create(user=request.user)
         return Response(CartSerializer(cart).data)
 
 class AddToCartAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    """
+    Adds items to cart, handling warehouse binding.
+    """
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         sku_code = request.data.get('sku')
-        sku_id = request.data.get('sku_id')
         qty = int(request.data.get('quantity', 1))
-        warehouse_id = request.data.get('warehouse_id')
+        # Trust middleware derived warehouse primarily, fall back to body if specific override needed (rare)
+        warehouse = request.warehouse 
         force_clear = request.data.get('force_clear', False)
 
-        if not warehouse_id:
+        if not warehouse:
             return Response(
-                {"error": "Warehouse Context Missing. Please re-select your location."},
+                {"error": "Location required to add items."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if not sku_code and sku_id:
-            try:
-                sku_code = InventoryItem.objects.get(id=sku_id).sku
-            except InventoryItem.DoesNotExist:
-                return Response({"error": "Invalid Item ID"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        if not sku_code:
-            return Response({"error": "SKU Required"}, status=status.HTTP_400_BAD_REQUEST)
-
+        from apps.inventory.models import InventoryItem
         item_inventory = InventoryItem.objects.filter(
             sku=sku_code,
-            bin__rack__aisle__zone__warehouse_id=warehouse_id
-        ).order_by('-available_stock').first()
+            bin__rack__aisle__zone__warehouse=warehouse
+        ).first()
 
         if not item_inventory:
             return Response(
-                {"error": f"Item '{sku_code}' not available in this store."}, 
+                {"error": "Item not available in this store."}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         cart, _ = Cart.objects.get_or_create(user=request.user)
 
-        if cart.items.exists():
-            existing_item = cart.items.select_related('sku__bin__rack__aisle__zone__warehouse').first()
-            if existing_item and existing_item.sku.warehouse.id != int(warehouse_id):
-                if force_clear:
-                    cart.items.all().delete()
-                else:
-                    return Response({
-                        "error": "Location Mismatch",
-                        "code": "warehouse_conflict",
-                        "message": "Your cart has items from a different store. Clear cart to proceed?",
-                        "action_required": "clear_cart"
-                    }, status=status.HTTP_409_CONFLICT)
+        # Check Conflict
+        if cart.warehouse and cart.warehouse != warehouse:
+            if force_clear:
+                cart.items.all().delete()
+                cart.warehouse = warehouse
+                cart.save()
+            else:
+                return Response({
+                    "error": "Location Mismatch",
+                    "code": "warehouse_conflict",
+                    "message": "Cart contains items from another store. Clear cart?",
+                }, status=status.HTTP_409_CONFLICT)
+        
+        # First item binds the cart
+        if not cart.warehouse:
+            cart.warehouse = warehouse
+            cart.save()
 
         if qty <= 0:
             CartItem.objects.filter(cart=cart, sku__sku=sku_code).delete()
-            cart.refresh_from_db()
-            return Response(CartSerializer(cart).data)
-
-        CartItem.objects.update_or_create(
-            cart=cart,
-            sku=item_inventory, 
-            defaults={'quantity': qty}
-        )
+        else:
+            CartItem.objects.update_or_create(
+                cart=cart,
+                sku=item_inventory,
+                defaults={'quantity': qty}
+            )
 
         return Response(CartSerializer(cart).data)
 

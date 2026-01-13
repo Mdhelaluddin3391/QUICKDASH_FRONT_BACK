@@ -2,11 +2,13 @@
  * Centralized API Service (Production Hardened)
  * - Auto-injects Authorization headers
  * - Handles 401 Token Refresh automatically
+ * - Injects Location Context (L1/L2) for Backend Middleware
  * - Injects Idempotency-Key for mutating requests
  * - Centralized Error Handling
  */
 (function () {
     const ApiService = {
+        
         isRefreshing: false,
         refreshSubscribers: [],
 
@@ -18,32 +20,51 @@
             });
         },
 
+        /**
+         * INJECTS HEADERS
+         * 1. Auth Token
+         * 2. Idempotency Key
+         * 3. Location Context (Critical for Backend Warehouse Resolution)
+         */
         getHeaders: function (uploadFile = false, method = 'GET') {
             const headers = {};
             if (!uploadFile) {
                 headers['Content-Type'] = 'application/json';
             }
 
-            const token = localStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN);
-            // [FIX] Strict check to avoid "Bearer null"
+            // 1. Auth Token
+            const token = localStorage.getItem(window.APP_CONFIG.STORAGE_KEYS.TOKEN);
             if (token && token !== 'null' && token !== 'undefined') {
                 headers['Authorization'] = `Bearer ${token}`;
             }
 
+            // 2. Idempotency
             if (['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
                 headers['Idempotency-Key'] = ApiService.uuidv4();
+            }
+
+            // 3. LOCATION CONTEXT INJECTION (New Architecture)
+            // Checks for L2 (Delivery Address) first, then L1 (GPS)
+            if (window.LocationManager) {
+                const locContext = window.LocationManager.getLocationContext();
+
+                if (locContext.type === 'L2' && locContext.addressId) {
+                    headers['X-Address-ID'] = locContext.addressId.toString();
+                } 
+                
+                if (locContext.lat && locContext.lng) {
+                    headers['X-Location-Lat'] = locContext.lat.toString();
+                    headers['X-Location-Lng'] = locContext.lng.toString();
+                }
             }
 
             return headers;
         },
 
         request: async function (endpoint, method = 'GET', body = null, isRetry = false) {
-            // Defensive: ensure endpoint is a string
             endpoint = typeof endpoint === 'string' ? endpoint : String(endpoint || '/');
-
-            // Ensure endpoint starts with /
             const safeEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-            const url = `${APP_CONFIG.API_BASE_URL}${safeEndpoint}`;
+            const url = `${window.APP_CONFIG.API_BASE_URL}${safeEndpoint}`;
 
             const options = {
                 method,
@@ -51,17 +72,28 @@
             };
 
             if (body) {
-                // Keep behavior identical: JSON body for non-upload
                 options.body = JSON.stringify(body);
             }
 
             try {
                 const response = await fetch(url, options);
 
-                // [AUDIT FIX] Handle 401 Unauthorized (Token Refresh Flow)
+                // [Global Handler] Location/Cart Mismatch (Architecture Step 8)
+                if (response.status === 409) {
+                    const resData = await response.clone().json().catch(() => ({}));
+                    if (resData.code === 'WAREHOUSE_MISMATCH') {
+                        // Cart belongs to Old Warehouse -> User moved to New Warehouse
+                        if (confirm(resData.message || "Your location has changed. Clear cart to proceed?")) {
+                            // Call clear endpoint or just reload (Backend ValidateCart handles logic)
+                             window.location.reload(); 
+                        }
+                        return Promise.reject(new Error("Cart conflict - Location Changed"));
+                    }
+                }
+
+                // [Existing Logic] Handle 401 Unauthorized (Token Refresh Flow)
                 if (response.status === 401 && !isRetry) {
                     if (ApiService.isRefreshing) {
-                        // If already refreshing, queue this request
                         return new Promise((resolve) => {
                             ApiService.refreshSubscribers.push(() => {
                                 resolve(ApiService.request(endpoint, method, body, true));
@@ -77,13 +109,12 @@
                         ApiService.onRefreshed();
                         return ApiService.request(endpoint, method, body, true);
                     } else {
-                        // Refresh failed - Handle Session Expiry smartly
                         ApiService.handleAuthFailure();
-                        return; // Stop execution
+                        return;
                     }
                 }
 
-                // Read response safely to handle empty or non-JSON bodies
+                // Parse Response
                 const text = await response.text();
                 let data;
                 try {
@@ -94,24 +125,11 @@
 
                 if (!response.ok) {
                     let errorMsg = 'An unexpected error occurred';
-
                     if (data) {
-                        if (data.detail) {
-                            errorMsg = data.detail;
-                        } else if (data.error) {
-                            errorMsg = typeof data.error === 'object' ? JSON.stringify(data.error) : data.error;
-                        } else if (data.non_field_errors) {
-                            errorMsg = data.non_field_errors[0];
-                        } else {
-                            const keys = Object.keys(data);
-                            if (keys.length > 0) {
-                                const firstKey = keys[0];
-                                const firstErr = Array.isArray(data[firstKey]) ? data[firstKey][0] : data[firstKey];
-                                errorMsg = `${firstKey}: ${firstErr}`;
-                            }
-                        }
+                        if (data.detail) errorMsg = data.detail;
+                        else if (data.error) errorMsg = typeof data.error === 'object' ? JSON.stringify(data.error) : data.error;
+                        else if (data.non_field_errors) errorMsg = data.non_field_errors[0];
                     }
-
                     throw new Error(errorMsg);
                 }
 
@@ -126,11 +144,11 @@
         },
 
         refreshToken: async function () {
-            const refresh = localStorage.getItem(APP_CONFIG.STORAGE_KEYS.REFRESH);
+            const refresh = localStorage.getItem(window.APP_CONFIG.STORAGE_KEYS.REFRESH);
             if (!refresh) return false;
 
             try {
-                const response = await fetch(`${APP_CONFIG.API_BASE_URL}/auth/refresh/`, {
+                const response = await fetch(`${window.APP_CONFIG.API_BASE_URL}/auth/refresh/`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ refresh })
@@ -138,9 +156,9 @@
 
                 if (response.ok) {
                     const data = await response.json();
-                    localStorage.setItem(APP_CONFIG.STORAGE_KEYS.TOKEN, data.access);
+                    localStorage.setItem(window.APP_CONFIG.STORAGE_KEYS.TOKEN, data.access);
                     if (data.refresh) {
-                        localStorage.setItem(APP_CONFIG.STORAGE_KEYS.REFRESH, data.refresh);
+                        localStorage.setItem(window.APP_CONFIG.STORAGE_KEYS.REFRESH, data.refresh);
                     }
                     return true;
                 }
@@ -155,18 +173,11 @@
             ApiService.refreshSubscribers = [];
         },
 
-        /**
-         * Smart Logout: 
-         * If on a public page (Home, Search), just clear token and reload (Guest Mode).
-         * If on a private page (Profile, Checkout), redirect to Login.
-         */
         handleAuthFailure: function() {
-            // 1. Clear Stale Data
-            localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.TOKEN);
-            localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.REFRESH);
-            localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.USER);
+            localStorage.removeItem(window.APP_CONFIG.STORAGE_KEYS.TOKEN);
+            localStorage.removeItem(window.APP_CONFIG.STORAGE_KEYS.REFRESH);
+            localStorage.removeItem(window.APP_CONFIG.STORAGE_KEYS.USER);
 
-            // 2. Determine Page Type
             const currentPath = window.location.pathname;
             const privatePages = [
                 '/profile.html', '/orders.html', '/checkout.html',
@@ -176,29 +187,17 @@
             const isPrivate = privatePages.some(page => currentPath.includes(page));
 
             if (isPrivate) {
-                window.location.href = APP_CONFIG.ROUTES.LOGIN;
+                window.location.href = window.APP_CONFIG.ROUTES.LOGIN;
             } else {
-                console.warn("Session expired on public page.");
-
-                // [FIX] Use sessionStorage instead of window variable
-                // This persists across the reload so the loop actually stops.
                 if (!sessionStorage.getItem('auth_reload_lock')) {
                     sessionStorage.setItem('auth_reload_lock', 'true');
-                    console.warn("Attempting one-time recovery reload...");
-                    try {
-                        window.location.reload();
-                    } catch (e) {
-                        console.warn("Reload failed", e);
-                    }
+                    window.location.reload();
                 } else {
-                    console.warn("Reload already attempted; skipping to prevent loop.");
-                    // Optional: Clear the lock after 10 seconds so normal usage isn't broken forever
                     setTimeout(() => sessionStorage.removeItem('auth_reload_lock'), 10000);
                 }
             }
         },
 
-        // Public shortcut methods (preserve names and behavior)
         get: function (endpoint) { return this.request(endpoint, 'GET'); },
         post: function (endpoint, body) { return this.request(endpoint, 'POST', body); },
         put: function (endpoint, body) { return this.request(endpoint, 'PUT', body); },

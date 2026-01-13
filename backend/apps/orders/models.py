@@ -1,7 +1,8 @@
-# apps/orders/models.py
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from apps.warehouse.models import Warehouse
+from apps.catalog.models import Product
 
 User = settings.AUTH_USER_MODEL
 
@@ -82,18 +83,26 @@ class OrderAbuseLog(models.Model):
 
 class Cart(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="cart")
+    
+    # This ensures a cart created in 'Zone A' cannot be checked out in 'Zone B'
+    # without re-validation.
+    warehouse = models.ForeignKey(Warehouse, on_delete=models.CASCADE, null=True) 
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def __str__(self):
+        return f"Cart({self.user}) - {self.warehouse.code if self.warehouse else 'No WH'}"
+
     @property
     def total_amount(self):
-        # Calculated live from current inventory prices
         return sum(item.total_price for item in self.items.all())
 
 
 class CartItem(models.Model):
-    cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name="items")
-    # Link to InventoryItem for live stock/price checks
+    cart = models.ForeignKey(Cart, related_name='items', on_delete=models.CASCADE)
+    
+    # Link to InventoryItem directly for live stock checks
     sku = models.ForeignKey('inventory.InventoryItem', on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
     

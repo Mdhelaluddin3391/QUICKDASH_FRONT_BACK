@@ -2,50 +2,36 @@
 from rest_framework import serializers
 from .models import Order, OrderItem, Cart, CartItem
 from apps.catalog.models import Product
+from rest_framework import serializers
+from .models import Order, OrderItem, Cart, CartItem
+from apps.catalog.models import Product
+from rest_framework import serializers
+from .models import Order
 
 class CartItemSerializer(serializers.ModelSerializer):
-    sku_id = serializers.IntegerField(source='sku.id', read_only=True)
-    sku = serializers.CharField(source='sku.sku', read_only=True)  # Added SKU String
-    sku_name = serializers.CharField(source='sku.product_name', read_only=True)
-    sku_image = serializers.SerializerMethodField()
-    sku_unit = serializers.SerializerMethodField()
-    unit_price = serializers.DecimalField(source='sku.price', max_digits=10, decimal_places=2, read_only=True)
-    warehouse_id = serializers.IntegerField(source='sku.warehouse.id', read_only=True)
-    
+    sku_code = serializers.CharField(source='sku.sku', read_only=True)
+    product_name = serializers.CharField(source='sku.product_name', read_only=True)
+    price = serializers.DecimalField(source='sku.price', max_digits=10, decimal_places=2, read_only=True)
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = CartItem
-        fields = (
-            'id', 'sku_id', 'sku', 'sku_name', 'sku_image', 
-            'sku_unit', 'quantity', 'unit_price', 'total_price', 
-            'warehouse_id'
-        )
+        fields = ('id', 'sku_code', 'product_name', 'quantity', 'price', 'total_price', 'image')
 
-    def get_sku_image(self, obj):
-        # Resolve product image from Catalog Product model via SKU code
-        product = Product.objects.filter(sku=obj.sku.sku).first()
-        if product and product.image:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(product.image.url)
-            return product.image.url
+    def get_image(self, obj):
+        # Resolve via SKU string from Catalog
+        p = Product.objects.filter(sku=obj.sku.sku).first()
+        if p and p.image:
+            return p.image.url
         return None
-
-    def get_sku_unit(self, obj):
-        product = Product.objects.filter(sku=obj.sku.sku).first()
-        return product.unit if product else "1 Unit"
-
-    def get_total_price(self, obj):
-        return obj.unit_price * obj.quantity
-
 
 
 class CartSerializer(serializers.ModelSerializer):
     items = CartItemSerializer(many=True, read_only=True)
-    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
-
+    
     class Meta:
         model = Cart
-        fields = ('id', 'items', 'total_amount')
+        fields = ('id', 'items', 'total_amount', 'warehouse')
 
 class OrderItemSerializer(serializers.ModelSerializer):
     sku_image = serializers.SerializerMethodField()
@@ -117,7 +103,14 @@ class OrderListSerializer(serializers.ModelSerializer):
 
 class CreateOrderSerializer(serializers.Serializer):
     # [FIX] Removed default=1. Warehouse ID is mandatory for inventory locking.
-    warehouse_id = serializers.IntegerField(required=True)
+    # warehouse_id = serializers.IntegerField(required=True)
+    address_id = serializers.IntegerField(required=True)
+    payment_method = serializers.ChoiceField(choices=Order.PAYMENT_CHOICES)
+    # total_amount should ideally be calculated on server, but for now we validate it
+    total_amount = serializers.DecimalField(max_digits=10, decimal_places=2) 
+    
+    # REMOVED warehouse_id entirely.
+    # REMOVED items list (we fetch from DB Cart).
     
     delivery_type = serializers.ChoiceField(choices=["express", "standard"], default="express")
     delivery_address_id = serializers.IntegerField(required=True)

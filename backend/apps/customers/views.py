@@ -10,9 +10,82 @@ from .models import SupportTicket, CustomerAddress
 from apps.accounts.serializers import UserSerializer
 from .serializers import CustomerAddressSerializer, SupportTicketSerializer 
 from .services import CustomerService
+from rest_framework import generics, status, permissions
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from django.shortcuts import get_object_or_404
+from .models import CustomerAddress
+from .serializers import CustomerAddressSerializer
+from apps.warehouse.services import WarehouseService
+
+
 
 User = get_user_model()
 logger = logging.getLogger(__name__)  # <--- Initialize logger at module level
+
+
+
+
+class CustomerAddressListCreateView(generics.ListCreateAPIView):
+    serializer_class = CustomerAddressSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Return most recently used addresses first
+        return CustomerAddress.objects.filter(customer__user=self.request.user, is_deleted=False).order_by('-is_default', '-updated_at')
+
+    def perform_create(self, serializer):
+        # 1. Auto-set Customer
+        # 2. If set as default, unset others
+        customer = self.request.user.customer_profile
+        
+        if serializer.validated_data.get('is_default', False):
+            CustomerAddress.objects.filter(customer=customer).update(is_default=False)
+            
+        serializer.save(customer=customer)
+
+    def create(self, request, *args, **kwargs):
+        # Custom Create to Validate Serviceability immediately
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        lat = serializer.validated_data.get('latitude')
+        lng = serializer.validated_data.get('longitude')
+        
+        # Check if we serve this location (UX Warning)
+        # We allow saving it, but we can tag it or warn the user
+        wh = WarehouseService.get_nearest_warehouse(lat, lng)
+        if not wh:
+            # We still save it (user might want to save Mom's house)
+            # but we return a warning flag
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            return Response(
+                {
+                    "data": serializer.data, 
+                    "warning": "Location currently unserviceable"
+                }, 
+                status=status.HTTP_201_CREATED, 
+                headers=headers
+            )
+
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
+
+class CustomerAddressDetailView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = CustomerAddressSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return CustomerAddress.objects.filter(customer__user=self.request.user, is_deleted=False)
+
+    def perform_destroy(self, instance):
+        # Soft Delete
+        instance.is_deleted = True
+        instance.save()
+
 
 class CustomerProfileAPIView(APIView):
     """

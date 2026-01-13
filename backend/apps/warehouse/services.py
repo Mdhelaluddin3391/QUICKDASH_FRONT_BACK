@@ -8,21 +8,105 @@ from django.utils import timezone
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.core.cache import cache
-
+from django.contrib.gis.geos import Point
+from django.db.models import F
+from .models import Warehouse
 from .models import Warehouse, PickingTask, PackingTask, Bin
 from apps.orders.models import Order
 from apps.inventory.models import InventoryItem, InventoryTransaction
 from apps.inventory.services import InventoryService
 from apps.utils.exceptions import BusinessLogicException
+import logging
+from django.contrib.gis.geos import Point
+from django.core.cache import cache
+from django.db.models import F
+from .models import Warehouse
+
+logger = logging.getLogger(__name__)
+
+
+
 
 class WarehouseService:
-    
+    CACHE_TIMEOUT = 300
+
+
     @staticmethod
     def get_active_warehouses(city: str):
         return Warehouse.objects.filter(
             city__iexact=city,
             is_active=True,
         )
+    
+
+    @staticmethod
+    def get_nearest_warehouse(lat, lng):
+        """
+        Finds the Serviceable Warehouse for a given Lat/Lng.
+        Uses Redis Caching to prevent DB spikes during high traffic.
+        """
+        try:
+            lat = float(lat)
+            lng = float(lng)
+        except (ValueError, TypeError):
+            return None
+
+        # 1. Check Cache (Round to ~11 meters precision)
+        # Key format: wh_lookup_12.9716_77.5946
+        cache_key = f"wh_lookup_{round(lat, 4)}_{round(lng, 4)}"
+        cached_id = cache.get(cache_key)
+
+        if cached_id:
+            try:
+                # Fast DB ID lookup is cheaper than Spatial Query
+                return Warehouse.objects.get(id=cached_id, is_active=True)
+            except Warehouse.DoesNotExist:
+                cache.delete(cache_key)
+
+        # 2. Database Spatial Query (PostGIS)
+        point = Point(lng, lat, srid=4326)
+        
+        # Priority:
+        # 1. Warehouse where point is strictly inside the Delivery Zone Polygon
+        # 2. Warehouse is Active
+        warehouse = Warehouse.objects.filter(
+            delivery_zone__contains=point,
+            is_active=True
+        ).first()
+
+        # 3. Cache Result
+        if warehouse:
+            cache.set(cache_key, warehouse.id, timeout=WarehouseService.CACHE_TIMEOUT)
+            return warehouse
+        
+        # 4. (Optional) Log Miss for Analytics (Heatmap of unserviceable areas)
+        # logger.info(f"Service Miss: {lat}, {lng}")
+        
+        return None
+    
+
+
+    @staticmethod
+    def get_warehouse_by_id(warehouse_id):
+        return Warehouse.objects.filter(id=warehouse_id, is_active=True).first()
+    
+
+
+
+
+    @staticmethod
+    def validate_warehouse_serviceability(warehouse, lat, lng):
+        """
+        Double check if a specific warehouse still serves a location.
+        Useful during Checkout to ensure the User hasn't drifted out of zone.
+        """
+        if not warehouse.delivery_zone:
+            return False # Strict mode: No Zone = No Service
+            
+        point = Point(float(lng), float(lat), srid=4326)
+        return warehouse.delivery_zone.contains(point)
+        
+
 
     @staticmethod
     def find_nearest_serviceable_warehouse(lat, lon, city=None, delivery_type="express"):

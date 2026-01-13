@@ -1,13 +1,15 @@
-# apps/core/middleware.py
 import uuid
 import logging
 from contextvars import ContextVar
+from django.utils.deprecation import MiddlewareMixin
 from django.http import JsonResponse
 from django.core.cache import cache
+from django.contrib.gis.geos import Point
+from apps.warehouse.models import Warehouse
 
 logger = logging.getLogger(__name__)
 
-# ContextVar is essential for async/ASGI safety (unlike threading.local)
+# ContextVar for Request ID (Async Safe)
 _correlation_id = ContextVar("correlation_id", default=None)
 
 def get_correlation_id():
@@ -15,75 +17,108 @@ def get_correlation_id():
 
 class CorrelationIDMiddleware:
     """
-    Attaches a unique Request ID to every request for distributed tracing.
-    Crucial for debugging across Nginx, Gunicorn, Celery, and Postgres.
+    Attaches a unique Request ID (Trace ID) to every request.
     """
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        # 1. Prefer upstream header from LB/Nginx
-        request_id = request.headers.get('X-Request-ID')
-        if not request_id:
-            request_id = str(uuid.uuid4())
-        
-        # 2. Set context variable for this request chain
+        request_id = request.headers.get('X-Request-ID') or str(uuid.uuid4())
         token = _correlation_id.set(request_id)
-        
-        # 3. Attach to request object for easy view access
         request.correlation_id = request_id
 
         try:
             response = self.get_response(request)
-            # 4. Expose in Response Header for client-side tracing
             response['X-Request-ID'] = request_id
             return response
         finally:
-            # 5. Clean up context to prevent leakage in async pools
             _correlation_id.reset(token)
-
 
 class GlobalKillSwitchMiddleware:
     """
-    Emergency Stop: Rejects state-changing requests if KILL_SWITCH is active.
-    Used during critical incidents or maintenance.
+    Emergency Stop for maintenance or critical incidents.
     """
     def __init__(self, get_response):
         self.get_response = get_response
 
     def __call__(self, request):
-        # Only block state-changing methods (POST, PUT, PATCH, DELETE)
         if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
             try:
-                # Key: 'config:kill_switch:active'
                 if cache.get("config:kill_switch:active"):
-                    logger.warning(f"Kill Switch Blocked Request: {request.path} | IP: {request.META.get('REMOTE_ADDR')}")
-                    return self._reject_request(request)
-                    
-            except Exception as e:
-                # SECURITY FIX: Fail Closed
-                # If Redis is down, we cannot guarantee the system is safe to write to.
-                # We block write traffic to prevent data corruption or inconsistencies.
-                logger.critical(f"CRITICAL: Kill Switch State Unknown (Redis Down). Blocking Write Traffic. Error: {e}")
-                return JsonResponse(
-                    {
-                        "error": {
-                            "code": "system_outage", 
-                            "message": "System is temporarily unavailable due to internal checks."
-                        }
-                    }, 
-                    status=503
-                )
-
+                    return JsonResponse(
+                        {"error": {"code": "maintenance_mode", "message": "System under maintenance."}}, 
+                        status=503
+                    )
+            except Exception:
+                # Fail Closed: If Redis is down, block writes to prevent corruption
+                return JsonResponse({"error": "System error"}, status=503)
         return self.get_response(request)
 
-    def _reject_request(self, request):
-        return JsonResponse(
-            {
-                "error": {
-                    "code": "maintenance_mode", 
-                    "message": "System is under maintenance. Read-only mode active."
-                }
-            }, 
-            status=503
-        )
+class LocationContextMiddleware(MiddlewareMixin):
+    """
+    🚀 CORE LOCATION INTELLIGENCE
+    Resolves the 'Serviceable Warehouse' based on Frontend Headers.
+    This ensures the Backend is the Single Source of Truth.
+    """
+
+    def process_request(self, request):
+        # 1. Initialize Default State
+        request.warehouse = None
+        request.user_coords = None
+
+        # 2. Extract Headers (Injected by api.service.js)
+        lat = request.headers.get('X-Location-Lat')
+        lng = request.headers.get('X-Location-Lng')
+        address_id = request.headers.get('X-Address-ID')
+
+        # 3. Strategy A: Resolve from Address ID (Higher Priority - L2)
+        if address_id and request.user.is_authenticated:
+            from apps.customers.models import CustomerAddress
+            try:
+                address = CustomerAddress.objects.get(id=address_id, customer__user=request.user)
+                request.user_coords = (address.latitude, address.longitude)
+                # Resolve Warehouse strictly for this address
+                request.warehouse = self._resolve_warehouse(address.latitude, address.longitude)
+                return
+            except CustomerAddress.DoesNotExist:
+                pass # Fallback to Lat/Lng headers if address invalid
+
+        # 4. Strategy B: Resolve from Raw GPS (Browsing - L1)
+        if lat and lng:
+            try:
+                lat = float(lat)
+                lng = float(lng)
+                request.user_coords = (lat, lng)
+                request.warehouse = self._resolve_warehouse(lat, lng)
+            except (ValueError, TypeError):
+                pass
+
+    def _resolve_warehouse(self, lat, lng):
+        """
+        Resolves Warehouse with Redis Caching (Geo-Hashing Strategy).
+        Rounds coordinates to 4 decimal places (~11m) to increase cache hits.
+        """
+        cache_key = f"wh_poly_lookup_{round(lat, 4)}_{round(lng, 4)}"
+        cached_wh_id = cache.get(cache_key)
+
+        if cached_wh_id:
+            try:
+                return Warehouse.objects.get(id=cached_wh_id)
+            except Warehouse.DoesNotExist:
+                cache.delete(cache_key)
+
+        # PostGIS Point-in-Polygon Query
+        point = Point(float(lng), float(lat), srid=4326)
+        
+        # Priority: Delivery Zone Polygon > Active Status
+        warehouse = Warehouse.objects.filter(
+            delivery_zone__contains=point,
+            is_active=True
+        ).first()
+
+        if warehouse:
+            # Cache valid lookup for 5 minutes
+            cache.set(cache_key, warehouse.id, timeout=300)
+            return warehouse
+        
+        return None

@@ -1,4 +1,3 @@
-# apps/inventory/services.py
 import redis
 import logging
 from django.conf import settings
@@ -7,6 +6,7 @@ from django.db.models import F
 from django.core.exceptions import ValidationError
 from .models import InventoryItem, InventoryTransaction
 from apps.utils.exceptions import BusinessLogicException
+from django.db import models # Added missing import
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,20 @@ class InventoryService:
     LUA_SUCCESS = 1
     LUA_STOCK_OUT = 0
     LUA_MISSING_KEY = -1
+
+    @staticmethod
+    def check_stock(product_id, warehouse_id, quantity):
+        """
+        Quick read-only check (Non-locking). 
+        Used for UI display (Cart validation).
+        """
+        # We sum up available stock across all bins in the warehouse for this product
+        inventory = InventoryItem.objects.filter(
+            product_id=product_id,
+            bin__rack__aisle__zone__warehouse_id=warehouse_id
+        ).aggregate(total=models.Sum('available_stock'))['total'] or 0
+        
+        return inventory >= quantity
 
     @staticmethod
     def _get_cache_key(warehouse_id: int, sku: str) -> str:
@@ -97,9 +111,6 @@ class InventoryService:
             if not item or item.available_stock < quantity:
                 raise BusinessLogicException(f"Out of stock: {sku}", code="stock_out")
             
-            # We don't actually deduct from DB here for temporary reservation 
-            # unless we want to mix persistent/ephemeral logic. 
-            # For this architecture, we assume this is a hard check.
             return True
 
     @staticmethod
@@ -284,8 +295,6 @@ class InventoryService:
             r.set(key, item.available_stock, ex=InventoryService.INVENTORY_TTL)
         except Exception as e:
             logger.error(f"Redis Sync Error: {e}")
-
-
 
     @staticmethod
     @transaction.atomic

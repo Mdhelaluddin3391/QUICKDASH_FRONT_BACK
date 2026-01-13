@@ -1,131 +1,115 @@
 /**
- * LocationManager: Centralized State Management for QuickDash Location Logic.
- * 1. L1 (Service Context): Browsing/Stock checks (GPS/Map Pin).
- * 2. L2 (Delivery Context): Checkout/Tax/Final routing (User Address).
- * 3. L2 always overrides L1 in UI display.
+ * LocationManager: Centralized State Management (Architecture v2.0)
+ * * Philosophy:
+ * - "Dumb" State Container: It just holds Lat, Lng, and Address ID.
+ * - Logic is in Backend: Backend decides if a location is serviceable.
+ * - L2 (Delivery Address) always overrides L1 (GPS).
  */
 const LocationManager = {
-    get KEYS() {
-        const k = window.APP_CONFIG?.STORAGE_KEYS || {};
-        return {
-            SERVICE: k.SERVICE_CONTEXT || 'app_service_context',
-            DELIVERY: k.DELIVERY_CONTEXT || 'app_delivery_context',
-            WAREHOUSE: k.WAREHOUSE_ID || 'current_warehouse_id'
-        };
+    KEYS: {
+        LAT: 'app_lat',
+        LNG: 'app_lng',
+        ADDRESS_ID: 'app_address_id',
+        ADDRESS_TEXT: 'app_address_text' // For UI display only
     },
 
-    getDisplayLocation() {
-        const delivery = this.getDeliveryContext();
-        const service = this.getServiceContext();
+    /**
+     * Set Location (Universal)
+     * - If addressId is provided, it's L2 (Delivery Mode).
+     * - If only lat/lng, it's L1 (Browsing Mode).
+     */
+    setLocation(lat, lng, addressText = '', addressId = null) {
+        localStorage.setItem(this.KEYS.LAT, lat);
+        localStorage.setItem(this.KEYS.LNG, lng);
+        
+        if (addressText) {
+            localStorage.setItem(this.KEYS.ADDRESS_TEXT, addressText);
+        }
+        
+        if (addressId) {
+            localStorage.setItem(this.KEYS.ADDRESS_ID, addressId);
+        } else {
+            localStorage.removeItem(this.KEYS.ADDRESS_ID); // Switch to L1 (Browsing)
+        }
 
-        // PRIORITY 1: Delivery Address (Checkout Context)
-        if (delivery && delivery.id) {
+        // Dispatch event for UI updates (Navbar, Cart)
+        window.dispatchEvent(new CustomEvent(window.APP_CONFIG?.EVENTS?.LOCATION_CHANGED || 'locationChanged', {
+            detail: { lat, lng, addressId }
+        }));
+    },
+
+    /**
+     * Returns context for ApiService Headers
+     */
+    getLocationContext() {
+        const lat = localStorage.getItem(this.KEYS.LAT);
+        const lng = localStorage.getItem(this.KEYS.LNG);
+        const addressId = localStorage.getItem(this.KEYS.ADDRESS_ID);
+
+        if (addressId) {
+            return { type: 'L2', addressId, lat, lng };
+        } else if (lat && lng) {
+            return { type: 'L1', lat, lng };
+        }
+        return { type: 'NONE' };
+    },
+
+    /**
+     * For UI Components (Navbar, Address Picker)
+     * Maintains backward compatibility with your frontend templates
+     */
+    getDisplayLocation() {
+        const addressId = localStorage.getItem(this.KEYS.ADDRESS_ID);
+        const addressText = localStorage.getItem(this.KEYS.ADDRESS_TEXT);
+        const lat = localStorage.getItem(this.KEYS.LAT);
+
+        // PRIORITY 1: Delivery Context (L2)
+        if (addressId) {
             return {
                 type: 'DELIVERY',
-                label: delivery.label || 'Delivery',
-                subtext: delivery.address_line || delivery.city || 'Selected Address',
-                is_active: true
+                label: 'Delivery to',
+                subtext: addressText || 'Selected Address',
+                is_active: true,
+                id: addressId
             };
         }
 
-        // PRIORITY 2: Service Location (Browsing Context)
-        if (service && service.lat) {
+        // PRIORITY 2: Service Context (L1)
+        if (lat) {
             return {
                 type: 'SERVICE',
-                label: service.area_name || service.city || 'Current Location',
-                subtext: service.city || '',
+                label: 'Browsing in',
+                subtext: addressText || 'Current Location',
                 is_active: false
             };
         }
 
-        // PRIORITY 3: Default
+        // PRIORITY 3: None
         return {
             type: 'NONE',
-            label: 'Select your location',
+            label: 'Select Location',
             subtext: '',
             is_active: false
         };
     },
 
-    getServiceContext() {
-        try { return JSON.parse(localStorage.getItem(this.KEYS.SERVICE)); } catch (e) { return null; }
+    hasLocation() {
+        return !!localStorage.getItem(this.KEYS.LAT);
     },
 
-    getDeliveryContext() {
-        try { return JSON.parse(localStorage.getItem(this.KEYS.DELIVERY)); } catch (e) { return null; }
-    },
-
-    /**
-     * Sets Browsing Location (L1).
-     * CRITICAL: Wipes Delivery Context (L2) to prevent "Ghost Address" conflicts.
-     */
-    setServiceLocation(data) {
-        const payload = {
-            lat: Number(data.lat),
-            lng: Number(data.lng),
-            area_name: data.area_name || 'Pinned Location',
-            city: data.city || '',
-            formatted_address: data.formatted_address || ''
-        };
-        
-        console.info('LocationManager: Set L1 (Service)', payload);
-        // Preserve DELIVERY context (L2). Do NOT wipe it here; Delivery must always override Service in UI.
-        const existingDelivery = localStorage.getItem(this.KEYS.DELIVERY);
-        localStorage.setItem(this.KEYS.SERVICE, JSON.stringify(payload));
-        if (existingDelivery) {
-            // Sanity check in dev: ensure we didn't accidentally remove delivery
-            console.assert(localStorage.getItem(this.KEYS.DELIVERY) !== null, 'Delivery context was unexpectedly removed by setServiceLocation');
-        }
-
-        this._notifyChange('SERVICE');
-    },
-
-    /**
-     * Sets Delivery Address (L2).
-     */
-    setDeliveryAddress(addressObj) {
-        const payload = {
-            id: addressObj.id,
-            label: addressObj.label, 
-            address_line: addressObj.address_line || addressObj.google_address_text,
-            city: addressObj.city,
-            lat: addressObj.latitude,
-            lng: addressObj.longitude
-        };
-
-        console.info('LocationManager: Set L2 (Delivery)', payload);
-        localStorage.setItem(this.KEYS.DELIVERY, JSON.stringify(payload));
-        this._notifyChange('DELIVERY');
-    },
-
-    _notifyChange(source) {
-        window.dispatchEvent(new CustomEvent(window.APP_CONFIG.EVENTS.LOCATION_CHANGED, { detail: { source } }));
+    clearLocation() {
+        Object.values(this.KEYS).forEach(key => localStorage.removeItem(key));
+        window.location.reload();
     }
 };
+
+// MULTI-TAB SYNC
+// If user changes location in Tab A, Tab B will auto-reload to prevent Ghost Carts.
+window.addEventListener('storage', (e) => {
+    if (e.key === LocationManager.KEYS.ADDRESS_ID || e.key === LocationManager.KEYS.LAT) {
+        console.warn("Location changed in another tab. Syncing...");
+        window.location.reload(); 
+    }
+});
+
 window.LocationManager = LocationManager;
-
-// --- DEV SANITY CHECK (non-destructive; only runs on localhost) ---
-(function(){
-    try {
-        if (!window.LocationManager) return;
-        if (!window.location || !(window.location.hostname === 'localhost' || (window.APP_CONFIG && window.APP_CONFIG.API_BASE_URL && window.APP_CONFIG.API_BASE_URL.includes('localhost')))) return;
-
-        const DKEY = LocationManager.KEYS.DELIVERY;
-        const backup = localStorage.getItem(DKEY);
-        try {
-            // Insert a temporary delivery context
-            localStorage.setItem(DKEY, JSON.stringify({ id: '__sanity__', label: 'SANITY', address_line: 'Sanity address' }));
-            // Call setServiceLocation (should NOT remove delivery context)
-            LocationManager.setServiceLocation({ lat: 0.1, lng: 0.1, city: 'SanityCity', area_name: 'SanityArea' });
-
-            if (!localStorage.getItem(DKEY)) {
-                console.error('LocationManager SANITY FAIL: Delivery context was removed by setServiceLocation');
-            } else {
-                console.info('LocationManager SANITY OK: Delivery context preserved by setServiceLocation');
-            }
-        } finally {
-            if (backup) localStorage.setItem(DKEY, backup);
-            else localStorage.removeItem(DKEY);
-        }
-    } catch (e) { /* ignore */ }
-})();

@@ -1,64 +1,63 @@
 # apps/customers/serializers.py
 from rest_framework import serializers
 from .models import CustomerProfile, CustomerAddress, SupportTicket
+from rest_framework import serializers
+from .models import CustomerAddress
+
+
+
 
 class CustomerAddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerAddress
         fields = (
-            "id",
-            "latitude",
-            "longitude",
-            "house_no",
-            "floor_no",
-            "apartment_name",
-            "landmark",
-            "google_address_text",
-            "city",
-            "pincode",
-            "label",
-            "receiver_name",
-            "receiver_phone",
-            "is_default"
+            'id', 'label', 'house_no', 'apartment_name', 
+            'landmark', 'address_line', 'city', 'pincode', 
+            'latitude', 'longitude', 'is_default', 'google_address_text'
         )
-        read_only_fields = ("id",)
+        read_only_fields = ('id',)
 
     def validate(self, data):
         """
-        Security & Integrity Checks.
+        STRICT GEO-VALIDATION
+        We cannot allow an address to be saved without coordinates, 
+        as this would bypass the Serviceability Checks during checkout.
         """
-        request = self.context.get('request')
-        if not request or not request.user:
-            raise serializers.ValidationError("Authentication required")
-
-        # 1. Coordinate Bounds Sanity Check
         lat = data.get('latitude')
         lng = data.get('longitude')
-        if lat is not None and lng is not None:
-            try:
-                lat_f = float(lat)
-                lng_f = float(lng)
-            except (ValueError, TypeError):
-                raise serializers.ValidationError("Invalid coordinates")
-            if not (-90 <= lat_f <= 90) or not (-180 <= lng_f <= 180):
-                raise serializers.ValidationError("Invalid coordinates")
 
-        # 2. Label Uniqueness (Per User)
-        # Prevent user from having 5 addresses named "Home"
-        if request.method == 'POST':
-            label = data.get('label')
-            exists = CustomerAddress.objects.filter(
-                customer__user=request.user,
-                label__iexact=label, # Case insensitive check
-                is_deleted=False
-            ).exists()
-            
-            if exists:
-                raise serializers.ValidationError({
-                    "label": f"You already have an address named '{label}'. Please use a different name."
-                })
+        # 1. Coordinate Check
+        if not lat or not lng:
+            raise serializers.ValidationError(
+                "Precise location is required. Please select your location on the map."
+            )
+
+        # 2. Range Check
+        try:
+            if not (-90 <= float(lat) <= 90) or not (-180 <= float(lng) <= 180):
+                raise serializers.ValidationError("Invalid coordinates.")
+        except (ValueError, TypeError):
+            raise serializers.ValidationError("Invalid coordinate format.")
 
         return data
+
+    def update(self, instance, validated_data):
+        """
+        PREVENT COORDINATE DRIFT
+        If a user wants to change the location pin, they should create a new address.
+        Editing coordinates of an existing address causes order history inconsistencies.
+        """
+        if 'latitude' in validated_data or 'longitude' in validated_data:
+            # Check if they actually changed significantly
+            old_lat = float(instance.latitude)
+            new_lat = float(validated_data.get('latitude', old_lat))
+            
+            if abs(old_lat - new_lat) > 0.0001: # approx 11 meters
+                raise serializers.ValidationError(
+                    "You cannot move the pin of a saved address. Please delete and create a new one."
+                )
+        
+        return super().update(instance, validated_data)
 
 
 class CustomerProfileSerializer(serializers.ModelSerializer):
