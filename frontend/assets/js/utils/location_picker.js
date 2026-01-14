@@ -20,7 +20,8 @@ window.LocationPicker = {
     get useGoogleMaps() {
         const config = window.APP_CONFIG || {};
         const key = config.GOOGLE_MAPS_KEY;
-        const isDev = config.ENV === 'development' || !key || key.includes('REPLACE') || key.length < 20;
+        // Basic validation for map key
+        const isDev = !key || key.includes('REPLACE') || key.length < 20;
         return !isDev;
     },
 
@@ -132,6 +133,7 @@ window.LocationPicker = {
     },
 
     async loadLeafletLib() {
+        if (window.L) return;
         return new Promise((resolve, reject) => {
             const css = document.createElement('link');
             css.rel = 'stylesheet';
@@ -221,7 +223,7 @@ window.LocationPicker = {
     },
 
     // ---------------------------------------------------------
-    // ✅ NEW: ROBUST GPS LOGIC (Fixes Timeout Error)
+    // ✅ ROBUST GPS LOGIC (Fallbacks included)
     // ---------------------------------------------------------
     
     async detectRealLocation(isSilent = false) {
@@ -237,7 +239,6 @@ window.LocationPicker = {
 
         try {
             // 2. Attempt 1: High Accuracy (GPS) with 5s Timeout
-            // Fails fast if indoors to switch to fallback quicker
             const position = await this._getPosition({ 
                 enableHighAccuracy: true, 
                 timeout: 5000, 
@@ -249,7 +250,6 @@ window.LocationPicker = {
             console.warn("High Accuracy GPS failed, switching to fallback...", err.message);
 
             // 3. Attempt 2: Low Accuracy (Wifi/Network)
-            // Much faster, rarely times out
             try {
                 const position = await this._getPosition({ 
                     enableHighAccuracy: false, 
@@ -264,7 +264,6 @@ window.LocationPicker = {
         }
     },
 
-    // Helper: Wrap Geolocation API in Promise
     _getPosition(options) {
         return new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, options);
@@ -314,6 +313,7 @@ window.LocationPicker = {
         const addr = this.tempAddressData || { formatted_address: 'Pinned Location' };
         
         if (this.callback) {
+            // PICKER MODE: Return data to caller (e.g., Address Form)
             this.callback({
                 lat: this.tempCoords.lat,
                 lng: this.tempCoords.lng,
@@ -325,6 +325,7 @@ window.LocationPicker = {
             return;
         }
 
+        // SERVICE MODE: Set Browsing Location
         if (this.mode === 'SERVICE') {
             let area = addr.city || 'Pinned Location';
             if (addr.formatted_address) {
@@ -332,6 +333,7 @@ window.LocationPicker = {
                 if (parts.length > 0) area = parts[0]; 
             }
 
+            // CRITICAL INTEGRATION: Use LocationManager
             if (window.LocationManager) {
                 window.LocationManager.setServiceLocation({
                     lat: this.tempCoords.lat,
@@ -340,8 +342,12 @@ window.LocationPicker = {
                     area_name: area,
                     formatted_address: addr.formatted_address
                 });
+            } else {
+                console.error("LocationManager missing!");
             }
             this.close();
+            // Force reload to refresh catalog for new location
+            window.location.reload();
         }
     },
 
@@ -403,11 +409,12 @@ window.LocationPicker = {
     },
 
     recoverLocation() {
-        try {
-            const ctx = JSON.parse(localStorage.getItem(window.APP_CONFIG?.STORAGE_KEYS?.SERVICE_CONTEXT) || 'null');
+        // Attempt to recover previous location center from LocationManager
+        if (window.LocationManager) {
+            const ctx = window.LocationManager.getLocationContext();
             if (ctx && ctx.lat) {
                 this.tempCoords = { lat: parseFloat(ctx.lat), lng: parseFloat(ctx.lng) };
             }
-        } catch(e) {}
+        }
     }
 };

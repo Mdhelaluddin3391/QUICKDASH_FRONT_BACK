@@ -2,36 +2,26 @@
 
 /**
  * CartService: Singleton for managing Cart State & API calls.
- * Dependencies: ApiService, APP_CONFIG
+ * Production Ready: Handles Location Switching conflicts.
  */
 (function () {
     const CartService = {
         _count: 0,
         _total: 0,
 
-        /**
-         * Initialize: Fetch count on load
-         */
         init: async function() {
-            if (localStorage.getItem(window.APP_CONFIG.STORAGE_KEYS.TOKEN)) {
+            if (localStorage.getItem(window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token')) {
                 await this.updateGlobalCount();
             }
             this.initListener();
         },
 
-        /**
-         * Fetch latest cart from backend and update UI
-         */
         getCart: async function () {
             try {
                 // ApiService injects Location Headers automatically
                 const res = await window.ApiService.get('/orders/cart/');
-                
-                // Update internal state
                 this._total = res.total_amount || 0;
                 this._count = (res.items || []).length;
-                
-                // Notify UI
                 this._notifyChange(res);
                 return res;
             } catch (error) {
@@ -40,39 +30,27 @@
             }
         },
 
-        /**
-         * Add Item to Cart
-         * @param {string} sku - Product SKU Code
-         * @param {number} qty - Quantity
-         */
         addItem: async function (sku, qty = 1) {
             return this.updateItem(sku, qty);
         },
 
-        /**
-         * Update Item Quantity (Add/Remove/Update)
-         */
         updateItem: async function (sku, qty) {
             try {
                 // Note: Warehouse ID is handled by Backend Middleware via Headers
                 // We don't need to send it explicitly unless overriding
-                
                 const res = await window.ApiService.post('/orders/cart/add/', {
                     sku: sku,
                     quantity: qty
                 });
-
-                // Update internal state from response
                 this._total = res.total_amount || 0;
                 this._count = (res.items || []).length;
-                
                 this._notifyChange(res);
                 return res;
 
             } catch (error) {
-                // Handle Warehouse Mismatch specifically if not caught by ApiService
-                // (Though ApiService usually catches 409 globally)
-                if (error.message && error.message.includes("Location Mismatch")) {
+                // Handle Warehouse Mismatch (Conflict)
+                // If backend returns 409 or explicit location mismatch error
+                if (error.status === 409 || (error.message && error.message.includes("Location Mismatch"))) {
                     if(confirm("Your cart contains items from another store. Clear it to add this item?")) {
                          return await window.ApiService.post('/orders/cart/add/', {
                             sku: sku,
@@ -85,9 +63,6 @@
             }
         },
 
-        /**
-         * Clear Cart
-         */
         clearCart: async function () {
             try {
                 await window.ApiService.delete('/orders/cart/');
@@ -99,16 +74,12 @@
             }
         },
 
-        /**
-         * Updates the little badge in the Navbar
-         */
         updateGlobalCount: async function () {
             try {
                 const res = await window.ApiService.get('/orders/cart/');
                 this._count = (res.items || []).length;
                 this._updateBadges();
             } catch (e) { 
-                // Silent fail if guest or error
                 this._updateBadges(); 
             }
         },
@@ -127,27 +98,27 @@
         },
 
         initListener() {
-            if (window.APP_CONFIG && window.APP_CONFIG.EVENTS) {
-                // Listen for Location Changes to re-validate cart if needed
-                window.addEventListener(window.APP_CONFIG.EVENTS.LOCATION_CHANGED, async () => {
-                    await this.validateCartOnLocationChange();
-                });
-            }
+            // Listen for Location Changes to re-validate cart if needed
+            // Updated to match LocationManager event
+            window.addEventListener('app:location-changed', async () => {
+                await this.validateCartOnLocationChange();
+            });
         },
 
         async validateCartOnLocationChange() {
-            const token = localStorage.getItem(window.APP_CONFIG.STORAGE_KEYS.TOKEN);
+            const token = localStorage.getItem(window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token');
             if (!token) return; 
 
             // ApiService will send new location headers automatically
             try {
+                // This call will fail with 409 if middleware detects warehouse mismatch
                 const res = await window.ApiService.post('/orders/validate-cart/', {});
                 
                 if (res.is_valid === false) {
                     this.showConflictModal(res.unavailable_items || []);
                 }
             } catch (e) {
-                console.warn("Cart validation check failed", e);
+                // Warning is expected if cart is empty or valid
             }
         },
 
@@ -158,6 +129,7 @@
                 : "Your cart items are from a different store.";
                 
             if (confirm(`⚠️ Location Changed\n\n${msg}\n\nDo you want to clear your cart to shop here?`)) {
+                // Force clear logic
                 window.ApiService.post('/orders/cart/add/', { force_clear: true, sku: 'DUMMY', quantity: 0 })
                     .then(() => {
                         this.updateGlobalCount();

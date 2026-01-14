@@ -9,10 +9,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 1. Initial Load
     await initHome();
 
-    // 2. Reactive Listener: Auto-reload when user changes location in Navbar
-    const evtName = (window.APP_CONFIG?.EVENTS?.LOCATION_CHANGED) || 'locationChanged';
+    // 2. Reactive Listener: Auto-reload when user changes location
+    // Matches the event name from LocationManager.js
+    const evtName = 'app:location-changed';
     window.addEventListener(evtName, async () => {
-        console.log("Home: Location changed, refreshing storefront...");
+        console.log("[Home] Location changed, refreshing storefront...");
         // Reset Feed State
         feedPage = 1;
         feedHasNext = true;
@@ -34,6 +35,7 @@ async function initHome() {
     if (window.LocationManager && window.LocationManager.hasLocation()) {
         const ctx = window.LocationManager.getLocationContext();
         
+        // Use Headers Context (L1 or L2)
         if (ctx.lat && ctx.lng) {
             await loadStorefront(ctx.lat, ctx.lng, ctx.city);
         } else {
@@ -43,9 +45,9 @@ async function initHome() {
         }
     } else {
         // No Location Set -> Show Generic Feed or Prompt
-        console.warn("Home: No location set. Loading generic categories.");
+        console.warn("[Home] No location set. Loading generic categories.");
         
-        // यह मैसेज दिखाएं
+        // Prompt User
         document.getElementById('feed-container').innerHTML = `
             <div class="alert alert-info text-center m-3">
                 <i class="fas fa-map-marker-alt"></i> 
@@ -55,10 +57,7 @@ async function initHome() {
             </div>
         `;
         
-        await loadCategories(); // कैटेगरीज लोड होने दें
-
-        // ❌ नीचे दी गई लाइन को हटा दें या कमेंट कर दें
-        // setupInfiniteScroll(); 
+        await loadCategories();
     }
 }
 
@@ -79,10 +78,9 @@ async function loadStorefront(lat, lng, city) {
         currentAbortController = new AbortController();
 
         // ApiService automatically injects X-Location headers. 
-        // We pass query params just in case the specific endpoint logic needs them explicitly.
+        // We pass query params just in case specific logic needs them, but backend uses headers first.
         const res = await ApiService.get(
-            `/catalog/storefront/?lat=${lat}&lon=${lng}&city=${city || ''}`,
-            // Pass signal if ApiService supports it, otherwise standard fetch
+            `/catalog/storefront/?lat=${lat}&lon=${lng}&city=${city || ''}`
         );
         
         currentAbortController = null;
@@ -91,7 +89,7 @@ async function loadStorefront(lat, lng, city) {
         if (res.serviceable === false) {
             feedContainer.innerHTML = `
                 <div class="text-center py-5">
-                    <img src="/assets/images/empty-store.png" style="width:120px; opacity:0.6; margin-bottom:15px;">
+                    <img src="/assets/images/empty-store.png" style="width:120px; opacity:0.6; margin-bottom:15px;" onerror="this.style.display='none'">
                     <h4>Not Serviceable Area</h4>
                     <p class="text-muted">We don't deliver to <strong>${city || 'this location'}</strong> yet.</p>
                     <button class="btn btn-outline-primary mt-2" onclick="window.LocationPicker.open('SERVICE')">
@@ -102,9 +100,6 @@ async function loadStorefront(lat, lng, city) {
             catContainer.innerHTML = ''; // Clear categories
             return;
         }
-
-        // Note: We DO NOT save warehouse_id to localStorage anymore.
-        // The backend resolves it via Middleware using the Lat/Lng headers.
 
         // Render Categories
         if (res.categories && res.categories.length > 0) {
@@ -132,7 +127,7 @@ async function loadStorefront(lat, lng, city) {
                 </section>
             `}).join('');
         } else {
-            feedContainer.innerHTML = '<p class="text-center py-5">No products available right now.</p>';
+            feedContainer.innerHTML = '<p class="text-center py-5">No products available in this store right now.</p>';
         }
 
     } catch (e) {
@@ -145,7 +140,6 @@ async function loadStorefront(lat, lng, city) {
 
 function setupInfiniteScroll() {
     // Only use infinite scroll for Generic Feed (No location set)
-    // Storefront usually loads everything in one go or handles its own pagination
     loadGenericFeed();
     
     // Check if sentinel already exists
@@ -177,7 +171,7 @@ async function loadGenericFeed() {
     const sentinelLoader = document.querySelector('#feed-sentinel .loader-spinner');
     
     if(feedPage > 1 && sentinelLoader) sentinelLoader.classList.remove('d-none');
-    if(feedPage === 1) container.innerHTML = '<div class="loader-spinner"></div>';
+    if(feedPage === 1 && !container.innerHTML) container.innerHTML = '<div class="loader-spinner"></div>';
 
     try {
         const res = await ApiService.get(`/catalog/home/feed/?page=${feedPage}`);

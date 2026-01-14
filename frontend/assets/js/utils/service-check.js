@@ -3,17 +3,24 @@
 if (!window.ServiceCheck) {
     window.ServiceCheck = {
         async init() {
-            // 1. If location exists, stop
-            if (localStorage.getItem(APP_CONFIG.STORAGE_KEYS.SERVICE_CONTEXT)) {
+            // 1. CRITICAL: Check via LocationManager (Support for L1 & L2)
+            if (window.LocationManager && window.LocationManager.hasLocation()) {
+                console.log("[ServiceCheck] Location Context Found. Skipping modal.");
                 return;
             }
 
-            // 2. Wait for Config
+            // Fallback: If LocationManager isn't loaded yet, check raw storage (safe guard)
+            // But prefer strict LocationManager check
+            if (localStorage.getItem('app_service_context') || localStorage.getItem('app_delivery_context')) {
+                return;
+            }
+
+            // 2. Wait for Config (if needed)
             try {
                 if (window.AppConfigService) await window.AppConfigService.load();
             } catch (e) { }
 
-            // 3. Silent Permission Check
+            // 3. Silent Permission Check (Browser API)
             if (navigator.permissions && navigator.permissions.query) {
                 try {
                     const result = await navigator.permissions.query({ name: 'geolocation' });
@@ -27,7 +34,7 @@ if (!window.ServiceCheck) {
                 }
             }
 
-            // 4. Show Modal
+            // 4. Show Modal if no location & no permission
             this.renderPermissionModal();
         },
 
@@ -107,7 +114,7 @@ if (!window.ServiceCheck) {
 
                     if (window.Toast) Toast.error(msg + " Please select manually.");
                 },
-                // Increased timeout to 20 seconds (20000ms)
+                // Increased timeout to 20 seconds (20000ms) to allow slow GPS lock
                 { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
             );
         },
@@ -118,6 +125,7 @@ if (!window.ServiceCheck) {
                 let area = 'Current Location';
                 let fmt = 'GPS Location';
 
+                // Reverse Geocode if Google Maps is available
                 if (!isFallback && window.APP_CONFIG && window.APP_CONFIG.GOOGLE_MAPS_KEY) {
                     try {
                         if (window.MapsLoader) await window.MapsLoader.load();
@@ -135,10 +143,17 @@ if (!window.ServiceCheck) {
                     } catch (e) { console.warn("Geocode skipped", e); }
                 }
 
+                // INTEGRATION: Use LocationManager to save L1 Context
                 if (window.LocationManager) {
                     window.LocationManager.setServiceLocation({
-                        lat: lat, lng: lng, city: city, area_name: area, formatted_address: fmt
+                        lat: lat, 
+                        lng: lng, 
+                        city: city, 
+                        area_name: area, 
+                        formatted_address: fmt
                     });
+                } else {
+                    console.error("LocationManager missing during ServiceCheck!");
                 }
 
                 const modal = document.getElementById('service-modal');
@@ -152,4 +167,4 @@ if (!window.ServiceCheck) {
             }
         }
     };
-} 
+}

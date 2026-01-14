@@ -33,7 +33,7 @@
             }
 
             // 1. Auth Token
-            const token = localStorage.getItem(window.APP_CONFIG.STORAGE_KEYS.TOKEN);
+            const token = localStorage.getItem(window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token');
             if (token && token !== 'null' && token !== 'undefined') {
                 headers['Authorization'] = `Bearer ${token}`;
             }
@@ -62,9 +62,10 @@
         },
 
         request: async function (endpoint, method = 'GET', body = null, isRetry = false) {
-            endpoint = typeof endpoint === 'string' ? endpoint : String(endpoint || '/');
+            // Ensure endpoint format
+            const baseUrl = window.APP_CONFIG?.API_BASE_URL || '/api/v1';
             const safeEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-            const url = `${window.APP_CONFIG.API_BASE_URL}${safeEndpoint}`;
+            const url = `${baseUrl}${safeEndpoint}`;
 
             const options = {
                 method,
@@ -84,7 +85,6 @@
                     if (resData.code === 'WAREHOUSE_MISMATCH') {
                         // Cart belongs to Old Warehouse -> User moved to New Warehouse
                         if (confirm(resData.message || "Your location has changed. Clear cart to proceed?")) {
-                            // Call clear endpoint or just reload (Backend ValidateCart handles logic)
                              window.location.reload(); 
                         }
                         return Promise.reject(new Error("Cart conflict - Location Changed"));
@@ -130,13 +130,13 @@
                         else if (data.error) errorMsg = typeof data.error === 'object' ? JSON.stringify(data.error) : data.error;
                         else if (data.non_field_errors) errorMsg = data.non_field_errors[0];
                     }
-                    throw new Error(errorMsg);
+                    throw { status: response.status, message: errorMsg, data: data };
                 }
 
                 return data === null ? {} : data;
 
             } catch (error) {
-                if (window.location.hostname === 'localhost') {
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
                     console.error(`API Error [${method} ${endpoint}]:`, error);
                 }
                 throw error;
@@ -144,11 +144,14 @@
         },
 
         refreshToken: async function () {
-            const refresh = localStorage.getItem(window.APP_CONFIG.STORAGE_KEYS.REFRESH);
+            const refreshKey = window.APP_CONFIG?.STORAGE_KEYS?.REFRESH || 'refresh_token';
+            const refresh = localStorage.getItem(refreshKey);
             if (!refresh) return false;
 
+            const baseUrl = window.APP_CONFIG?.API_BASE_URL || '/api/v1';
+
             try {
-                const response = await fetch(`${window.APP_CONFIG.API_BASE_URL}/auth/refresh/`, {
+                const response = await fetch(`${baseUrl}/auth/refresh/`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ refresh })
@@ -156,9 +159,9 @@
 
                 if (response.ok) {
                     const data = await response.json();
-                    localStorage.setItem(window.APP_CONFIG.STORAGE_KEYS.TOKEN, data.access);
+                    localStorage.setItem(window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token', data.access);
                     if (data.refresh) {
-                        localStorage.setItem(window.APP_CONFIG.STORAGE_KEYS.REFRESH, data.refresh);
+                        localStorage.setItem(refreshKey, data.refresh);
                     }
                     return true;
                 }
@@ -174,9 +177,9 @@
         },
 
         handleAuthFailure: function() {
-            localStorage.removeItem(window.APP_CONFIG.STORAGE_KEYS.TOKEN);
-            localStorage.removeItem(window.APP_CONFIG.STORAGE_KEYS.REFRESH);
-            localStorage.removeItem(window.APP_CONFIG.STORAGE_KEYS.USER);
+            localStorage.removeItem(window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token');
+            localStorage.removeItem(window.APP_CONFIG?.STORAGE_KEYS?.REFRESH || 'refresh_token');
+            localStorage.removeItem(window.APP_CONFIG?.STORAGE_KEYS?.USER || 'user_info');
 
             const currentPath = window.location.pathname;
             const privatePages = [
@@ -187,7 +190,7 @@
             const isPrivate = privatePages.some(page => currentPath.includes(page));
 
             if (isPrivate) {
-                window.location.href = window.APP_CONFIG.ROUTES.LOGIN;
+                window.location.href = window.APP_CONFIG?.ROUTES?.LOGIN || '/frontend/auth.html';
             } else {
                 if (!sessionStorage.getItem('auth_reload_lock')) {
                     sessionStorage.setItem('auth_reload_lock', 'true');
@@ -198,7 +201,11 @@
             }
         },
 
-        get: function (endpoint) { return this.request(endpoint, 'GET'); },
+        get: function (endpoint, params = {}) { 
+            const queryString = new URLSearchParams(params).toString();
+            const url = queryString ? `${endpoint}?${queryString}` : endpoint;
+            return this.request(url, 'GET'); 
+        },
         post: function (endpoint, body) { return this.request(endpoint, 'POST', body); },
         put: function (endpoint, body) { return this.request(endpoint, 'PUT', body); },
         patch: function (endpoint, body) { return this.request(endpoint, 'PATCH', body); },

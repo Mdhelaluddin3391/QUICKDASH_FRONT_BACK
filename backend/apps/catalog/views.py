@@ -214,23 +214,25 @@ class StorefrontCatalogAPIView(APIView):
     """
     Home Page Feed.
     Returns products available in the detected Warehouse.
-    FIXED: Annotates effective_price to prevent 500 Error.
+    Prioritizes Middleware resolved warehouse (via Headers) over Query Params.
     """
     permission_classes = [AllowAny]
     authentication_classes = [] 
 
     @extend_schema(
         parameters=[
-            OpenApiParameter("lat", OpenApiTypes.DOUBLE, required=True),
-            OpenApiParameter("lon", OpenApiTypes.DOUBLE, required=True),
-            OpenApiParameter("city", OpenApiTypes.STR, required=True),
+            OpenApiParameter("X-Location-Lat", OpenApiTypes.DOUBLE, location=OpenApiParameter.HEADER, description="User Latitude"),
+            OpenApiParameter("X-Location-Lng", OpenApiTypes.DOUBLE, location=OpenApiParameter.HEADER, description="User Longitude"),
+            OpenApiParameter("lat", OpenApiTypes.DOUBLE, required=False, description="Fallback Latitude"),
+            OpenApiParameter("lon", OpenApiTypes.DOUBLE, required=False, description="Fallback Longitude"),
+            OpenApiParameter("city", OpenApiTypes.STR, required=False),
         ],
     )
     def get(self, request):
-        # 1. Resolve Warehouse
+        # 1. Resolve Warehouse (Middleware Priority)
         warehouse = getattr(request, 'warehouse', None)
         
-        # Fallback if Middleware didn't find it
+        # Fallback if Middleware didn't find it (e.g. headers missing, but query params present)
         if not warehouse:
             lat = request.query_params.get("lat")
             lon = request.query_params.get("lon")
@@ -251,14 +253,14 @@ class StorefrontCatalogAPIView(APIView):
         
         feed = []
         for cat in categories:
-            # --- FIX START: Price Subquery Setup ---
-            # इन्वेंट्री से इस वेयरहाउस का प्राइस निकालें
+            # --- Price Subquery Setup ---
+            # Get price from Inventory for this warehouse
             price_subquery = InventoryItem.objects.filter(
                 sku=OuterRef('sku'),
                 bin__rack__aisle__zone__warehouse=warehouse
             ).values('price')[:1]
 
-            # Fetch products aur effective_price ko annotate karein
+            # Fetch products and annotate effective_price
             products = Product.objects.filter(
                 Q(category=cat) | Q(category__parent=cat),
                 id__in=product_ids_in_stock,
@@ -269,16 +271,15 @@ class StorefrontCatalogAPIView(APIView):
                     output_field=DecimalField(max_digits=10, decimal_places=2)
                 )
             )[:6]
-            # --- FIX END ---
 
             if products.exists():
-                # FIX: context={'request': request} पास करें ताकि इमेज URL पूरे आएं
+                # Pass context={'request': request} for absolute image URLs
                 p_data = ProductSerializer(products, many=True, context={'request': request}).data
                 
-                # Stock Flag Injection
+                # Consistency Injection
                 for p in p_data: 
-                    p['available_stock'] = 10 
-                    # Fallback agar effective_price null ho (Database consistency ke liye)
+                    p['available_stock'] = 10 # Front-end indicator
+                    # Fallback if effective_price is null
                     if p.get('effective_price') is None:
                         p['effective_price'] = p.get('mrp')
                         p['sale_price'] = p.get('mrp')
