@@ -25,8 +25,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function initHome() {
-    // Parallel load for independent components (Banners, Brands, Flash Sales)
-    // These might be location-dependent, so we reload them too.
+    // Parallel load for independent components
     loadBanners();
     loadBrands();
     loadFlashSales();
@@ -34,7 +33,7 @@ async function initHome() {
     // 3. Location-Aware Storefront Loading
     if (window.LocationManager && window.LocationManager.hasLocation()) {
         const ctx = window.LocationManager.getLocationContext();
-        // Prefer L2 (Delivery) lat/lng, fallback to L1 (Browsing)
+        
         if (ctx.lat && ctx.lng) {
             await loadStorefront(ctx.lat, ctx.lng, ctx.city);
         } else {
@@ -45,6 +44,8 @@ async function initHome() {
     } else {
         // No Location Set -> Show Generic Feed or Prompt
         console.warn("Home: No location set. Loading generic categories.");
+        
+        // यह मैसेज दिखाएं
         document.getElementById('feed-container').innerHTML = `
             <div class="alert alert-info text-center m-3">
                 <i class="fas fa-map-marker-alt"></i> 
@@ -53,9 +54,11 @@ async function initHome() {
                 <button class="btn btn-sm btn-primary mt-2" onclick="window.LocationPicker.open('SERVICE')">Select Location</button>
             </div>
         `;
-        await loadCategories(); // Load top-level categories at least
-        // Optional: Load generic feed
-        setupInfiniteScroll(); 
+        
+        await loadCategories(); // कैटेगरीज लोड होने दें
+
+        // ❌ नीचे दी गई लाइन को हटा दें या कमेंट कर दें
+        // setupInfiniteScroll(); 
     }
 }
 
