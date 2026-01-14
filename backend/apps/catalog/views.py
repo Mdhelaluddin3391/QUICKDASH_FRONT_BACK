@@ -214,6 +214,7 @@ class StorefrontCatalogAPIView(APIView):
     """
     Home Page Feed.
     Returns products available in the detected Warehouse.
+    FIXED: Annotates effective_price to prevent 500 Error.
     """
     permission_classes = [AllowAny]
     authentication_classes = [] 
@@ -226,10 +227,10 @@ class StorefrontCatalogAPIView(APIView):
         ],
     )
     def get(self, request):
-        # 1. Resolve Warehouse (Middleware does this, but we can double check fallback)
+        # 1. Resolve Warehouse
         warehouse = getattr(request, 'warehouse', None)
         
-        # If Middleware failed (e.g. no headers), try params (Legacy support)
+        # Fallback if Middleware didn't find it
         if not warehouse:
             lat = request.query_params.get("lat")
             lon = request.query_params.get("lon")
@@ -239,8 +240,7 @@ class StorefrontCatalogAPIView(APIView):
         if not warehouse:
             return Response({"serviceable": False, "message": "Location not serviceable"}, status=200)
 
-        # 2. Get Products In Stock
-        # Optimization: Get IDs of in-stock products first
+        # 2. Get Products In Stock IDs
         product_ids_in_stock = InventoryItem.objects.filter(
             bin__rack__aisle__zone__warehouse=warehouse,
             available_stock__gt=0
@@ -251,19 +251,38 @@ class StorefrontCatalogAPIView(APIView):
         
         feed = []
         for cat in categories:
-            # Fetch products in this category that are in stock
+            # --- FIX START: Price Subquery Setup ---
+            # इन्वेंट्री से इस वेयरहाउस का प्राइस निकालें
+            price_subquery = InventoryItem.objects.filter(
+                sku=OuterRef('sku'),
+                bin__rack__aisle__zone__warehouse=warehouse
+            ).values('price')[:1]
+
+            # Fetch products aur effective_price ko annotate karein
             products = Product.objects.filter(
                 Q(category=cat) | Q(category__parent=cat),
                 id__in=product_ids_in_stock,
                 is_active=True
+            ).annotate(
+                effective_price=Subquery(
+                    price_subquery, 
+                    output_field=DecimalField(max_digits=10, decimal_places=2)
+                )
             )[:6]
+            # --- FIX END ---
 
             if products.exists():
-                # Serialize
-                p_data = ProductSerializer(products, many=True).data
-                # Inject stock flag manually for UI
-                for p in p_data: p['available_stock'] = 10 
+                # FIX: context={'request': request} पास करें ताकि इमेज URL पूरे आएं
+                p_data = ProductSerializer(products, many=True, context={'request': request}).data
                 
+                # Stock Flag Injection
+                for p in p_data: 
+                    p['available_stock'] = 10 
+                    # Fallback agar effective_price null ho (Database consistency ke liye)
+                    if p.get('effective_price') is None:
+                        p['effective_price'] = p.get('mrp')
+                        p['sale_price'] = p.get('mrp')
+
                 feed.append({
                     "id": cat.id,
                     "name": cat.name,
@@ -278,7 +297,6 @@ class StorefrontCatalogAPIView(APIView):
             "warehouse_name": warehouse.name,
             "categories": feed
         })
-
 
 class GlobalSearchAPIView(APIView):
     permission_classes = [AllowAny]
