@@ -3,6 +3,8 @@ from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions, generics
+# ✅ यह लाइन जोड़ी गई है
+from rest_framework.pagination import PageNumberPagination 
 from django.conf import settings
 
 from apps.customers.models import CustomerAddress
@@ -164,6 +166,8 @@ class CreateOrderAPIView(APIView):
 class MyOrdersAPIView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = OrderListSerializer
+    pagination_class = StandardResultsSetPagination # यह अच्छा अभ्यास है कि pagination क्लास का उपयोग किया जाए
+
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user).order_by("-created_at")
 
@@ -250,7 +254,8 @@ class AddToCartAPIView(APIView):
         return Response(CartSerializer(cart).data)
 
 class OrderSimulationAPIView(APIView):
-    permission_classes = [IsAdminUser]
+    # ✅ FIX: IsAdminUser -> permissions.IsAdminUser
+    permission_classes = [permissions.IsAdminUser]
 
     def post(self, request, order_id):
         target_status = request.data.get('status')

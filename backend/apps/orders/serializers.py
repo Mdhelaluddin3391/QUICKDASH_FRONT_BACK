@@ -7,6 +7,13 @@ from .models import Order, OrderItem, Cart, CartItem
 from apps.catalog.models import Product
 from rest_framework import serializers
 from .models import Order
+# apps/orders/serializers.py
+from rest_framework import serializers
+from .models import Order, OrderItem, Cart, CartItem
+from apps.catalog.models import Product
+
+
+
 
 class CartItemSerializer(serializers.ModelSerializer):
     sku_code = serializers.CharField(source='sku.sku', read_only=True)
@@ -102,20 +109,20 @@ class OrderListSerializer(serializers.ModelSerializer):
         return obj.items.count()
 
 class CreateOrderSerializer(serializers.Serializer):
-    # [FIX] Removed default=1. Warehouse ID is mandatory for inventory locking.
-    # warehouse_id = serializers.IntegerField(required=True)
+    # ✅ यहाँ PAYMENT_METHOD_CHOICES का सही इस्तेमाल किया गया है
+    payment_method = serializers.ChoiceField(choices=Order.PAYMENT_METHOD_CHOICES, default="COD")
+    
+    # Address ID required for delivery validation
     address_id = serializers.IntegerField(required=True)
-    payment_method = serializers.ChoiceField(choices=Order.PAYMENT_CHOICES)
-    # total_amount should ideally be calculated on server, but for now we validate it
+    
+    # total_amount validation
     total_amount = serializers.DecimalField(max_digits=10, decimal_places=2) 
     
-    # REMOVED warehouse_id entirely.
-    # REMOVED items list (we fetch from DB Cart).
+    delivery_type = serializers.ChoiceField(choices=Order.DELIVERY_TYPE_CHOICES, default="express")
     
-    delivery_type = serializers.ChoiceField(choices=["express", "standard"], default="express")
-    delivery_address_id = serializers.IntegerField(required=True)
-    payment_method = serializers.ChoiceField(choices=["COD", "RAZORPAY"], default="COD")
+    # Optional Items (if not using Cart)
     items = serializers.ListField(child=serializers.DictField(), required=False, allow_null=True)
+    
     max_accepted_amount = serializers.DecimalField(
         max_digits=10, decimal_places=2, required=False, allow_null=True
     )

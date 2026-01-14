@@ -5,7 +5,7 @@ from django.utils.deprecation import MiddlewareMixin
 from django.http import JsonResponse
 from django.core.cache import cache
 from django.contrib.gis.geos import Point
-from apps.warehouse.models import Warehouse
+# from apps.warehouse.models import Warehouse
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +98,10 @@ class LocationContextMiddleware(MiddlewareMixin):
         Resolves Warehouse with Redis Caching (Geo-Hashing Strategy).
         Rounds coordinates to 4 decimal places (~11m) to increase cache hits.
         """
+        from apps.warehouse.models import Warehouse
+
+
+        
         cache_key = f"wh_poly_lookup_{round(lat, 4)}_{round(lng, 4)}"
         cached_wh_id = cache.get(cache_key)
 
