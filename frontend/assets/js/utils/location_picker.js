@@ -16,13 +16,10 @@ window.LocationPicker = {
 
     /**
      * Configuration Check
-     * Returns TRUE if we should use Google Maps (Prod + Valid Key).
-     * Returns FALSE for Dev/OpenStreetMap.
      */
     get useGoogleMaps() {
         const config = window.APP_CONFIG || {};
         const key = config.GOOGLE_MAPS_KEY;
-        // Check for specific ENV flag OR if the key is a dummy/missing
         const isDev = config.ENV === 'development' || !key || key.includes('REPLACE') || key.length < 20;
         return !isDev;
     },
@@ -31,7 +28,6 @@ window.LocationPicker = {
      * Entry point to open the map modal.
      */
     async open(arg1 = 'SERVICE', arg2 = null) {
-        // Handle Arguments (Mode vs Callback)
         if (typeof arg1 === 'function') {
             this.mode = 'PICKER';
             this.callback = arg1;
@@ -40,44 +36,29 @@ window.LocationPicker = {
             this.callback = arg2;
         }
         
-        // 1. Inject UI Modal
         this.injectModal();
         const modal = document.getElementById('loc-picker-modal');
         if(modal) modal.classList.add('active');
 
-        // ---------------------------------------------------------
         // Button Behavior Logic
-        // ---------------------------------------------------------
         const manageBtn = document.getElementById('lp-manage-addrs');
         if (manageBtn) {
             manageBtn.style.display = 'block';
-            
-            // Check current mode
             if (this.mode === 'PICKER') {
-                // Mode 1: Selecting location for New Address
                 manageBtn.innerText = "Enter Address Manually";
-                // Clicking it will trigger confirmPin() which opens the form via callback
                 manageBtn.onclick = () => this.confirmPin(); 
             } else {
-                // Mode 2: Normal Browsing (Service Location)
                 manageBtn.innerText = "Manage addresses";
-                this.bindManageButton(); // Re-bind the redirect logic
+                this.bindManageButton();
             }
         }
 
-        // 2. Recover Last Known Location
         this.recoverLocation();
 
-        // 3. Initialize the appropriate Map Provider
         if (this.useGoogleMaps) {
             await this.initGoogleMap();
         } else {
             await this.initLeafletMap();
-        }
-
-        // 4. "Real Lat/Lng": If using default coords, try to fetch GPS
-        if (this.isDefaultLocation(this.tempCoords)) {
-            this.detectRealLocation();
         }
     },
 
@@ -85,7 +66,6 @@ window.LocationPicker = {
         const modal = document.getElementById('loc-picker-modal');
         if (modal) modal.classList.remove('active');
         
-        // Cleanup Leaflet instance to prevent "Map already initialized" error
         if (this.leafletMap) {
             this.leafletMap.remove();
             this.leafletMap = null;
@@ -96,7 +76,7 @@ window.LocationPicker = {
     },
 
     // ---------------------------------------------------------
-    // Strategy 1: Google Maps (Production)
+    // Maps Initialization
     // ---------------------------------------------------------
     async initGoogleMap() {
         if (!window.MapsLoader) return;
@@ -106,7 +86,6 @@ window.LocationPicker = {
             const mapEl = document.getElementById('lp-map');
             if (!mapEl) return;
 
-            // Initialize Google Map
             this.googleMap = new google.maps.Map(mapEl, {
                 center: this.tempCoords,
                 zoom: 17,
@@ -116,55 +95,42 @@ window.LocationPicker = {
 
             this.geocoder = new google.maps.Geocoder();
 
-            // Bind Events
             this.googleMap.addListener('idle', () => {
                 const c = this.googleMap.getCenter();
                 this.handleMapMove({ lat: c.lat(), lng: c.lng() });
             });
 
-            // Initial Geocode
             this.reverseGeocode(this.tempCoords.lat, this.tempCoords.lng);
 
         } catch (e) {
             console.error("Google Maps Load Failed, falling back to OSM", e);
-            this.initLeafletMap(); // Failover
+            this.initLeafletMap();
         }
     },
 
-    // ---------------------------------------------------------
-    // Strategy 2: Leaflet + OpenStreetMap (Development)
-    // ---------------------------------------------------------
     async initLeafletMap() {
-        // Ensure Leaflet Library is loaded
         if (!window.L) await this.loadLeafletLib();
 
         const mapEl = document.getElementById('lp-map');
         if (!mapEl) return;
 
-        // Initialize Leaflet
         this.leafletMap = L.map(mapEl, { zoomControl: false }).setView(
             [this.tempCoords.lat, this.tempCoords.lng], 
             17
         );
 
-        // Add OSM Tile Layer (Free, No Key)
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(this.leafletMap);
 
-        // Bind Events (Simulate "Idle" using "moveend")
         this.leafletMap.on('moveend', () => {
             const c = this.leafletMap.getCenter();
             this.handleMapMove({ lat: c.lat, lng: c.lng });
         });
 
-        // Initial Geocode
         this.reverseGeocode(this.tempCoords.lat, this.tempCoords.lng);
     },
 
-    /**
-     * Dynamically loads Leaflet for pages that don't have it (like addresses.html)
-     */
     async loadLeafletLib() {
         return new Promise((resolve, reject) => {
             const css = document.createElement('link');
@@ -181,12 +147,11 @@ window.LocationPicker = {
     },
 
     // ---------------------------------------------------------
-    // Core Logic (Provider Agnostic)
+    // Geocoding Logic
     // ---------------------------------------------------------
     
     handleMapMove(coords) {
         this.tempCoords = coords;
-        // Debounce API calls (1 second) to respect Nominatim Rate Limits
         clearTimeout(this.debounceTimer);
         
         const txt = document.getElementById('lp-address-text');
@@ -204,35 +169,25 @@ window.LocationPicker = {
 
         try {
             if (this.useGoogleMaps && this.geocoder) {
-                // --- GOOGLE STRATEGY ---
                 const response = await this.geocoder.geocode({ location: { lat, lng } });
                 if (response.results[0]) {
                     this.setResultData(response.results[0], 'GOOGLE');
                 }
             } else {
-                // --- OPENSTREETMAP STRATEGY (NOMINATIM) ---
                 const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`;
-                
-                const response = await fetch(url, {
-                    headers: { 'Accept-Language': 'en' } // Prefer English
-                });
+                const response = await fetch(url, { headers: { 'Accept-Language': 'en' } });
                 if (!response.ok) throw new Error("Nominatim Error");
-                
                 const data = await response.json();
                 this.setResultData(data, 'OSM');
             }
         } catch (e) {
             console.warn("Geocode failed", e);
             if (txt) txt.innerText = "Unknown Location (Pin Selected)";
-            // Still allow confirming coordinates even if address lookup fails
             this.tempAddressData = { formatted_address: "Pinned Location" };
             if (btn) btn.disabled = false;
         }
     },
 
-    /**
-     * Normalizes data from Google or OSM into a standard internal format
-     */
     setResultData(data, source) {
         const txt = document.getElementById('lp-address-text');
         const btn = document.getElementById('lp-confirm-btn');
@@ -250,12 +205,10 @@ window.LocationPicker = {
         } else if (source === 'OSM') {
             formatted = data.display_name;
             const addr = data.address || {};
-            // Nominatim city mapping is complex
             city = addr.city || addr.town || addr.village || addr.county || '';
             pincode = addr.postcode || '';
         }
 
-        // Store Normalized Data
         this.tempAddressData = {
             formatted_address: formatted,
             city: city,
@@ -267,36 +220,99 @@ window.LocationPicker = {
         if (btn) btn.disabled = false;
     },
 
-    /**
-     * Uses Browser Geolocation API to find real user location.
-     */
-    detectRealLocation() {
-        if (!navigator.geolocation) return;
+    // ---------------------------------------------------------
+    // ✅ NEW: ROBUST GPS LOGIC (Fixes Timeout Error)
+    // ---------------------------------------------------------
+    
+    async detectRealLocation(isSilent = false) {
+        if (!navigator.geolocation) {
+            if(!isSilent && window.Toast) Toast.error("Geolocation not supported.");
+            return;
+        }
 
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                const { latitude, longitude } = pos.coords;
-                this.tempCoords = { lat: latitude, lng: longitude };
-                
-                // Move Map Center
-                if (this.googleMap) {
-                    this.googleMap.panTo(this.tempCoords);
-                } else if (this.leafletMap) {
-                    this.leafletMap.setView([latitude, longitude], 17);
-                }
-                
-                // Trigger Geocode immediately
-                this.reverseGeocode(latitude, longitude);
-            },
-            (err) => console.warn("GPS Denied", err),
-            { enableHighAccuracy: true, timeout: 5000 }
-        );
+        // 1. UI Feedback: Start Spinner
+        const btn = document.getElementById('lp-gps-btn');
+        const icon = btn ? btn.querySelector('i') : null;
+        if (icon) icon.className = 'fas fa-circle-notch fa-spin text-primary';
+
+        try {
+            // 2. Attempt 1: High Accuracy (GPS) with 5s Timeout
+            // Fails fast if indoors to switch to fallback quicker
+            const position = await this._getPosition({ 
+                enableHighAccuracy: true, 
+                timeout: 5000, 
+                maximumAge: 0 
+            });
+            this._handleGpsSuccess(position, isSilent, icon);
+
+        } catch (err) {
+            console.warn("High Accuracy GPS failed, switching to fallback...", err.message);
+
+            // 3. Attempt 2: Low Accuracy (Wifi/Network)
+            // Much faster, rarely times out
+            try {
+                const position = await this._getPosition({ 
+                    enableHighAccuracy: false, 
+                    timeout: 10000, 
+                    maximumAge: 0 
+                });
+                this._handleGpsSuccess(position, isSilent, icon);
+            } catch (err2) {
+                // 4. Final Failure
+                this._handleGpsError(err2, isSilent, icon);
+            }
+        }
     },
+
+    // Helper: Wrap Geolocation API in Promise
+    _getPosition(options) {
+        return new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, options);
+        });
+    },
+
+    _handleGpsSuccess(pos, isSilent, icon) {
+        const { latitude, longitude } = pos.coords;
+        this.tempCoords = { lat: latitude, lng: longitude };
+        
+        // Update Map Center
+        if (this.googleMap) {
+            this.googleMap.panTo(this.tempCoords);
+            this.googleMap.setZoom(17);
+        } else if (this.leafletMap) {
+            this.leafletMap.setView([latitude, longitude], 17);
+        }
+        
+        // Fetch Address
+        this.reverseGeocode(latitude, longitude);
+
+        // Reset Icon
+        if (icon) icon.className = 'fas fa-crosshairs text-primary';
+        if (!isSilent && window.Toast) Toast.success("Location detected!");
+    },
+
+    _handleGpsError(err, isSilent, icon) {
+        console.error("GPS Final Error", err);
+        if (icon) icon.className = 'fas fa-crosshairs text-muted'; // Gray out
+        
+        if (!isSilent) {
+            let msg = "Could not detect location.";
+            if (err.code === 1) msg = "Permission Denied. Please enable location.";
+            else if (err.code === 2) msg = "Location unavailable.";
+            else if (err.code === 3) msg = "Location request timed out (Signal weak).";
+            
+            if (window.Toast) Toast.error(msg);
+            else alert(msg);
+        }
+    },
+
+    // ---------------------------------------------------------
+    // Confirm & Cleanup
+    // ---------------------------------------------------------
 
     confirmPin() {
         const addr = this.tempAddressData || { formatted_address: 'Pinned Location' };
         
-        // 1. Handle Callback Mode (e.g. from Add Address form)
         if (this.callback) {
             this.callback({
                 lat: this.tempCoords.lat,
@@ -309,19 +325,14 @@ window.LocationPicker = {
             return;
         }
 
-        // 2. Handle Service Mode (Browsing Context)
         if (this.mode === 'SERVICE') {
             let area = addr.city || 'Pinned Location';
-            
-            // Extract short area name for Navbar
             if (addr.formatted_address) {
                 const parts = addr.formatted_address.split(',');
                 if (parts.length > 0) area = parts[0]; 
             }
 
             if (window.LocationManager) {
-                // IMPORTANT: This sets L1 location (Browsing Context)
-                // Does NOT wipe L2 (Delivery Context) if it exists.
                 window.LocationManager.setServiceLocation({
                     lat: this.tempCoords.lat,
                     lng: this.tempCoords.lng,
@@ -334,12 +345,9 @@ window.LocationPicker = {
         }
     },
 
-    // --- Utility Methods ---
-
     injectModal() {
         if (document.getElementById('loc-picker-modal')) return;
 
-        // Note: The center pin is a pure CSS overlay, works for both Maps
         const html = `
         <div id="loc-picker-modal" class="location-modal">
             <div class="modal-content-map">
@@ -356,7 +364,7 @@ window.LocationPicker = {
                          <div style="width:8px; height:4px; background:rgba(0,0,0,0.3); border-radius:50%;"></div>
                     </div>
 
-                    <div class="gps-btn" onclick="window.LocationPicker.detectRealLocation()" style="position:absolute; bottom:20px; right:20px; z-index:800; background:white; width:45px; height:45px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 10px rgba(0,0,0,0.2); cursor:pointer;">
+                    <div id="lp-gps-btn" class="gps-btn" onclick="window.LocationPicker.detectRealLocation()" style="position:absolute; bottom:20px; right:20px; z-index:800; background:white; width:45px; height:45px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 10px rgba(0,0,0,0.2); cursor:pointer;">
                         <i class="fas fa-crosshairs text-primary"></i>
                     </div>
                 </div>
@@ -373,7 +381,6 @@ window.LocationPicker = {
 
         document.body.insertAdjacentHTML('beforeend', html);
         
-        // Add minimal CSS for Leaflet if needed (usually handled by loadLeafletLib)
         const style = document.createElement('style');
         style.innerHTML = `.leaflet-control-attribution { font-size: 9px; opacity: 0.7; }`;
         document.head.appendChild(style);
@@ -397,15 +404,10 @@ window.LocationPicker = {
 
     recoverLocation() {
         try {
-            // Try L1 context first
             const ctx = JSON.parse(localStorage.getItem(window.APP_CONFIG?.STORAGE_KEYS?.SERVICE_CONTEXT) || 'null');
             if (ctx && ctx.lat) {
                 this.tempCoords = { lat: parseFloat(ctx.lat), lng: parseFloat(ctx.lng) };
             }
         } catch(e) {}
-    },
-
-    isDefaultLocation(coords) {
-        return Math.abs(coords.lat - 12.9716) < 0.0001 && Math.abs(coords.lng - 77.5946) < 0.0001;
     }
 };
