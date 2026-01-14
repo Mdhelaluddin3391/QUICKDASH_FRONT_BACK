@@ -37,20 +37,21 @@ else:
             "http://127.0.0.1:8000",
             "http://0.0.0.0:8081",
             "http://localhost:8081",
-            "http://localhost:5000",      # Backend Self
+            "http://localhost:5000",
             "http://127.0.0.1:5000",
             "https://quickdash.com",
             "https://www.quickdash.com",
             "http://localhost:8080",
             "http://127.0.0.1:8080",
-            
         ]
 
 CORS_ALLOW_CREDENTIALS = True
 
-# 🔴 REQUIRED FIX FOR YOUR ERROR
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "idempotency-key",
+    "x-location-lat",
+    "x-location-lng",
+    "x-address-id",
 ]
 
 # ------------------------------------------------------------------------------

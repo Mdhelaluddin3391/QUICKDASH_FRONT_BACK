@@ -1,9 +1,6 @@
 /**
  * LocationManager: Centralized State Management (Architecture v2.0)
- * * Philosophy:
- * - "Dumb" State Container: It just holds Lat, Lng, and Address ID.
- * - Logic is in Backend: Backend decides if a location is serviceable.
- * - L2 (Delivery Address) always overrides L1 (GPS).
+ * Fixed: Added missing setServiceLocation and setDeliveryAddress methods
  */
 const LocationManager = {
     KEYS: {
@@ -14,11 +11,16 @@ const LocationManager = {
     },
 
     /**
-     * Set Location (Universal)
+     * Set Location (Universal Core Logic)
      * - If addressId is provided, it's L2 (Delivery Mode).
      * - If only lat/lng, it's L1 (Browsing Mode).
      */
     setLocation(lat, lng, addressText = '', addressId = null) {
+        if(!lat || !lng) {
+            console.error("LocationManager: Invalid coordinates provided", lat, lng);
+            return;
+        }
+
         localStorage.setItem(this.KEYS.LAT, lat);
         localStorage.setItem(this.KEYS.LNG, lng);
         
@@ -32,10 +34,40 @@ const LocationManager = {
             localStorage.removeItem(this.KEYS.ADDRESS_ID); // Switch to L1 (Browsing)
         }
 
+        console.log(`Location Set: ${lat}, ${lng} (ID: ${addressId || 'None'})`);
+
         // Dispatch event for UI updates (Navbar, Cart)
-        window.dispatchEvent(new CustomEvent(window.APP_CONFIG?.EVENTS?.LOCATION_CHANGED || 'locationChanged', {
+        // Using a safe fallback string if APP_CONFIG isn't loaded yet
+        const evtName = (window.APP_CONFIG && window.APP_CONFIG.EVENTS && window.APP_CONFIG.EVENTS.LOCATION_CHANGED) 
+                        ? window.APP_CONFIG.EVENTS.LOCATION_CHANGED 
+                        : 'app:location-changed';
+                        
+        window.dispatchEvent(new CustomEvent(evtName, {
             detail: { lat, lng, addressId }
         }));
+    },
+
+    /**
+     * ✅ ADDED THIS FUNCTION (Fixes your console error)
+     * Used by location_picker.js when GPS or Map is used.
+     */
+    setServiceLocation(data) {
+        // Handle data coming from Google Maps or GPS fallback
+        const text = data.formatted_address || data.area_name || 'Current Location';
+        // Pass null as addressId strictly for Service Mode (Browsing)
+        this.setLocation(data.lat, data.lng, text, null);
+    },
+
+    /**
+     * ✅ ADDED THIS FUNCTION (Future proofing)
+     * Used when selecting a saved address during checkout.
+     */
+    setDeliveryAddress(data) {
+        // Handle potential naming differences (backend usually sends 'latitude', frontend uses 'lat')
+        const lat = data.latitude || data.lat;
+        const lng = data.longitude || data.lng;
+        // Pass address ID strictly for Delivery Mode
+        this.setLocation(lat, lng, data.address_line, data.id);
     },
 
     /**
@@ -56,7 +88,6 @@ const LocationManager = {
 
     /**
      * For UI Components (Navbar, Address Picker)
-     * Maintains backward compatibility with your frontend templates
      */
     getDisplayLocation() {
         const addressId = localStorage.getItem(this.KEYS.ADDRESS_ID);
@@ -112,4 +143,5 @@ window.addEventListener('storage', (e) => {
     }
 });
 
+// Expose to window
 window.LocationManager = LocationManager;
