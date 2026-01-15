@@ -209,6 +209,8 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
 
         return Response(data)
 
+# backend/apps/catalog/views.py
+
 class StorefrontCatalogAPIView(APIView):
     """
     Home Page Feed.
@@ -242,11 +244,9 @@ class StorefrontCatalogAPIView(APIView):
             return Response({"serviceable": False, "message": "Location not serviceable"}, status=200)
 
         # 2. Get Products (SKUs) In Stock
-        # ✅ FIXED: Use F() expression to compare columns directly in DB
-        # ✅ FIXED: Fetch 'sku' because 'product_id' field does not exist on InventoryItem
         skus_in_stock = InventoryItem.objects.filter(
             bin__rack__aisle__zone__warehouse=warehouse,
-            total_stock__gt=F('reserved_stock')  # total > reserved means available > 0
+            total_stock__gt=F('reserved_stock')
         ).values_list('sku', flat=True).distinct()
 
         # 3. Build Categories Feed
@@ -263,7 +263,7 @@ class StorefrontCatalogAPIView(APIView):
             # Fetch products
             products = Product.objects.filter(
                 Q(category=cat) | Q(category__parent=cat),
-                sku__in=skus_in_stock, # ✅ FIXED: Use sku__in instead of id__in
+                sku__in=skus_in_stock,
                 is_active=True
             ).annotate(
                 effective_price=Subquery(
@@ -282,11 +282,16 @@ class StorefrontCatalogAPIView(APIView):
                         p['effective_price'] = p.get('mrp')
                         p['sale_price'] = p.get('mrp')
 
+                # ✅ FIX: Yahan 'request.build_absolute_uri' add kiya hai icon ke liye
+                icon_url = None
+                if cat.icon:
+                    icon_url = request.build_absolute_uri(cat.icon.url)
+
                 feed.append({
                     "id": cat.id,
                     "name": cat.name,
                     "slug": cat.slug,
-                    "icon": cat.icon.url if cat.icon else None,
+                    "icon": icon_url, # Ab ye poora URL bhejega
                     "products": p_data
                 })
 
