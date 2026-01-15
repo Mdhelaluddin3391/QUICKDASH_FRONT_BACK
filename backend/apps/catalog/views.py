@@ -8,7 +8,7 @@ from django.db.models import Prefetch, OuterRef, Subquery, DecimalField, Q, Sum
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
-
+from django.db.models import F  # <--- Add this import
 from .models import Category, Product, Banner, Brand, FlashSale
 from .serializers import (
     CategorySerializer, ProductSerializer, BannerSerializer, 
@@ -243,10 +243,10 @@ class StorefrontCatalogAPIView(APIView):
             return Response({"serviceable": False, "message": "Location not serviceable"}, status=200)
 
         # 2. Get Products In Stock IDs
-        product_ids_in_stock = InventoryItem.objects.filter(
+        skus_in_stock = InventoryItem.objects.filter(
             bin__rack__aisle__zone__warehouse=warehouse,
-            available_stock__gt=0
-        ).values_list('product_id', flat=True).distinct()
+            total_stock__gt=F('reserved_stock')  # ✅ Fixed: Use F() instead of property
+        ).values_list('sku', flat=True).distinct() # ✅ Fixed: Fetch 'sku', not 'product_id'
 
         # 3. Build Categories Feed
         categories = Category.objects.filter(is_active=True, parent__isnull=True)[:6]
@@ -263,7 +263,7 @@ class StorefrontCatalogAPIView(APIView):
             # Fetch products and annotate effective_price
             products = Product.objects.filter(
                 Q(category=cat) | Q(category__parent=cat),
-                id__in=product_ids_in_stock,
+                sku__in=skus_in_stock,  # ✅ Fixed: Filter by SKU, not ID
                 is_active=True
             ).annotate(
                 effective_price=Subquery(
