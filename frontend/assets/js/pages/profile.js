@@ -6,37 +6,45 @@ document.addEventListener('DOMContentLoaded', initDashboard);
    INITIALIZATION
 ========================= */
 async function initDashboard() {
+    // Critical Security Check: Agar user login nahi hai, turant content hide karein aur redirect karein
     if (!isAuthenticated()) {
-        window.location.href = window.APP_CONFIG.ROUTES.LOGIN;
+        document.body.style.display = 'none'; // Flash rokne ke liye
+        const loginUrl = window.APP_CONFIG?.ROUTES?.LOGIN || 'auth.html';
+        window.location.replace(loginUrl); // .replace() back button loop ko rokta hai
         return;
     }
 
     // 1. Initial Render from LocalStorage (Optimistic UI)
     const storedUser = getStoredUser();
-    if (storedUser) renderUserInfo(storedUser);
+    if (storedUser && Object.keys(storedUser).length > 0) {
+        renderUserInfo(storedUser);
+    }
 
     // 2. Bind Events
     bindEvents();
 
     // 3. Fetch Fresh Data
-    await Promise.all([
-        loadProfile(),
-        loadStats(),
-        loadRecentOrders()
-    ]);
+    try {
+        await Promise.all([
+            loadProfile(),
+            loadStats(),
+            loadRecentOrders()
+        ]);
+    } catch (err) {
+        console.warn("Partial data load failure", err);
+    }
 }
 
 /* =========================
    AUTH HELPERS
 ========================= */
 function isAuthenticated() {
-    return Boolean(localStorage.getItem(window.APP_CONFIG.STORAGE_KEYS.TOKEN));
-}
-
-function getStoredUser() {
-    try {
-        return JSON.parse(localStorage.getItem(window.APP_CONFIG.STORAGE_KEYS.USER) || '{}');
-    } catch (e) { return {}; }
+    // APP_CONFIG exist karta hai ya nahi, safely check karein
+    const tokenKey = window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token';
+    const token = localStorage.getItem(tokenKey);
+    
+    // Sirf 'exist' karna kaafi nahi, check karein ki woh 'null' string ya garbage na ho
+    return token && token !== 'null' && token !== 'undefined' && token.trim() !== '';
 }
 
 /* =========================

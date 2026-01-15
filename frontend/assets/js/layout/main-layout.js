@@ -241,21 +241,59 @@
         } catch (err) { }
     }
 
-    function initializeGlobalEvents() {
-        // Listen for Location Changes from Manager
-        window.addEventListener(EVENTS.LOCATION_CHANGED, renderNavbarLocation);
-        renderNavbarLocation();
-        bindNavbarLocationClick();
 
-        // Update Cart Count
-        const token = localStorage.getItem(STORAGE_KEYS.TOKEN);
-        if (token && window.CartService && typeof window.CartService.updateGlobalCount === 'function') {
-            window.CartService.updateGlobalCount();
-        } else {
-            const badges = document.querySelectorAll('.cart-count');
-            badges.forEach(el => el.style.display = 'none');
-        }
+
+    function checkProtectedRoutes() {
+    const privatePages = [
+        '/profile.html', 
+        '/orders.html', 
+        '/checkout.html',
+        '/addresses.html', 
+        '/order_detail.html', 
+        '/track_order.html'
+    ];
+    
+    const currentPath = window.location.pathname;
+    const isPrivate = privatePages.some(page => currentPath.includes(page));
+    
+    // isLoggedIn() main-layout.js mein pehle se define hai
+    if (isPrivate && !isLoggedIn()) {
+        // Content ko turant saaf kar dein taaki user kuch dekh na paaye
+        document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;"><p>Redirecting to Login...</p></div>';
+        
+        const loginRoute = window.APP_CONFIG?.ROUTES?.LOGIN || 'auth.html';
+        // Current page ko 'next' parameter mein bhejein taaki login ke baad wapas aa sakein
+        window.location.href = `${loginRoute}?next=${encodeURIComponent(currentPath)}`;
+        throw new Error("Access Denied: Redirecting to Login"); // Script execution yahin rok dein
     }
+}
+
+
+
+
+
+    function initializeGlobalEvents() {
+    // 1. Security Check Sabse Pehle (Yeh naya add kiya hai)
+    checkProtectedRoutes();
+
+    // 2. Listen for Location Changes from Manager
+    if (window.EVENTS?.LOCATION_CHANGED) {
+        window.addEventListener(window.EVENTS.LOCATION_CHANGED, renderNavbarLocation);
+    }
+    renderNavbarLocation();
+    bindNavbarLocationClick();
+
+    // 3. Update Cart Count
+    const tokenKey = (window.APP_CONFIG?.STORAGE_KEYS?.TOKEN) || 'auth_token';
+    const token = localStorage.getItem(tokenKey);
+    
+    if (token && window.CartService && typeof window.CartService.updateGlobalCount === 'function') {
+        window.CartService.updateGlobalCount();
+    } else {
+        const badges = document.querySelectorAll('.cart-count');
+        badges.forEach(el => el.style.display = 'none');
+    }
+}
 
     document.addEventListener("DOMContentLoaded", async () => {
         if (window.AppConfigService) {

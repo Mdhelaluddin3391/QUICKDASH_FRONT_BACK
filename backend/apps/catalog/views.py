@@ -1,14 +1,12 @@
-# backend/apps/catalog/views.py
-
 from rest_framework import generics, filters, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
-from django.db.models import Prefetch, OuterRef, Subquery, DecimalField, Q, Sum
+from django.db.models import Prefetch, OuterRef, Subquery, DecimalField, Q, Sum, F  # ✅ Added 'F' here
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
-from django.db.models import F  # <--- Add this import
+
 from .models import Category, Product, Banner, Brand, FlashSale
 from .serializers import (
     CategorySerializer, ProductSerializer, BannerSerializer, 
@@ -17,7 +15,6 @@ from .serializers import (
 )
 from apps.warehouse.services import WarehouseService
 from apps.inventory.models import InventoryItem
-
 # ==============================================================================
 # PUBLIC CATALOG APIS
 # Authentication classes empty to allow Guest Browsing
@@ -52,7 +49,6 @@ class HomeCategoryAPIView(APIView):
 
         serializer = HomeCategorySerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
-
 
 class SkuListAPIView(generics.ListAPIView):
     """
@@ -149,7 +145,6 @@ class SkuListAPIView(generics.ListAPIView):
             if sku in price_map:
                 item['sale_price'] = price_map[sku] # Frontend expects 'sale_price'
 
-
 class SkuDetailAPIView(generics.RetrieveAPIView):
     """
     Product Detail Page.
@@ -185,14 +180,19 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
 
         if warehouse:
             # 1. Get Stock
+            # Note: Assuming InventoryItem has 'sku' and we join on Product via SKU logic if needed
+            # Or if you have a direct link. Based on error logs, InventoryItem uses 'sku'.
             stock_data = InventoryItem.objects.filter(
-                product=instance,
+                sku=instance.sku, # Adjusted to match SKU logic
                 bin__rack__aisle__zone__warehouse=warehouse
-            ).aggregate(total=Sum('available_stock'))
-            available_stock = stock_data['total'] or 0
+            ).aggregate(total_stock=Sum('total_stock'), reserved=Sum('reserved_stock'))
+            
+            # Safe calculation using aggregation results
+            t_stock = stock_data.get('total_stock') or 0
+            r_stock = stock_data.get('reserved') or 0
+            available_stock = t_stock - r_stock
 
-            # 2. Get Price (if specific to warehouse)
-            # Assuming 1 item per SKU per Warehouse usually
+            # 2. Get Price
             inv_item = InventoryItem.objects.filter(
                 sku=instance.sku,
                 bin__rack__aisle__zone__warehouse=warehouse
@@ -208,7 +208,6 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
         data['sale_price'] = sale_price
 
         return Response(data)
-
 
 class StorefrontCatalogAPIView(APIView):
     """
@@ -232,7 +231,7 @@ class StorefrontCatalogAPIView(APIView):
         # 1. Resolve Warehouse (Middleware Priority)
         warehouse = getattr(request, 'warehouse', None)
         
-        # Fallback if Middleware didn't find it (e.g. headers missing, but query params present)
+        # Fallback if Middleware didn't find it
         if not warehouse:
             lat = request.query_params.get("lat")
             lon = request.query_params.get("lon")
@@ -242,11 +241,13 @@ class StorefrontCatalogAPIView(APIView):
         if not warehouse:
             return Response({"serviceable": False, "message": "Location not serviceable"}, status=200)
 
-        # 2. Get Products In Stock IDs
+        # 2. Get Products (SKUs) In Stock
+        # ✅ FIXED: Use F() expression to compare columns directly in DB
+        # ✅ FIXED: Fetch 'sku' because 'product_id' field does not exist on InventoryItem
         skus_in_stock = InventoryItem.objects.filter(
             bin__rack__aisle__zone__warehouse=warehouse,
-            total_stock__gt=F('reserved_stock')  # ✅ Fixed: Use F() instead of property
-        ).values_list('sku', flat=True).distinct() # ✅ Fixed: Fetch 'sku', not 'product_id'
+            total_stock__gt=F('reserved_stock')  # total > reserved means available > 0
+        ).values_list('sku', flat=True).distinct()
 
         # 3. Build Categories Feed
         categories = Category.objects.filter(is_active=True, parent__isnull=True)[:6]
@@ -254,16 +255,15 @@ class StorefrontCatalogAPIView(APIView):
         feed = []
         for cat in categories:
             # --- Price Subquery Setup ---
-            # Get price from Inventory for this warehouse
             price_subquery = InventoryItem.objects.filter(
                 sku=OuterRef('sku'),
                 bin__rack__aisle__zone__warehouse=warehouse
             ).values('price')[:1]
 
-            # Fetch products and annotate effective_price
+            # Fetch products
             products = Product.objects.filter(
                 Q(category=cat) | Q(category__parent=cat),
-                sku__in=skus_in_stock,  # ✅ Fixed: Filter by SKU, not ID
+                sku__in=skus_in_stock, # ✅ FIXED: Use sku__in instead of id__in
                 is_active=True
             ).annotate(
                 effective_price=Subquery(
@@ -273,13 +273,11 @@ class StorefrontCatalogAPIView(APIView):
             )[:6]
 
             if products.exists():
-                # Pass context={'request': request} for absolute image URLs
                 p_data = ProductSerializer(products, many=True, context={'request': request}).data
                 
                 # Consistency Injection
                 for p in p_data: 
-                    p['available_stock'] = 10 # Front-end indicator
-                    # Fallback if effective_price is null
+                    p['available_stock'] = 10 # Just a flag for Frontend
                     if p.get('effective_price') is None:
                         p['effective_price'] = p.get('mrp')
                         p['sale_price'] = p.get('mrp')
@@ -327,7 +325,6 @@ class GlobalSearchAPIView(APIView):
         # Warehouse Price Injection logic can be added here similar to SkuListAPIView
         return Response(ProductSerializer(products, many=True, context={'request': request}).data)
 
-
 class SearchSuggestAPIView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = [] 
@@ -369,6 +366,7 @@ class FlashSaleListAPIView(APIView):
         now = timezone.now()
         sales = FlashSale.objects.filter(is_active=True, end_time__gt=now).select_related('product')
         return Response(FlashSaleSerializer(sales, many=True, context={'request': request}).data)
+    
 
 class CategoryListAPIView(generics.ListAPIView):
     permission_classes = [AllowAny]
