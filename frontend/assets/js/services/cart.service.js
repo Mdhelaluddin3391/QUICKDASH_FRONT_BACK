@@ -9,7 +9,7 @@
         _count: 0,
         _total: 0,
 
-        init: async function() {
+        init: async function () {
             if (localStorage.getItem(window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token')) {
                 await this.updateGlobalCount();
             }
@@ -34,32 +34,44 @@
             return this.updateItem(sku, qty);
         },
 
-        updateItem: async function (sku, qty) {
+        async updateItem(sku, quantity) {
             try {
-                // Note: Warehouse ID is handled by Backend Middleware via Headers
-                // We don't need to send it explicitly unless overriding
-                const res = await window.ApiService.post('/orders/cart/add/', {
+                // API को कॉल करें
+                const response = await window.ApiService.post('/orders/cart/add/', {
                     sku: sku,
-                    quantity: qty
+                    quantity: quantity
                 });
-                this._total = res.total_amount || 0;
-                this._count = (res.items || []).length;
-                this._notifyChange(res);
-                return res;
+
+                // अगर सब ठीक है, तो कार्ट अपडेट करें (आपका मौजूदा कोड)
+                // notifyListeners(response.cart); ... 
+                return response;
 
             } catch (error) {
-                // Handle Warehouse Mismatch (Conflict)
-                // If backend returns 409 or explicit location mismatch error
-                if (error.status === 409 || (error.message && error.message.includes("Location Mismatch"))) {
-                    if(confirm("Your cart contains items from another store. Clear it to add this item?")) {
-                         return await window.ApiService.post('/orders/cart/add/', {
-                            sku: sku,
-                            quantity: qty,
-                            force_clear: true
-                        });
+                console.error("Cart Update Error:", error);
+
+                // --- यहाँ हमने Toast का लॉजिक जोड़ा है ---
+
+                // चेक करें कि क्या एरर में मैसेज है
+                const errorMessage = error.message || "Something went wrong";
+
+                // अगर आइटम स्टोर में नहीं है (400 Bad Request)
+                if (error.status === 400 || errorMessage.includes('not available')) {
+
+                    // Toast दिखाएं (लाल रंग या Error स्टाइल में)
+                    if (window.Toast) {
+                        window.Toast.show(errorMessage, 'error');
+                    } else {
+                        alert(errorMessage); // बैकअप अगर Toast लोड नहीं हुआ
+                    }
+
+                } else {
+                    // कोई और एरर हो तो भी दिखाएं
+                    if (window.Toast) {
+                        window.Toast.show("Error updating cart: " + errorMessage, 'error');
                     }
                 }
-                throw error;
+
+                throw error; // एरर को आगे भेजें ताकि UI (button loader) को पता चले कि फेल हुआ
             }
         },
 
@@ -79,12 +91,12 @@
                 const res = await window.ApiService.get('/orders/cart/');
                 this._count = (res.items || []).length;
                 this._updateBadges();
-            } catch (e) { 
-                this._updateBadges(); 
+            } catch (e) {
+                this._updateBadges();
             }
         },
 
-        _updateBadges: function() {
+        _updateBadges: function () {
             const badges = document.querySelectorAll('.cart-count');
             badges.forEach(el => {
                 el.innerText = this._count;
@@ -107,13 +119,13 @@
 
         async validateCartOnLocationChange() {
             const token = localStorage.getItem(window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token');
-            if (!token) return; 
+            if (!token) return;
 
             // ApiService will send new location headers automatically
             try {
                 // This call will fail with 409 if middleware detects warehouse mismatch
                 const res = await window.ApiService.post('/orders/validate-cart/', {});
-                
+
                 if (res.is_valid === false) {
                     this.showConflictModal(res.unavailable_items || []);
                 }
@@ -124,10 +136,10 @@
 
         showConflictModal(items) {
             const itemName = items.length > 0 ? items[0].product_name : "Items";
-            const msg = items.length > 0 
+            const msg = items.length > 0
                 ? `${itemName} and others are not available at this new location.`
                 : "Your cart items are from a different store.";
-                
+
             if (confirm(`⚠️ Location Changed\n\n${msg}\n\nDo you want to clear your cart to shop here?`)) {
                 // Force clear logic
                 window.ApiService.post('/orders/cart/add/', { force_clear: true, sku: 'DUMMY', quantity: 0 })
@@ -136,7 +148,7 @@
                         if (window.Toast) window.Toast.info("Cart cleared for new location.");
                         if (window.location.pathname.includes('cart.html')) window.location.reload();
                     })
-                    .catch(() => {});
+                    .catch(() => { });
             }
         }
     };
