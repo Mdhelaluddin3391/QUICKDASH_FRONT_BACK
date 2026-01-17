@@ -232,7 +232,7 @@ async function loadCategories() {
     if (!container) return;
     try {
         // Fallback for categories if Storefront API fails or no location
-        const cats = await ApiService.get('/catalog/categories/children/');
+        const cats = await ApiService.get('/catalog/categories/parents/');
         if (Array.isArray(cats) && cats.length > 0) {
             container.innerHTML = cats.slice(0, 8).map(c => `
                 <div class="cat-card" onclick="window.location.href='./search_results.html?slug=${c.slug}'">

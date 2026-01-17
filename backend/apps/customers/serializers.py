@@ -11,9 +11,10 @@ class CustomerAddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerAddress
         fields = (
-            'id', 'label', 'house_no', 'apartment_name', 
-            'landmark', 'address_line', 'city', 'pincode', 
-            'latitude', 'longitude', 'is_default', 'google_address_text'
+            'id', 'label', 'house_no', 'floor_no', 'apartment_name', 
+            'landmark', 'city', 'pincode', 
+            'latitude', 'longitude', 'is_default', 'google_address_text',
+            'receiver_name', 'receiver_phone'
         )
         read_only_fields = ('id',)
 

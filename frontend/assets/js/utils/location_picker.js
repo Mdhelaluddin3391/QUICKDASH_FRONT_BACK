@@ -195,27 +195,17 @@ window.LocationPicker = {
         const btn = document.getElementById('lp-confirm-btn');
         
         let formatted = '';
-        let city = '';
-        let pincode = '';
-
         if (source === 'GOOGLE') {
             formatted = data.formatted_address;
-            data.address_components?.forEach(c => {
-                if (c.types.includes('locality')) city = c.long_name;
-                if (c.types.includes('postal_code')) pincode = c.long_name;
-            });
         } else if (source === 'OSM') {
             formatted = data.display_name;
-            const addr = data.address || {};
-            city = addr.city || addr.town || addr.village || addr.county || '';
-            pincode = addr.postcode || '';
         }
 
+        // Raw data ko bhi save kar rahe hain taaki components nikaal sakein
         this.tempAddressData = {
             formatted_address: formatted,
-            city: city,
-            pincode: pincode,
-            source: source
+            source: source,
+            raw: data // Ye important hai detailed extraction ke liye
         };
 
         if (txt) txt.innerText = formatted;
@@ -310,43 +300,65 @@ window.LocationPicker = {
     // ---------------------------------------------------------
 
     confirmPin() {
-        const addr = this.tempAddressData || { formatted_address: 'Pinned Location' };
-        
-        if (this.callback) {
-            // PICKER MODE: Return data to caller (e.g., Address Form)
-            this.callback({
-                lat: this.tempCoords.lat,
-                lng: this.tempCoords.lng,
-                address: addr.formatted_address,
-                city: addr.city || '',
-                pincode: addr.pincode || ''
+        const data = this.tempAddressData || {};
+        const raw = data.raw || {};
+        const source = data.source;
+
+        // --- INTELLIGENT DATA EXTRACTION ---
+        let details = {
+            lat: this.tempCoords.lat,
+            lng: this.tempCoords.lng,
+            address: data.formatted_address || '',
+            houseNo: '',
+            building: '', // Street/Road
+            area: '',
+            city: '',
+            pincode: '',
+            state: ''
+        };
+
+        if (source === 'GOOGLE' && raw.address_components) {
+            raw.address_components.forEach(c => {
+                const t = c.types;
+                if (t.includes('street_number')) details.houseNo = c.long_name;
+                if (t.includes('route')) details.building = c.long_name; // Road Name
+                if (t.includes('sublocality') || t.includes('neighborhood')) details.area = c.long_name;
+                if (t.includes('locality')) details.city = c.long_name;
+                if (t.includes('administrative_area_level_1')) details.state = c.long_name;
+                if (t.includes('postal_code')) details.pincode = c.long_name;
             });
+        } else if (source === 'OSM' && raw.address) {
+            const a = raw.address;
+            details.houseNo = a.house_number || '';
+            details.building = a.road || '';
+            details.area = a.suburb || a.neighbourhood || '';
+            details.city = a.city || a.town || a.village || '';
+            details.pincode = a.postcode || '';
+            details.state = a.state || '';
+        }
+        // -------------------------------------
+
+        if (this.callback) {
+            // PICKER MODE: Form ko detailed data bhejo
+            this.callback(details);
             this.close();
             return;
         }
 
-        // SERVICE MODE: Set Browsing Location
+        // SERVICE MODE (Browsing)
         if (this.mode === 'SERVICE') {
-            let area = addr.city || 'Pinned Location';
-            if (addr.formatted_address) {
-                const parts = addr.formatted_address.split(',');
-                if (parts.length > 0) area = parts[0]; 
-            }
-
-            // CRITICAL INTEGRATION: Use LocationManager
+            const areaName = details.area || details.city || 'Pinned Location';
+            
             if (window.LocationManager) {
                 window.LocationManager.setServiceLocation({
-                    lat: this.tempCoords.lat,
-                    lng: this.tempCoords.lng,
-                    city: addr.city || 'Unknown',
-                    area_name: area,
-                    formatted_address: addr.formatted_address
+                    lat: details.lat,
+                    lng: details.lng,
+                    city: details.city || 'Unknown',
+                    area_name: areaName,
+                    formatted_address: details.address
                 });
-            } else {
-                console.error("LocationManager missing!");
             }
             this.close();
-            // Force reload to refresh catalog for new location
             window.location.reload();
         }
     },

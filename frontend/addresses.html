@@ -111,21 +111,56 @@
         };
 
         function showFormModal(mapData) {
-            const modal = document.getElementById('address-modal');
-            document.getElementById('address-form').reset();
-            document.getElementById('a-lat').value = mapData.lat;
-            document.getElementById('a-lng').value = mapData.lng;
-            document.getElementById('a-google-text').value = mapData.address;
-            document.getElementById('a-city').value = mapData.city;
-            document.getElementById('a-pin').value = mapData.pincode;
-            document.getElementById('display-map-address').innerText = mapData.address || "Pinned Location";
-            try {
-                const user = JSON.parse(localStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER) || '{}');
-                if(user.phone) document.getElementById('a-phone').value = user.phone.replace('+91', '');
-                if(user.first_name) document.getElementById('a-name').value = user.first_name;
-            } catch(e){}
-            modal.classList.add('active');
+    const modal = document.getElementById('address-modal');
+    // Form reset karein
+    document.getElementById('address-form').reset();
+
+    // 1. Hidden Fields (Coordinates & Google Text)
+    document.getElementById('a-lat').value = mapData.lat;
+    document.getElementById('a-lng').value = mapData.lng;
+    document.getElementById('a-google-text').value = mapData.address;
+
+    // 2. Display Label
+    document.getElementById('display-map-address').innerText = mapData.address || "Pinned Location";
+
+    // 3. AUTO-FILL LOGIC
+    // City & Pincode
+    document.getElementById('a-city').value = mapData.city || '';
+    document.getElementById('a-pin').value = mapData.pincode || '';
+
+    // House No (Agar map ne pakda hai toh)
+    if (mapData.houseNo) {
+        document.getElementById('a-house').value = mapData.houseNo;
+    }
+
+    // Building/Apartment Name
+    // Hum "Road Name" aur "Area" ko combine karke yahan daal denge
+    // Example: "MG Road, Indiranagar"
+    let buildingInfo = [];
+    if (mapData.building) buildingInfo.push(mapData.building);
+    if (mapData.area) buildingInfo.push(mapData.area);
+    
+    if (buildingInfo.length > 0) {
+        document.getElementById('a-building').value = buildingInfo.join(', ');
+    }
+
+    // 4. User Personal Details (LocalStorage se)
+    try {
+        const user = JSON.parse(localStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER) || '{}');
+        // Name Auto-fill
+        if (user.first_name) {
+            const fullName = user.last_name ? `${user.first_name} ${user.last_name}` : user.first_name;
+            document.getElementById('a-name').value = fullName;
         }
+        // Phone Auto-fill (Remove +91 if exists)
+        if (user.phone) {
+            document.getElementById('a-phone').value = user.phone.replace('+91', '').replace(/\s/g, '');
+        }
+    } catch(e) { console.error("User data pre-fill failed", e); }
+
+    // Modal Show
+    modal.classList.add('active');
+}
 
         window.closeModal = () => document.getElementById('address-modal').classList.remove('active');
 
