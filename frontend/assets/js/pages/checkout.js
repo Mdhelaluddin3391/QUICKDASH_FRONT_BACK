@@ -163,53 +163,47 @@ async function resolveWarehouse(lat, lng, city) {
 async function placeOrder() {
     if (!selectedAddressId) {
         Toast.warning("⚠️ Delivery Address is Required!");
-        document.querySelector('.step-header').scrollIntoView({behavior: "smooth"});
+        const stepHeader = document.querySelector('.step-header');
+        if(stepHeader) stepHeader.scrollIntoView({behavior: "smooth"});
         return;
     }
-    // UX check
+    
+    // Check warehouse logic (from your existing code)
     if (!resolvedWarehouseId) return Toast.error("Service check failed. Please refresh.");
 
     const btn = document.getElementById('place-order-btn');
     const originalText = btn.innerText;
     btn.disabled = true;
-    btn.innerText = "Verifying Stock...";
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
     try {
-        // 1. Final Stock Validation with L2 Address ID
-        const validation = await ApiService.post('/orders/validate-cart/', {
-            address_id: selectedAddressId 
-        });
-
-        if (!validation.is_valid) {
-            showAvailabilityErrorModal(validation.unavailable_items);
-            btn.innerText = originalText;
-            btn.disabled = false;
-            return;
-        }
-
-        // 2. Create Order
-        btn.innerText = "Processing Order...";
-        
-        if (paymentMethod === 'RAZORPAY') {
-            if (typeof Razorpay === 'undefined') await loadRazorpayScript();
-        }
-
-        // [SECURE] We do NOT send warehouse_id. Backend derives it from delivery_address_id.
-        const orderRes = await ApiService.post('/orders/create/', {
+        // Step A: Create the Order first (Status: Created, Payment: Pending)
+        const orderPayload = {
             delivery_address_id: selectedAddressId, 
             payment_method: paymentMethod,
             delivery_type: 'express'
-        });
+        };
 
+        const orderRes = await ApiService.post('/orders/create/', orderPayload);
+        const orderId = orderRes.order ? orderRes.order.id : orderRes.id;
+
+        // Step B: Handle Payment based on Method
         if (paymentMethod === 'COD') {
+            // Direct Success for COD
             localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT);
-            window.location.href = `/success.html?order_id=${orderRes.order.id}`;
+            window.location.href = `/success.html?order_id=${orderId}`;
+        
         } else if (paymentMethod === 'RAZORPAY') {
-            if (orderRes.razorpay_order) {
-                handleRazorpay(orderRes.razorpay_order, orderRes.order.id, btn);
-            } else {
-                throw new Error("Payment initialization failed");
-            }
+            // Load SDK if not present
+            if (typeof Razorpay === 'undefined') await loadRazorpayScript();
+
+            btn.innerText = "Contacting Bank...";
+            
+            // Call the Payment View you created explicitly to get Razorpay ID
+            const paymentConfig = await ApiService.post(`/payments/create/${orderId}/`);
+            
+            // Launch UPI Modal
+            handleRazorpay(paymentConfig, orderId, btn);
         }
 
     } catch (e) {
@@ -238,43 +232,82 @@ function showAvailabilityErrorModal(items) {
     document.body.appendChild(div);
 }
 
-function loadRazorpayScript() {
-    return new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-        script.onload = resolve;
-        script.onerror = () => reject(new Error("Failed to load Razorpay SDK"));
-        document.body.appendChild(script);
-    });
-}
+function handleRazorpay(rpConfig, orderId, btn) {
+    if (!window.Razorpay) { 
+        Toast.error("Payment SDK not loaded"); 
+        btn.disabled = false;
+        btn.innerText = "Place Order";
+        return; 
+    }
 
-function handleRazorpay(rpOrder, orderId, btn) {
-    if (!window.Razorpay) { Toast.error("Payment SDK not loaded"); return; }
     const options = {
-        "key": rpOrder.key || rpOrder.key_id, 
-        "amount": rpOrder.amount, 
-        "currency": rpOrder.currency,
-        "name": "QuickDash",
-        "description": "Order #" + orderId,
-        "order_id": rpOrder.id,
+        "key": rpConfig.key, 
+        "amount": rpConfig.amount, 
+        "currency": rpConfig.currency,
+        "name": rpConfig.name || "QuickDash",
+        "description": rpConfig.description || "Food Order",
+        "order_id": rpConfig.id, // The ID from backend (starts with order_...)
+        
+        // --- THIS CONFIG BLOCK RESTRICTS TO UPI ONLY ---
+        "config": {
+            "display": {
+                "blocks": {
+                    "upi": {
+                        "name": "Pay via UPI",
+                        "instruments": [
+                            { "method": "upi" }
+                        ]
+                    }
+                },
+                "sequence": ["block.upi"],
+                "preferences": {
+                    "show_default_blocks": false 
+                }
+            }
+        },
+        // ------------------------------------------------
+
         "handler": async function (response) {
-            btn.innerText = "Verifying...";
+            btn.innerHTML = '<i class="fas fa-shield-alt"></i> Verifying...';
             try {
+                // Verify Signature on Backend
                 await ApiService.post('/payments/verify/razorpay/', {
                     razorpay_payment_id: response.razorpay_payment_id,
                     razorpay_order_id: response.razorpay_order_id,
                     razorpay_signature: response.razorpay_signature
                 });
+                
+                // Success!
                 localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT);
                 window.location.href = `/success.html?order_id=${orderId}`;
+                
             } catch (e) {
-                alert("Payment successful but verification timed out. Check 'My Orders'.");
-                window.location.href = './orders.html';
+                console.error(e);
+                Toast.error("Payment successful but verification failed. Please check 'My Orders'.");
+                setTimeout(() => { window.location.href = './orders.html'; }, 2000);
             }
         },
-        "modal": { "ondismiss": function() { btn.disabled = false; btn.innerText = "Place Order"; } }
+        "modal": { 
+            "ondismiss": function() { 
+                btn.disabled = false; 
+                btn.innerText = "Place Order";
+                Toast.info("Payment cancelled. You can retry.");
+            } 
+        },
+        "theme": {
+            "color": "#10b981" // Primary Green Color
+        }
     };
+
     const rzp1 = new Razorpay(options);
+    
+    // Handle failures gracefully
+    rzp1.on('payment.failed', function (response){
+        console.error(response.error);
+        Toast.error(response.error.description || "Payment Failed");
+        btn.disabled = false;
+        btn.innerText = "Retry Payment";
+    });
+
     rzp1.open();
-    rzp1.on('payment.failed', function (response){ Toast.error("Payment Failed"); btn.disabled = false; });
 }

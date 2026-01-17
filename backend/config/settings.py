@@ -291,5 +291,5 @@ if not DEBUG and os.getenv("SENTRY_DSN"):
 # ------------------------------------------------------------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "dummy_key")
-RAZORPAY_SECRET = os.getenv("RAZORPAY_SECRET", "dummy_secret")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "dummy_secret")
 GOOGLE_MAPS_KEY = os.getenv("GOOGLE_MAPS_KEY", "")
