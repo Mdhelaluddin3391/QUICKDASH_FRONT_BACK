@@ -94,3 +94,123 @@
     .order-item-card { flex-direction: column; align-items: flex-start; gap: 15px; }
     .order-item-card .text-right { text-align: left; width: 100%; display: flex; justify-content: space-between; align-items: center; }
 }
+
+
+
+
+
+
+
+/* =============================
+   MODAL POPUP STYLES
+   ============================= */
+
+/* 1. The Overlay (Background) */
+#profile-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6); /* Dark semi-transparent background */
+    backdrop-filter: blur(5px);           /* Blur effect for modern feel */
+    z-index: 9999;
+    
+    /* Centering logic is handled by JS setting display:flex, 
+       but we ensure alignment here too */
+    justify-content: center;
+    align-items: center;
+    
+    /* Smooth fade in */
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* 2. The Box (Popup Card) */
+.modal-box {
+    background: #ffffff;
+    width: 90%;
+    max-width: 450px;       /* Not too wide */
+    padding: 30px;
+    border-radius: 16px;    /* Smooth rounded corners */
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25); /* Deep shadow for 'pop' effect */
+    position: relative;
+    
+    /* Animation: Slide up slightly */
+    animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* 3. Form Inputs Styling inside Modal */
+.modal-box .form-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #444;
+    margin-bottom: 6px;
+    display: block;
+}
+
+.modal-box .form-control {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    background-color: #f9f9f9;
+    transition: all 0.2s;
+    margin-bottom: 15px;
+}
+
+.modal-box .form-control:focus {
+    background-color: #fff;
+    border-color: #007bff; /* Primary color */
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    outline: none;
+}
+
+/* 4. Buttons */
+.modal-box .d-flex {
+    margin-top: 10px;
+    gap: 15px; /* Space between buttons */
+}
+
+.modal-box .btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 500;
+    flex: 1; /* Both buttons take equal width */
+}
+
+/* Close Button (X) */
+.close-modal {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    color: #999;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.close-modal:hover {
+    color: #333;
+}
+
+/* =============================
+   ANIMATIONS
+   ============================= */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes slideUp {
+    from { 
+        opacity: 0; 
+        transform: translateY(30px) scale(0.95); 
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0) scale(1); 
+    }
+}

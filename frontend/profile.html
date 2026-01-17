@@ -19,16 +19,17 @@
     <main class="container">
         <div class="account-layout">
             <aside class="account-sidebar">
-                <div class="user-profile-brief">
+                <div class="user-profile-brief" style="align-items: flex-start;">
                     <div class="avatar-circle">U</div>
-                    <div style="flex: 1;">
-                        <h4 id="user-name" style="font-size:1rem; margin-bottom:2px;">User</h4>
-                        <p id="user-phone" class="text-muted small">...</p>
+                    <div style="flex: 1; padding-left: 10px;">
+                        <h4 id="user-name" style="font-size:1.1rem; margin-bottom:4px; font-weight: 700;">Loading...</h4>
+                        
+                        <p id="user-phone" style="font-size: 0.9rem; color: #333; margin-bottom: 8px;">...</p>
+                        
+                        <button id="edit-profile-btn" class="btn btn-sm btn-outline-primary" style="padding: 4px 10px; font-size: 0.8rem;">
+                            <i class="fas fa-pen"></i> Edit Profile
+                        </button>
                     </div>
-                    <button id="edit-profile-btn" class="btn btn-sm btn-outline" style="padding: 5px 10px;"
-                        title="Edit Profile">
-                        <i class="fas fa-pen"></i>
-                    </button>
                 </div>
 
                 <nav>
@@ -75,7 +76,11 @@
 
     <div id="profile-modal" class="modal-overlay d-none">
         <div class="modal-box">
-            <h3 class="mb-3">Edit Profile</h3>
+            <div class="d-flex justify-between align-center mb-3">
+                <h3 class="m-0">Edit Profile</h3>
+                <button type="button" class="btn btn-sm btn-light close-modal" onclick="closeProfileModal()">&times;</button>
+            </div>
+            
             <form id="profile-form">
                 <div class="form-group">
                     <label class="form-label">First Name</label>
@@ -100,17 +105,15 @@
 
     <div id="footer-placeholder"></div>
 
-<script src="./assets/js/config.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
-<script src="./assets/js/utils/formatters.js?v=1.0.0" defer></script>
-<script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
-<script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
-<script src="./assets/js/services/cart.service.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+    <script src="./assets/js/config.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/formatters.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+    <script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+    <script src="./assets/js/services/cart.service.js?v=1.0.0" defer></script>
+    <script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+    
+    <script src="./assets/js/pages/profile.js?v=1.0.1" defer></script>
 </body>
-
 </html>
