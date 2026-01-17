@@ -5,6 +5,7 @@ from django.utils.deprecation import MiddlewareMixin
 from django.http import JsonResponse
 from django.core.cache import cache
 from django.contrib.gis.geos import Point
+from django.conf import settings  # ✅ FIX: Settings import किया गया
 
 logger = logging.getLogger(__name__)
 
@@ -101,5 +102,17 @@ class LocationContextMiddleware(MiddlewareMixin):
         if warehouse:
             cache.set(cache_key, warehouse.id, timeout=300)
             return warehouse
+        
+        # ✅ FIX: Development Fallback (जुगाड़)
+        # अगर लोकेशन किसी भी जोन में नहीं है, लेकिन DEBUG मोड ऑन है,
+        # तो पहला एक्टिव वेयरहाउस उठा लो।
+        if settings.DEBUG:
+            fallback = Warehouse.objects.filter(is_active=True).first()
+            if fallback:
+                # सिर्फ एक बार लॉग में दिखा दो कि फॉलबैक यूज हो रहा है
+                if not cache.get("warn_fallback_active"):
+                    logger.warning(f"⚠️ DEBUG MODE: Using Fallback Warehouse '{fallback.name}' because exact location match failed.")
+                    cache.set("warn_fallback_active", "1", timeout=60)
+                return fallback
         
         return None

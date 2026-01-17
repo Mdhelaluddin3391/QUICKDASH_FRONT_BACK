@@ -11,7 +11,9 @@ from .models import Order
 from rest_framework import serializers
 from .models import Order, OrderItem, Cart, CartItem
 from apps.catalog.models import Product
-
+from rest_framework import serializers
+from .models import Order, OrderItem, Cart, CartItem
+from apps.catalog.models import Product
 
 
 
@@ -31,7 +33,6 @@ class CartItemSerializer(serializers.ModelSerializer):
         if p and p.image:
             return p.image.url
         return None
-
 
 class CartSerializer(serializers.ModelSerializer):
     items = CartItemSerializer(many=True, read_only=True)

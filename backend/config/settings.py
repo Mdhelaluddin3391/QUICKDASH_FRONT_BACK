@@ -105,6 +105,7 @@ MIDDLEWARE = [
 
     "apps.core.middleware.CorrelationIDMiddleware",
     "apps.core.middleware.GlobalKillSwitchMiddleware",
+    "apps.core.middleware.LocationContextMiddleware",
 
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",

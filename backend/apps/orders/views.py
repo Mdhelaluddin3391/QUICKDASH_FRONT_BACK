@@ -14,6 +14,11 @@ from apps.payments.services import PaymentService
 from .models import Order, Cart, CartItem
 from .services import OrderService
 from .serializers import CreateOrderSerializer, CartSerializer, OrderListSerializer, OrderSerializer
+from .services import OrderService, OrderSimulationService 
+
+from .serializers import CreateOrderSerializer, CartSerializer, OrderListSerializer, OrderSerializer
+
+
 
 class ValidateCartAPIView(APIView):
     """
@@ -254,7 +259,7 @@ class AddToCartAPIView(APIView):
         return Response(CartSerializer(cart).data)
 
 class OrderSimulationAPIView(APIView):
-    # ✅ FIX: IsAdminUser -> permissions.IsAdminUser
+    # ✅ FIX: IsAdminUser -> permissions.IsAdminUser (Already fixed in your code, keeping strictly correct)
     permission_classes = [permissions.IsAdminUser]
 
     def post(self, request, order_id):
@@ -264,6 +269,7 @@ class OrderSimulationAPIView(APIView):
         try:
             msg = ""
             if target_status == 'packed':
+                # ✅ अब यह लाइन बिना एरर के चलेगी क्योंकि हमने ऊपर import कर लिया है
                 msg = OrderSimulationService.advance_to_packed(order)
             elif target_status == 'out_for_delivery':
                 msg = OrderSimulationService.advance_to_out_for_delivery(order)
