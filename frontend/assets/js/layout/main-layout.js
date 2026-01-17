@@ -6,7 +6,6 @@
     const STORAGE_KEYS = window.APP_CONFIG?.STORAGE_KEYS || {};
     const EVENTS = window.APP_CONFIG?.EVENTS || {};
 
-
     function isLoggedIn() {
         const tokenKey = (window.APP_CONFIG?.STORAGE_KEYS?.TOKEN) || 'auth_token';
         return !!localStorage.getItem(tokenKey);
@@ -34,33 +33,73 @@
             const html = await response.text();
             element.innerHTML = html;
 
+            // Load hone ke baad highlight karein
             highlightActiveLink(element);
         } catch (error) {
             console.error(`Error loading component ${filePath}:`, error);
         }
     }
 
+    /**
+     * [UPDATED] Smart Link Highlighting
+     * Ab ye Query Parameters (slug) ko bhi check karega
+     */
     function highlightActiveLink(container) {
-        const currentPath = window.location.pathname;
-        const links = container.querySelectorAll('a.nav-item, a.icon-link');
-        links.forEach(link => {
-            const href = link.getAttribute('href');
-            if (!href) return;
-            let linkPath = href;
-            try {
-                linkPath = new URL(href, window.location.href).pathname;
-            } catch (e) { }
+        try {
+            const currentUrl = new URL(window.location.href);
+            const currentPath = currentUrl.pathname; // e.g. /search_results.html
+            const currentSlug = currentUrl.searchParams.get('slug'); // e.g. fruits
 
-            if (
-                linkPath === currentPath ||
-                (currentPath === '/' && (linkPath === '/index.html' || linkPath === 'index.html')) ||
-                (currentPath.endsWith('/') && (linkPath === 'index.html' || linkPath === '/index.html'))
-            ) {
-                link.classList.add('active');
+            // Select generic nav items and icon links
+            const links = container.querySelectorAll('a.nav-item, a.icon-link, .nav-links a');
+            
+            links.forEach(link => {
+                link.classList.remove('active'); // Reset purana active
+                
+                // Cleanup inline icon color if previously added
                 const icon = link.querySelector('i');
-                if (icon) icon.style.color = 'var(--primary)';
-            }
-        });
+                if (icon) icon.style.removeProperty('color');
+
+                const href = link.getAttribute('href');
+                if (!href) return;
+
+                // Resolve link URL absolute path to compare safely
+                const linkUrl = new URL(href, window.location.href);
+                const linkPath = linkUrl.pathname;
+                const linkSlug = linkUrl.searchParams.get('slug');
+
+                let isActive = false;
+
+                // CASE 1: Category Pages (Jahan slug matter karta hai)
+                if (currentPath.includes('search_results.html') && linkPath.includes('search_results.html')) {
+                    // Sirf tab active karein jab slug match kare
+                    if (currentSlug && linkSlug && currentSlug === linkSlug) {
+                        isActive = true;
+                    }
+                }
+                // CASE 2: Normal Pages (Home, Orders, Profile)
+                else {
+                    // Simple Path Match
+                    if (linkPath === currentPath) {
+                        isActive = true;
+                    }
+                    // Root / vs index.html handle
+                    else if ((currentPath === '/' && linkPath.endsWith('index.html')) || 
+                             (linkPath === '/' && currentPath.endsWith('index.html'))) {
+                        isActive = true;
+                    }
+                }
+
+                // Apply Active Class
+                if (isActive) {
+                    link.classList.add('active');
+                    // Agar icon hai toh color set karein (CSS fallback)
+                    if (icon && link.classList.contains('icon-link')) {
+                        icon.style.color = 'var(--primary)';
+                    }
+                }
+            });
+        } catch(e) { console.error("Highlight error", e); }
     }
 
     // ---------------------------------------------------------
@@ -89,15 +128,12 @@
         const icon = box.querySelector('i.fas.fa-map-marker-alt') || box.querySelector('i.fas.fa-map-pin');
 
         if (display.type === 'DELIVERY') {
-            // L2: Strong Green/Primary - Delivery Mode
             box.classList.add("active-delivery");
             if (icon) icon.className = 'fas fa-map-marker-alt text-primary';
         } else if (display.type === 'SERVICE') {
-            // L1: Muted/Orange - Browsing Mode
             box.classList.add("active-service");
             if (icon) icon.className = 'fas fa-map-pin text-danger';
         } else {
-            // None
             if (icon) icon.className = 'fas fa-search-location text-muted';
         }
     }
@@ -113,17 +149,13 @@
             const box = (node && typeof node.closest === 'function') ? node.closest('#navbar-location-box') : null;
             if (!box) return;
 
-            // Prevent double opening
             if (document.querySelector('.address-switcher-modal')) return;
             const modal = document.getElementById('loc-picker-modal');
             if (modal && modal.classList.contains('active')) return;
 
-            // 1. Check if Logged In
             if (isLoggedIn()) {
-                // User -> Show Address Switcher
                 await openAddressSwitcher();
             } else {
-                // Guest -> Open Map Picker (Service Mode)
                 openMapPickerFallback();
             }
         }, false);
@@ -132,17 +164,13 @@
     async function openAddressSwitcher() {
         try {
             if (!window.ApiService) {
-                console.error("ApiService not found");
                 openMapPickerFallback();
                 return;
             }
-
             const res = await window.ApiService.get('/customers/addresses/');
             const addresses = Array.isArray(res) ? res : (res.results || []);
             createAndShowAddressModal(addresses);
-
         } catch (err) {
-            console.error("Failed to fetch addresses:", err);
             openMapPickerFallback();
         }
     }
@@ -178,9 +206,7 @@
                 <h3>Select Location</h3>
                 <button class="close-btn">&times;</button>
             </div>
-            <div class="addr-list">
-                ${listHtml}
-            </div>
+            <div class="addr-list">${listHtml}</div>
             <div class="addr-footer">
                 <button class="btn-gps"><i class="fas fa-crosshairs"></i> Use Current Location</button>
                 <button class="btn-add"><i class="fas fa-plus"></i> Add New Address</button>
@@ -194,29 +220,21 @@
         backdrop.onclick = close;
         modal.querySelector('.close-btn').onclick = close;
 
-        // Click Handler: Select Address (Sets L2 Context)
         modal.querySelectorAll('.addr-item').forEach(item => {
             item.onclick = () => {
                 try {
                     const data = JSON.parse(item.getAttribute('data-json'));
                     if (window.LocationManager) {
                         window.LocationManager.setDeliveryAddress(data);
-                        window.location.reload(); // Refresh to apply context
+                        window.location.reload();
                     }
-                } catch (e) { console.error(e); }
+                } catch (e) { }
                 close();
             };
         });
 
-        // "Use Current Location": Switch to L1 (Service Mode)
-        modal.querySelector('.btn-gps').onclick = () => {
-            close();
-            openMapPickerFallback();
-        };
-
-        modal.querySelector('.btn-add').onclick = () => {
-            window.location.href = 'addresses.html';
-        };
+        modal.querySelector('.btn-gps').onclick = () => { close(); openMapPickerFallback(); };
+        modal.querySelector('.btn-add').onclick = () => { window.location.href = 'addresses.html'; };
     }
 
     function openMapPickerFallback() {
@@ -232,74 +250,45 @@
                 s.async = true;
                 s.src = (window.Asset && typeof window.Asset.url === 'function') ? window.Asset.url('assets/js/utils/location_picker.js') : '/assets/js/utils/location_picker.js';
                 s.onload = () => {
-                    if (window.LocationPicker && typeof window.LocationPicker.open === 'function') {
-                        try { window.LocationPicker.open('SERVICE'); } catch (err) { }
-                    }
+                    if (window.LocationPicker) window.LocationPicker.open('SERVICE');
                 };
                 document.body.appendChild(s);
             }
         } catch (err) { }
     }
 
-
-
     function checkProtectedRoutes() {
-    const privatePages = [
-        '/profile.html', 
-        '/orders.html', 
-        '/checkout.html',
-        '/addresses.html', 
-        '/order_detail.html', 
-        '/track_order.html'
-    ];
-    
-    const currentPath = window.location.pathname;
-    const isPrivate = privatePages.some(page => currentPath.includes(page));
-    
-    // isLoggedIn() main-layout.js mein pehle se define hai
-    if (isPrivate && !isLoggedIn()) {
-        // Content ko turant saaf kar dein taaki user kuch dekh na paaye
-        document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;"><p>Redirecting to Login...</p></div>';
+        const privatePages = ['/profile.html', '/orders.html', '/checkout.html', '/addresses.html', '/order_detail.html', '/track_order.html'];
+        const currentPath = window.location.pathname;
+        const isPrivate = privatePages.some(page => currentPath.includes(page));
         
-        const loginRoute = window.APP_CONFIG?.ROUTES?.LOGIN || 'auth.html';
-        // Current page ko 'next' parameter mein bhejein taaki login ke baad wapas aa sakein
-        window.location.href = `${loginRoute}?next=${encodeURIComponent(currentPath)}`;
-        throw new Error("Access Denied: Redirecting to Login"); // Script execution yahin rok dein
+        if (isPrivate && !isLoggedIn()) {
+            document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;"><p>Redirecting to Login...</p></div>';
+            const loginRoute = window.APP_CONFIG?.ROUTES?.LOGIN || 'auth.html';
+            window.location.href = `${loginRoute}?next=${encodeURIComponent(currentPath)}`;
+            throw new Error("Access Denied");
+        }
     }
-}
-
-
-
-
 
     function initializeGlobalEvents() {
-    // 1. Security Check Sabse Pehle (Yeh naya add kiya hai)
-    checkProtectedRoutes();
+        checkProtectedRoutes();
+        if (window.EVENTS?.LOCATION_CHANGED) {
+            window.addEventListener(window.EVENTS.LOCATION_CHANGED, renderNavbarLocation);
+        }
+        renderNavbarLocation();
+        bindNavbarLocationClick();
 
-    // 2. Listen for Location Changes from Manager
-    if (window.EVENTS?.LOCATION_CHANGED) {
-        window.addEventListener(window.EVENTS.LOCATION_CHANGED, renderNavbarLocation);
+        const tokenKey = (window.APP_CONFIG?.STORAGE_KEYS?.TOKEN) || 'auth_token';
+        if (localStorage.getItem(tokenKey) && window.CartService?.updateGlobalCount) {
+            window.CartService.updateGlobalCount();
+        } else {
+            document.querySelectorAll('.cart-count').forEach(el => el.style.display = 'none');
+        }
     }
-    renderNavbarLocation();
-    bindNavbarLocationClick();
-
-    // 3. Update Cart Count
-    const tokenKey = (window.APP_CONFIG?.STORAGE_KEYS?.TOKEN) || 'auth_token';
-    const token = localStorage.getItem(tokenKey);
-    
-    if (token && window.CartService && typeof window.CartService.updateGlobalCount === 'function') {
-        window.CartService.updateGlobalCount();
-    } else {
-        const badges = document.querySelectorAll('.cart-count');
-        badges.forEach(el => el.style.display = 'none');
-    }
-}
 
     document.addEventListener("DOMContentLoaded", async () => {
-        if (window.AppConfigService) {
-            await window.AppConfigService.load();
-        }
-
+        if (window.AppConfigService) await window.AppConfigService.load();
+        
         await Promise.all([
             loadComponent("navbar-placeholder", "./components/navbar.html"),
             loadComponent("footer-placeholder", "./components/footer.html")
@@ -315,12 +304,10 @@
 
         const API_URL = `${window.APP_CONFIG.API_BASE_URL}/catalog/categories/parents/`;
         const CACHE_KEY = 'nav_parents_cache';
-        const CACHE_TTL = 60 * 60 * 1000;
-
+        
         try {
             const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-            const now = Date.now();
-            if (cached && (now - cached.ts) < CACHE_TTL && Array.isArray(cached.data)) {
+            if (cached && (Date.now() - cached.ts) < 3600000 && Array.isArray(cached.data)) {
                 renderNav(cached.data);
                 return;
             }
@@ -328,27 +315,12 @@
 
         try {
             const resp = await fetch(API_URL);
-            let data = [];
-            const contentType = resp.headers.get("content-type");
-            if (contentType && contentType.indexOf("application/json") !== -1) {
-                data = await resp.json();
-            } else {
-                throw new Error("API returned non-JSON response");
-            }
-
+            const data = await resp.json();
             if (Array.isArray(data)) {
-                try {
-                    localStorage.setItem(
-                        CACHE_KEY,
-                        JSON.stringify({ ts: Date.now(), data: data })
-                    );
-                } catch (e) { }
-
+                localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: data }));
                 renderNav(data);
             }
-        } catch (err) {
-            console.warn('Failed to fetch navbar categories:', err);
-        }
+        } catch (err) { }
     }
 
     function renderNav(categories) {
@@ -356,72 +328,50 @@
         if (!navEl) return;
 
         const items = [];
+        // Trending Link (Static)
         items.push(
             `<a href="index.html" class="nav-item">
-                    <i class="fas fa-fire"></i> Trending
-                 </a>`
+                <i class="fas fa-fire"></i> Trending
+             </a>`
         );
 
+        // Dynamic Categories
         categories.forEach(c => {
             const slug = c.slug || (c.name || '').toLowerCase().replace(/\s+/g, '-');
-            const name = escapeHtml(c.name || 'Category');
+            const name = c.name || 'Category';
             let imgHtml = '';
             if (c.icon_url) {
-                imgHtml = `
-                        <img
-                            src="${escapeHtml(c.icon_url)}"
-                            alt="${name}"
-                            style="width:18px;height:18px;object-fit:cover;
-                                   border-radius:4px;margin-right:8px;
-                                   vertical-align:middle;"
-                        >
-                    `;
+                imgHtml = `<img src="${c.icon_url}" alt="${name}" style="width:18px;height:18px;object-fit:cover;border-radius:4px;margin-right:8px;vertical-align:middle;">`;
             }
             items.push(
-                `<a href="search_results.html?slug=${encodeURIComponent(slug)}"
-                        class="nav-item" title="${name}">
-                        ${imgHtml}${name}
-                    </a>`
+                `<a href="search_results.html?slug=${encodeURIComponent(slug)}" class="nav-item" title="${name}">
+                    ${imgHtml}${name}
+                 </a>`
             );
         });
 
         navEl.innerHTML = items.join('');
+        // Render hone ke baad highlight karein
         highlightActiveLink(navEl);
-    }
-
-    function escapeHtml(str) {
-        return String(str).replace(/[&<>"']/g, function (m) {
-            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
-        });
     }
 
     window.logout = async function () {
         try {
-            if (window.ApiService && typeof window.ApiService.post === 'function') {
-                try { await window.ApiService.post('/auth/logout/', {}); } catch (e) { }
-            }
+            if (window.ApiService?.post) await window.ApiService.post('/auth/logout/', {});
         } catch (e) { } finally {
-            try {
-                localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.TOKEN);
-                localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.REFRESH);
-                localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.USER);
-                // Clear Delivery Context (L2) but maybe keep Service Context (L1) for UX
-                localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT);
-            } catch (e) { }
-
-            const privatePages = [
-                '/profile.html', '/orders.html', '/checkout.html',
-                '/addresses.html', '/order_detail.html', '/track_order.html'
-            ];
+            localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.TOKEN);
+            localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.REFRESH);
+            localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.USER);
+            localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT);
+            
+            const privatePages = ['/profile.html', '/orders.html', '/checkout.html', '/addresses.html', '/order_detail.html', '/track_order.html'];
             const currentPath = window.location.pathname;
-            const isPrivate = privatePages.some(page => currentPath.includes(page));
-
-            if (isPrivate) {
+            
+            if (privatePages.some(page => currentPath.includes(page))) {
                 window.location.href = APP_CONFIG.ROUTES.LOGIN;
             } else {
-                try { window.location.reload(); } catch (e) { window.location.href = APP_CONFIG.ROUTES.HOME; }
+                window.location.reload();
             }
         }
     };
-
 })();

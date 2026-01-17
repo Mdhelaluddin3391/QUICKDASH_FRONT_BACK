@@ -141,3 +141,20 @@ footer {
 .footer-col a { display: block; color: var(--text-muted); margin-bottom: 8px; font-size: 0.9rem; }
 .footer-col a:hover { color: var(--primary); transform: translateX(5px); display: inline-block; }
 .copyright { text-align: center; padding-top: 20px; border-top: 1px solid var(--border-color); font-size: 0.85rem; color: #999; }
+
+
+
+
+.nav-menu a.active,
+.nav-links a.active,
+.mobile-nav a.active {
+    color: var(--primary-color, #ff6b6b); /* Aapka main color */
+    font-weight: 700;
+    border-bottom: 2px solid var(--primary-color, #ff6b6b); /* Neeche line (optional) */
+}
+
+/* Ensure karein ki hover aur active mein conflict na ho */
+.nav-menu a:hover {
+    color: var(--primary-color, #ff6b6b);
+    opacity: 0.8;
+}

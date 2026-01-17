@@ -62,6 +62,7 @@ async function initHome() {
 }
 
 // 1. Optimized Storefront (Location Aware)
+// 1. Optimized Storefront (Location Aware) - Updated Logic
 async function loadStorefront(lat, lng, city) {
     const feedContainer = document.getElementById('feed-container');
     const catContainer = document.getElementById('category-grid');
@@ -78,7 +79,6 @@ async function loadStorefront(lat, lng, city) {
         currentAbortController = new AbortController();
 
         // ApiService automatically injects X-Location headers. 
-        // We pass query params just in case specific logic needs them, but backend uses headers first.
         const res = await ApiService.get(
             `/catalog/storefront/?lat=${lat}&lon=${lng}&city=${city || ''}`
         );
@@ -97,20 +97,23 @@ async function loadStorefront(lat, lng, city) {
                     </button>
                 </div>
             `;
-            catContainer.innerHTML = ''; // Clear categories
+            // UPDATED: Clear karne ki bajaye generic categories load karein taaki section dikhe
+            if (catContainer) await loadCategories(); 
             return;
         }
 
         // Render Categories
         if (res.categories && res.categories.length > 0) {
-            catContainer.innerHTML = res.categories.slice(0, 8).map(c => `
-                <div class="cat-card" onclick="window.location.href='./search_results.html?slug=${c.slug}'">
-                    <div class="cat-img-box">
-                        <img src="${c.icon || 'https://cdn-icons-png.flaticon.com/512/3703/3703377.png'}" alt="${c.name}" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3703/3703377.png'">
+            if (catContainer) {
+                catContainer.innerHTML = res.categories.slice(0, 8).map(c => `
+                    <div class="cat-card" onclick="window.location.href='./search_results.html?slug=${c.slug}'">
+                        <div class="cat-img-box">
+                            <img src="${c.icon || 'https://cdn-icons-png.flaticon.com/512/3703/3703377.png'}" alt="${c.name}" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3703/3703377.png'">
+                        </div>
+                        <div class="cat-name">${c.name}</div>
                     </div>
-                    <div class="cat-name">${c.name}</div>
-                </div>
-            `).join('');
+                `).join('');
+            }
 
             // Render Feed Sections
             feedContainer.innerHTML = res.categories.map(cat => {
@@ -127,14 +130,21 @@ async function loadStorefront(lat, lng, city) {
                 </section>
             `}).join('');
         } else {
+            // UPDATED: Agar Storefront se categories nahi aayi, toh Generic Categories load karein
+            console.warn("Storefront returned no categories, loading generic fallback.");
+            if (catContainer) await loadCategories();
+            
             feedContainer.innerHTML = '<p class="text-center py-5">No products available in this store right now.</p>';
         }
 
     } catch (e) {
         if (e.name === 'AbortError') return; // Ignore cancelled requests
         console.error("Storefront failed", e);
+        
         // Fallback to generic feed if Storefront crashes
         loadGenericFeed();
+        // UPDATED: Error aane par bhi Categories load honi chahiye
+        if (catContainer) loadCategories(); 
     }
 }
 
