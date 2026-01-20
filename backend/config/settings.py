@@ -103,15 +103,16 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",  # MUST BE FIRST
     "django.middleware.common.CommonMiddleware",
 
-    "apps.core.middleware.CorrelationIDMiddleware",
-    "apps.core.middleware.GlobalKillSwitchMiddleware",
-    "apps.core.middleware.LocationContextMiddleware",
-
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+
+    "apps.core.middleware.CorrelationIDMiddleware",
+    "apps.core.middleware.GlobalKillSwitchMiddleware",
+    "apps.core.middleware.LocationContextMiddleware",
+
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 
     "django_prometheus.middleware.PrometheusAfterMiddleware",
@@ -292,4 +293,5 @@ if not DEBUG and os.getenv("SENTRY_DSN"):
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "dummy_key")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "dummy_secret")
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
 GOOGLE_MAPS_KEY = os.getenv("GOOGLE_MAPS_KEY", "")

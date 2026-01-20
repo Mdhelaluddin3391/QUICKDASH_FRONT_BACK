@@ -17,6 +17,8 @@ from .serializers import CreateOrderSerializer, CartSerializer, OrderListSeriali
 from .services import OrderService, OrderSimulationService 
 
 from .serializers import CreateOrderSerializer, CartSerializer, OrderListSerializer, OrderSerializer
+from apps.utils.idempotency import idempotent
+from apps.accounts.permissions import IsCustomer
 
 
 
@@ -82,8 +84,9 @@ class CreateOrderAPIView(APIView):
     TRUSTS: Server-side calculated warehouse.
     IGNORES: Client-side warehouse_id.
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsCustomer]
 
+    @idempotent(timeout=300)
     @transaction.atomic
     def post(self, request):
         serializer = CreateOrderSerializer(data=request.data)

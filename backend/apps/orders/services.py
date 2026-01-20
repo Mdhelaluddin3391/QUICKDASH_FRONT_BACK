@@ -40,6 +40,48 @@ class OrderService:
 
     @staticmethod
     @transaction.atomic
+    def create_order(user, warehouse, items, delivery_type, address_id=None, payment_method=None):
+        """
+        Wrapper for create_order_after_reservation for backward compatibility.
+        """
+        if address_id is None:
+            # Find or create a default address
+            from apps.customers.models import CustomerAddress, CustomerProfile
+            address = CustomerAddress.objects.filter(customer__user=user, is_deleted=False).first()
+            if not address:
+                # Create a dummy address
+                customer, _ = CustomerProfile.objects.get_or_create(user=user)
+                address = CustomerAddress.objects.create(
+                    customer=customer,
+                    house_no="123",
+                    apartment_name="Test Apt",
+                    google_address_text="Test Address",
+                    latitude=0.0,
+                    longitude=0.0,
+                    city="Test City"
+                )
+            address_id = address.id
+        if payment_method is None:
+            payment_method = "cash"
+        
+        # Reserve inventory
+        InventoryService.bulk_lock_and_reserve(
+            warehouse_id=warehouse.id,
+            items_dict={i['sku']: i['quantity'] for i in items},
+            reference=f"order_init_{user.id}"
+        )
+        
+        return OrderService.create_order_after_reservation(
+            user=user,
+            warehouse_id=warehouse.id,
+            items_data=items,
+            delivery_type=delivery_type,
+            address_id=address_id,
+            payment_method=payment_method
+        )
+
+    @staticmethod
+    @transaction.atomic
     def create_order_after_reservation(user, warehouse_id, items_data, delivery_type, address_id, payment_method):
         """
         Creates Order. 

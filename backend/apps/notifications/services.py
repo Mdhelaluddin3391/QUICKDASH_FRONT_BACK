@@ -70,13 +70,20 @@ class OTPService:
         if len(phone) < 10 or len(phone) > 15:
              raise BusinessLogicException("Invalid phone number format", code="invalid_format")
 
-        # 2. Resend Cooldown (Redis)
+        # 2. Per-Phone Rate Limiting (5 OTPs/hour)
+        rate_key = f"otp_rate:{phone}"
+        attempts = cache.get(rate_key, 0)
+        if attempts >= 5:
+            raise BusinessLogicException("Too many OTP requests. Try again later.", code="rate_limited")
+        cache.set(rate_key, attempts + 1, timeout=3600)
+
+        # 3. Resend Cooldown (Redis)
         cooldown_key = f"otp_cooldown:{phone}"
         if cache.get(cooldown_key):
              ttl = cache.ttl(cooldown_key)
              raise BusinessLogicException(f"Please wait {ttl} seconds before retrying", code="rate_limit")
 
-        # 3. Abuse & Security Checks
+        # 4. Abuse & Security Checks
         OTPAbuseService.check(phone, ip_address)
 
         # 4. Generate & Save (Atomic)

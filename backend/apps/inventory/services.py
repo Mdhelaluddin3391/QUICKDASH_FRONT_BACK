@@ -19,11 +19,22 @@ except Exception as e:
 
 class InventoryService:
     INVENTORY_TTL = 3600  # 1 Hour
+    REDIS_CIRCUIT_TIMEOUT = 30  # seconds
     
     # Lua Script Return Codes
     LUA_SUCCESS = 1
     LUA_STOCK_OUT = 0
     LUA_MISSING_KEY = -1
+
+    @staticmethod
+    def _redis_circuit_open():
+        """Check if Redis circuit is open (down)."""
+        from django.core.cache import cache
+        try:
+            cache.get("redis_health_check")
+            return False
+        except:
+            return True
 
     @staticmethod
     def check_stock(product_id, warehouse_id, quantity):
@@ -51,7 +62,7 @@ class InventoryService:
         2. If Key Missing -> Lazy Load from DB -> Retry.
         3. If Stock Out -> Fast Fail.
         """
-        if not r:
+        if InventoryService._redis_circuit_open() or not r:
             # Fallback if Redis is down: Direct DB Lock (slower but safe)
             return InventoryService._reserve_stock_db_fallback(sku, warehouse_id, quantity)
 
@@ -102,7 +113,11 @@ class InventoryService:
         """
         Fallback when Redis is down. Directly locks DB row.
         """
+        from django.db import connection
         with transaction.atomic():
+            # Set lock timeout to prevent indefinite waits
+            with connection.cursor() as cursor:
+                cursor.execute("SET LOCAL lock_timeout = '10s'")
             item = InventoryItem.objects.select_for_update().filter(
                 sku=sku, 
                 bin__rack__aisle__zone__warehouse_id=warehouse_id
@@ -123,6 +138,50 @@ class InventoryService:
         if item and r:
             key = InventoryService._get_cache_key(warehouse_id, sku)
             r.set(key, item.available_stock, ex=InventoryService.INVENTORY_TTL, nx=True)
+
+    @staticmethod
+    @transaction.atomic
+    def bulk_lock_and_reserve(warehouse_id: int, items_dict: dict, reference: str):
+        """
+        Reserves stock for multiple SKUs in a warehouse.
+        Uses Redis for performance, falls back to DB.
+        """
+        reserved_items = []
+        
+        for sku, qty_needed in items_dict.items():
+            success = InventoryService.reserve_stock_cached(sku, warehouse_id, qty_needed)
+            if not success:
+                # Rollback previous reservations
+                for prev_item in reserved_items:
+                    InventoryService.rollback_redis_stock(prev_item.sku, warehouse_id, prev_item.qty)
+                raise BusinessLogicException(f"Insufficient stock for {sku}", code="stock_out")
+            
+            # Track for rollback if needed
+            reserved_items.append(type('obj', (object,), {'sku': sku, 'qty': qty_needed})())
+        
+        # If all succeeded, commit to DB
+        for sku, qty_needed in items_dict.items():
+            item = InventoryItem.objects.select_for_update().filter(
+                sku=sku, 
+                bin__rack__aisle__zone__warehouse_id=warehouse_id
+            ).first()
+            
+            if not item or item.available_stock < qty_needed:
+                # This shouldn't happen if Redis is consistent, but safety check
+                raise BusinessLogicException(f"DB inconsistency for {sku}", code="stock_out")
+            
+            item.reserved_stock = F("reserved_stock") + qty_needed
+            item.save(update_fields=["reserved_stock"])
+            
+            # Audit Log
+            InventoryTransaction.objects.create(
+                inventory_item=item,
+                transaction_type="reserve",
+                quantity=qty_needed,
+                reference=reference
+            )
+        
+        return True
 
     @staticmethod
     def rollback_redis_stock(sku: str, warehouse_id: int, quantity: int):

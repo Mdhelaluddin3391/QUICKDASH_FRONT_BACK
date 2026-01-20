@@ -23,6 +23,11 @@ class CorrelationIDMiddleware:
         token = _correlation_id.set(request_id)
         request.correlation_id = request_id
         try:
+            logger.info(f"Request {request_id}: {request.method} {request.path}", extra={
+                'correlation_id': request_id,
+                'user_id': request.user.id if request.user.is_authenticated else None,
+                'warehouse_id': getattr(request, 'warehouse', None).id if getattr(request, 'warehouse', None) else None
+            })
             response = self.get_response(request)
             response['X-Request-ID'] = request_id
             return response

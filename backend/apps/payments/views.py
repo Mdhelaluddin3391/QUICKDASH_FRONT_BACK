@@ -8,6 +8,7 @@ from django.conf import settings
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 import razorpay
+from apps.utils.idempotency import idempotent
 from apps.orders.models import Order
 from apps.payments.models import Payment, Refund
 from .services import PaymentService
@@ -67,6 +68,7 @@ class RazorpayVerifyAPIView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @idempotent(timeout=300)
     def post(self, request):
         data = request.data
         payment_id = data.get("razorpay_payment_id")
@@ -114,13 +116,13 @@ class RazorpayWebhookAPIView(APIView):
     permission_classes = [AllowAny] # Webhooks are public but signed
     authentication_classes = []     # Disable JWT for this endpoint
 
+    @idempotent(timeout=300)
     def post(self, request):
         # 1. Get Signature and Secret
         signature = request.headers.get("X-Razorpay-Signature")
-        secret = getattr(settings, "RAZORPAY_WEBHOOK_SECRET", None)
-
+        secret = settings.RAZORPAY_WEBHOOK_SECRET
         if not secret:
-            logger.error("RAZORPAY_WEBHOOK_SECRET is missing in settings")
+            logger.error("RAZORPAY_WEBHOOK_SECRET not set")
             return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         # 2. Security Check (HMAC Verification)
