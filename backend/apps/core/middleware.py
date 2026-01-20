@@ -89,35 +89,49 @@ class LocationContextMiddleware(MiddlewareMixin):
         
         # FIX: Increased precision to 5 decimals (~1.1 meters)
         cache_key = f"wh_poly_lookup_{round(lat, 5)}_{round(lng, 5)}"
-        cached_wh_id = cache.get(cache_key)
+        cached_wh_id = None
+        try:
+            cached_wh_id = cache.get(cache_key)
+        except Exception as e:
+            logger.warning(f"Redis cache error in warehouse resolution: {e}")
 
         if cached_wh_id:
             try:
                 return Warehouse.objects.get(id=cached_wh_id)
             except Warehouse.DoesNotExist:
-                cache.delete(cache_key)
+                try:
+                    cache.delete(cache_key)
+                except Exception:
+                    pass
 
         point = Point(float(lng), float(lat), srid=4326)
         
+        # Deterministic selection: order by id to ensure consistency
         warehouse = Warehouse.objects.filter(
             delivery_zone__contains=point,
             is_active=True
-        ).first()
+        ).order_by('id').first()
 
         if warehouse:
-            cache.set(cache_key, warehouse.id, timeout=300)
+            try:
+                cache.set(cache_key, warehouse.id, timeout=300)
+            except Exception as e:
+                logger.warning(f"Redis cache set error: {e}")
             return warehouse
         
-        # ✅ FIX: Development Fallback (जुगाड़)
+        # ✅ FIX: Development Fallback (isolated to DEBUG only)
         # अगर लोकेशन किसी भी जोन में नहीं है, लेकिन DEBUG मोड ऑन है,
         # तो पहला एक्टिव वेयरहाउस उठा लो।
         if settings.DEBUG:
-            fallback = Warehouse.objects.filter(is_active=True).first()
+            fallback = Warehouse.objects.filter(is_active=True).order_by('id').first()
             if fallback:
                 # सिर्फ एक बार लॉग में दिखा दो कि फॉलबैक यूज हो रहा है
                 if not cache.get("warn_fallback_active"):
                     logger.warning(f"⚠️ DEBUG MODE: Using Fallback Warehouse '{fallback.name}' because exact location match failed.")
-                    cache.set("warn_fallback_active", "1", timeout=60)
+                    try:
+                        cache.set("warn_fallback_active", "1", timeout=60)
+                    except Exception:
+                        pass
                 return fallback
         
         return None

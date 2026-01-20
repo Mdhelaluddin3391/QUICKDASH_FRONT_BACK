@@ -37,26 +37,36 @@ class WarehouseService:
 
         # 1. Check Cache (Precision: 5 decimal places)
         cache_key = f"wh_lookup_{round(lat, 5)}_{round(lng, 5)}"
-        cached_id = cache.get(cache_key)
+        cached_id = None
+        try:
+            cached_id = cache.get(cache_key)
+        except Exception as e:
+            logger.warning(f"Redis cache error in get_nearest_warehouse: {e}")
 
         if cached_id:
             try:
                 return Warehouse.objects.get(id=cached_id, is_active=True)
             except Warehouse.DoesNotExist:
-                cache.delete(cache_key)
+                try:
+                    cache.delete(cache_key)
+                except Exception:
+                    pass
 
         # 2. DB Spatial Query
         point = Point(lng, lat, srid=4326)
         
-        # Priority: Strict Polygon Containment
+        # Priority: Strict Polygon Containment (Deterministic: order by id)
         warehouse = Warehouse.objects.filter(
             delivery_zone__contains=point,
             is_active=True
-        ).first()
+        ).order_by('id').first()
 
         # 3. Cache & Return
         if warehouse:
-            cache.set(cache_key, warehouse.id, timeout=WarehouseService.CACHE_TIMEOUT)
+            try:
+                cache.set(cache_key, warehouse.id, timeout=WarehouseService.CACHE_TIMEOUT)
+            except Exception as e:
+                logger.warning(f"Redis cache set error: {e}")
             return warehouse
         
         return None
@@ -92,7 +102,7 @@ class WarehouseService:
         warehouse_qs = Warehouse.objects.filter(
             is_active=True,
             delivery_zone__contains=user_point
-        )
+        ).order_by('id')
         
         if city:
             warehouse_qs = warehouse_qs.filter(city__iexact=city)

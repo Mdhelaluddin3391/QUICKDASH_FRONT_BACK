@@ -30,6 +30,7 @@ class Warehouse(models.Model):
             models.Index(fields=["city", "is_active"]),
             # GIST Index for spatial queries
             models.Index(fields=['location'], name='warehouse_loc_gist_idx', opclasses=['gist_geometry_ops_2d']),
+            models.Index(fields=['delivery_zone'], name='wh_del_zone_gist_idx', opclasses=['gist_geometry_ops_2d']),
         ]
 
     def __str__(self):
