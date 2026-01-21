@@ -18,8 +18,10 @@ fi
 # Run migrations ONLY on primary container
 # --------------------------------------------------
 if [ "$IS_PRIMARY" = "1" ]; then
-  echo "📦 Running migrations (PRIMARY)..."
-  python manage.py migrate --noinput
+  echo "📦 Skipping automatic migrations (Manual Mode Enabled)..."
+  
+  # 👇 यह लाइन कमेंट कर दी गई है ताकि ऑटो-माइग्रेशन न हो
+  # python manage.py migrate --noinput
 
   echo "🎨 Collecting static files (PRIMARY)..."
   python manage.py collectstatic --noinput --clear
