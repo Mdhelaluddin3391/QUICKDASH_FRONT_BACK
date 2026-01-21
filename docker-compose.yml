@@ -29,6 +29,7 @@ services:
     env_file: .env
     environment:
       - RUN_GUNICORN=1  # ✅ यह लाइन बहुत ज़रूरी है सर्वर स्टार्ट करने के लिए
+      - IS_PRIMARY=1
     ports:
       - "5000:5000"   # Backend 5000 पर चलेगा
     volumes:
