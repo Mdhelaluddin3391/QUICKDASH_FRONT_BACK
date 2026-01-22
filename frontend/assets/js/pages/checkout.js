@@ -15,13 +15,142 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     await Promise.all([loadAddresses(), loadSummary()]);
-    document.getElementById('place-order-btn').addEventListener('click', placeOrder);
+    
+    const placeOrderBtn = document.getElementById('place-order-btn');
+    if(placeOrderBtn) {
+        placeOrderBtn.addEventListener('click', placeOrder);
+    }
     
     const deliveryCtx = JSON.parse(localStorage.getItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT) || 'null');
     if (deliveryCtx) {
         resolveWarehouse(deliveryCtx.lat, deliveryCtx.lng, deliveryCtx.city);
     }
+
+    // --- NEW: Address Form Submit Listener Add Karein ---
+    const addrForm = document.getElementById('address-form');
+    if (addrForm) {
+        addrForm.addEventListener('submit', handleSaveAddress);
+    }
 });
+
+// ==========================================
+//  NEW: MAP & ADDRESS MODAL LOGIC
+// ==========================================
+
+// 1. "Add New Address" button click hone par ye chalega
+window.openAddressModal = function() {
+    if (window.LocationPicker) {
+        // Pehle Map Picker open karein
+        window.LocationPicker.open((data) => {
+            // Jab user Map par location confirm karega, ye data milega
+            showAddressFormModal(data);
+        });
+    } else {
+        Toast.error("Map service loading... please wait.");
+    }
+};
+
+// 2. Map se data lekar Form show karna
+function showAddressFormModal(mapData) {
+    const modal = document.getElementById('address-modal');
+    if(modal) modal.classList.remove('d-none');
+
+    // Form reset karein
+    document.getElementById('address-form').reset();
+
+    // 1. Hidden Fields (Coordinates & Google Text)
+    document.getElementById('addr-lat').value = mapData.lat;
+    document.getElementById('addr-lng').value = mapData.lng;
+    document.getElementById('addr-google-text').value = mapData.address;
+
+    // 2. Display Label
+    document.getElementById('display-map-address').innerText = mapData.address || "Pinned Location";
+
+    // 3. AUTO-FILL LOGIC
+    // City & Pincode
+    document.getElementById('addr-city').value = mapData.city || '';
+    document.getElementById('addr-pin').value = mapData.pincode || '';
+
+    // House No (Agar map ne pakda hai toh)
+    if (mapData.houseNo) {
+        document.getElementById('addr-house').value = mapData.houseNo;
+    }
+
+    // Building/Apartment Name
+    let buildingInfo = [];
+    if (mapData.building) buildingInfo.push(mapData.building);
+    if (mapData.area) buildingInfo.push(mapData.area);
+    
+    if (buildingInfo.length > 0) {
+        document.getElementById('addr-building').value = buildingInfo.join(', ');
+    }
+
+    // 4. User Personal Details (LocalStorage se)
+    try {
+        const user = JSON.parse(localStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER) || '{}');
+        // Name Auto-fill
+        if (user.first_name || user.last_name) {
+            document.getElementById('addr-name').value = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+        }
+        // Phone Auto-fill
+        if (user.phone) {
+            document.getElementById('addr-phone').value = user.phone;
+        }
+    } catch (e) {
+        console.warn("User data not found for auto-fill");
+    }
+}
+
+// 3. Modal Close
+window.closeAddressModal = function() {
+    const modal = document.getElementById('address-modal');
+    if(modal) modal.classList.add('d-none');
+};
+
+// 4. API Call karke Address Save karna
+async function handleSaveAddress(e) {
+    e.preventDefault();
+    
+    const btn = e.target.querySelector('button[type="submit"]');
+    const originalText = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = "Saving...";
+
+    try {
+        const payload = {
+            label: document.querySelector('input[name="addr-type"]:checked').value,
+            receiver_name: document.getElementById('addr-name').value,
+            receiver_phone: document.getElementById('addr-phone').value,
+            house_no: document.getElementById('addr-house').value,
+            floor_no: document.getElementById('addr-floor').value,
+            apartment_name: document.getElementById('addr-building').value,
+            landmark: document.getElementById('addr-landmark').value,
+            address_line: document.getElementById('addr-google-text').value,
+            city: document.getElementById('addr-city').value,
+            pincode: document.getElementById('addr-pin').value,
+            latitude: document.getElementById('addr-lat').value,
+            longitude: document.getElementById('addr-lng').value,
+            is_default: true
+        };
+
+        // Backend API call
+        await ApiService.post('/auth/customer/addresses/', payload);
+        
+        Toast.success("Address Saved!");
+        closeAddressModal();
+        loadAddresses(); // Reload the address list
+    } catch (error) {
+        console.error("Save address error:", error);
+        Toast.error(error.message || "Failed to save address");
+    } finally {
+        btn.disabled = false;
+        btn.innerText = originalText;
+    }
+}
+
+// ==========================================
+//  EXISTING CHECKOUT LOGIC
+// ==========================================
 
 async function loadSummary() {
     try {
@@ -82,7 +211,6 @@ async function loadAddresses() {
             const match = addresses.find(a => a.id == storedCtx.id);
             if (match) initialSelect = match;
             else {
-                // Address in storage no longer exists or mismatch
                 localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT);
                 window.dispatchEvent(new CustomEvent(APP_CONFIG.EVENTS.LOCATION_CHANGED, { detail: { source: 'ADDRESS_CLEANUP' } }));
             }
@@ -133,9 +261,10 @@ window.selectPayment = function(method, el) {
     el.classList.add('selected');
 }
 
-// UI Check ONLY. Does not affect backend validity.
 async function resolveWarehouse(lat, lng, city) {
     const placeOrderBtn = document.getElementById('place-order-btn');
+    if (!placeOrderBtn) return;
+
     placeOrderBtn.disabled = true;
     placeOrderBtn.innerText = "Checking Availability...";
 
@@ -144,7 +273,6 @@ async function resolveWarehouse(lat, lng, city) {
 
         if (res.serviceable && res.warehouse && res.warehouse.id) {
             resolvedWarehouseId = res.warehouse.id; 
-            // Note: We do NOT rely on local storage for warehouse ID in checkout anymore
             placeOrderBtn.disabled = false;
             placeOrderBtn.innerText = "Place Order";
         } else {
@@ -159,7 +287,6 @@ async function resolveWarehouse(lat, lng, city) {
     }
 }
 
-// --- STRICT PLACE ORDER LOGIC ---
 async function placeOrder() {
     if (!selectedAddressId) {
         Toast.warning("⚠️ Delivery Address is Required!");
@@ -168,7 +295,6 @@ async function placeOrder() {
         return;
     }
     
-    // Check warehouse logic (from your existing code)
     if (!resolvedWarehouseId) return Toast.error("Service check failed. Please refresh.");
 
     const btn = document.getElementById('place-order-btn');
@@ -177,7 +303,6 @@ async function placeOrder() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
     try {
-        // Step A: Create the Order first (Status: Created, Payment: Pending)
         const orderPayload = {
             delivery_address_id: selectedAddressId, 
             payment_method: paymentMethod,
@@ -187,22 +312,14 @@ async function placeOrder() {
         const orderRes = await ApiService.post('/orders/create/', orderPayload);
         const orderId = orderRes.order ? orderRes.order.id : orderRes.id;
 
-        // Step B: Handle Payment based on Method
         if (paymentMethod === 'COD') {
-            // Direct Success for COD
             localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT);
             window.location.href = `/success.html?order_id=${orderId}`;
         
         } else if (paymentMethod === 'RAZORPAY') {
-            // Load SDK if not present
             if (typeof Razorpay === 'undefined') await loadRazorpayScript();
-
             btn.innerText = "Contacting Bank...";
-            
-            // Call the Payment View you created explicitly to get Razorpay ID
             const paymentConfig = await ApiService.post(`/payments/create/${orderId}/`);
-            
-            // Launch UPI Modal
             handleRazorpay(paymentConfig, orderId, btn);
         }
 
@@ -213,23 +330,6 @@ async function placeOrder() {
         btn.disabled = false;
         btn.innerText = originalText;
     }
-}
-
-function showAvailabilityErrorModal(items) {
-    const itemNames = items.map(i => `<li><strong>${i.product_name}</strong> <span class="text-danger small">(${i.reason})</span></li>`).join('');
-    const div = document.createElement('div');
-    div.id = 'stock-error-modal';
-    div.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);`;
-    div.innerHTML = `
-        <div style="background:white;padding:25px;border-radius:12px;max-width:350px;width:90%;text-align:center;">
-            <div style="color:#e74c3c;font-size:40px;margin-bottom:10px;"><i class="fas fa-exclamation-circle"></i></div>
-            <h3>Items Unavailable</h3>
-            <p class="text-muted">The following items are not available at your delivery location:</p>
-            <ul style="text-align:left;background:#fff5f5;padding:15px;list-style:disc;margin:15px 0;border-radius:8px;color:#c0392b;">${itemNames}</ul>
-            <button onclick="window.location.href='./cart.html'" class="btn btn-primary w-100 mb-2">Go to Cart & Remove</button>
-            <button onclick="document.getElementById('stock-error-modal').remove()" class="btn btn-outline-secondary w-100">Change Address</button>
-        </div>`;
-    document.body.appendChild(div);
 }
 
 function handleRazorpay(rpConfig, orderId, btn) {
@@ -246,44 +346,32 @@ function handleRazorpay(rpConfig, orderId, btn) {
         "currency": rpConfig.currency,
         "name": rpConfig.name || "QuickDash",
         "description": rpConfig.description || "Food Order",
-        "order_id": rpConfig.id, // The ID from backend (starts with order_...)
-        
-        // --- THIS CONFIG BLOCK RESTRICTS TO UPI ONLY ---
+        "order_id": rpConfig.id, 
         "config": {
             "display": {
                 "blocks": {
                     "upi": {
                         "name": "Pay via UPI",
-                        "instruments": [
-                            { "method": "upi" }
-                        ]
+                        "instruments": [ { "method": "upi" } ]
                     }
                 },
                 "sequence": ["block.upi"],
-                "preferences": {
-                    "show_default_blocks": false 
-                }
+                "preferences": { "show_default_blocks": false }
             }
         },
-        // ------------------------------------------------
-
         "handler": async function (response) {
             btn.innerHTML = '<i class="fas fa-shield-alt"></i> Verifying...';
             try {
-                // Verify Signature on Backend
                 await ApiService.post('/payments/verify/razorpay/', {
                     razorpay_payment_id: response.razorpay_payment_id,
                     razorpay_order_id: response.razorpay_order_id,
                     razorpay_signature: response.razorpay_signature
                 });
-                
-                // Success!
                 localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT);
                 window.location.href = `/success.html?order_id=${orderId}`;
-                
             } catch (e) {
                 console.error(e);
-                Toast.error("Payment successful but verification failed. Please check 'My Orders'.");
+                Toast.error("Payment successful but verification failed.");
                 setTimeout(() => { window.location.href = './orders.html'; }, 2000);
             }
         },
@@ -291,23 +379,17 @@ function handleRazorpay(rpConfig, orderId, btn) {
             "ondismiss": function() { 
                 btn.disabled = false; 
                 btn.innerText = "Place Order";
-                Toast.info("Payment cancelled. You can retry.");
+                Toast.info("Payment cancelled.");
             } 
         },
-        "theme": {
-            "color": "#10b981" // Primary Green Color
-        }
+        "theme": { "color": "#10b981" }
     };
 
     const rzp1 = new Razorpay(options);
-    
-    // Handle failures gracefully
     rzp1.on('payment.failed', function (response){
-        console.error(response.error);
         Toast.error(response.error.description || "Payment Failed");
         btn.disabled = false;
         btn.innerText = "Retry Payment";
     });
-
     rzp1.open();
 }

@@ -63,6 +63,14 @@
     color: var(--text-main);
 }
 
+/* Quantity Control and Delete Button Container */
+.qty-and-delete {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
 /* Quantity Control Buttons */
 .qty-control {
     display: flex;
@@ -99,6 +107,18 @@
     text-align: center;
     font-weight: 600;
     color: var(--primary-dark);
+}
+
+/* Delete Button */
+.delete-btn {
+    color: #ef4444;
+    border-color: #ef4444;
+    padding: 6px 12px;
+}
+
+.delete-btn:hover {
+    background: #ef4444;
+    color: white;
 }
 
 /* --- Checkout Steps --- */
@@ -261,6 +281,11 @@
     .cart-item {
         flex-direction: row;
         align-items: flex-start;
+    }
+    
+    .cart-item .qty-and-delete {
+        flex-direction: row;
+        gap: 10px;
     }
     
     .cart-item .qty-control {

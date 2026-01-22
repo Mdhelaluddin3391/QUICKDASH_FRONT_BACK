@@ -37,12 +37,15 @@ async function loadCart() {
                     <div class="item-unit text-muted small">${item.sku_unit || ''}</div>
                     <div class="item-price">${Formatters.currency(item.total_price)}</div>
                 </div>
-                <div class="qty-control">
-                    <button class="qty-btn-sm" onclick="changeQty('${item.sku}', ${item.quantity - 1})">
-                        ${item.quantity === 1 ? '<i class="fas fa-trash"></i>' : '-'}
+                <div class="qty-and-delete">
+                    <div class="qty-control">
+                        <button class="qty-btn-sm" onclick="changeQty('${item.sku}', ${item.quantity - 1})">-</button>
+                        <span id="qty-${item.sku}">${item.quantity}</span>
+                        <button class="qty-btn-sm" onclick="changeQty('${item.sku}', ${item.quantity + 1})">+</button>
+                    </div>
+                    <button class="btn btn-outline btn-sm delete-btn" onclick="deleteItem('${item.sku}')">
+                        <i class="fas fa-trash"></i>
                     </button>
-                    <span id="qty-${item.sku}">${item.quantity}</span>
-                    <button class="qty-btn-sm" onclick="changeQty('${item.sku}', ${item.quantity + 1})">+</button>
                 </div>
             </div>
         `).join('');
@@ -60,7 +63,7 @@ async function loadCart() {
 window.changeQty = async function(skuCode, newQty) {
     try {
         if (newQty <= 0) {
-            if(!confirm("Remove item from cart?")) return;
+            return; // Don't allow negative quantities through UI
         }
         
         // UI Feedback: Disable buttons temporarily
@@ -76,6 +79,33 @@ window.changeQty = async function(skuCode, newQty) {
         
     } catch (e) {
         Toast.error("Failed to update cart");
+        // Re-enable on error
+        const card = document.getElementById(`item-card-${skuCode}`);
+        if(card) {
+            const btns = card.querySelectorAll('button');
+            btns.forEach(b => b.disabled = false);
+            card.style.opacity = '1';
+        }
+    }
+};
+
+window.deleteItem = async function(skuCode) {
+    try {
+        if(!confirm("Remove item from cart?")) return;
+        
+        // UI Feedback: Disable buttons temporarily
+        const card = document.getElementById(`item-card-${skuCode}`);
+        if(card) {
+            const btns = card.querySelectorAll('button');
+            btns.forEach(b => b.disabled = true);
+            card.style.opacity = '0.7';
+        }
+
+        await CartService.updateItem(skuCode, 0); // Setting quantity to 0 removes the item
+        await loadCart(); // Refresh UI
+        
+    } catch (e) {
+        Toast.error("Failed to remove item");
         // Re-enable on error
         const card = document.getElementById(`item-card-${skuCode}`);
         if(card) {
