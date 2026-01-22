@@ -22,10 +22,11 @@ class CartItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='sku.product_name', read_only=True)
     price = serializers.DecimalField(source='sku.price', max_digits=10, decimal_places=2, read_only=True)
     image = serializers.SerializerMethodField()
-
+    sku_name = serializers.CharField(source='sku.product_name', read_only=True)
+    
     class Meta:
         model = CartItem
-        fields = ('id', 'sku_code', 'product_name', 'quantity', 'price', 'total_price', 'image')
+        fields = ('id', 'sku_code', 'sku_name','product_name', 'quantity', 'price', 'total_price', 'image')
 
     def get_image(self, obj):
         # Resolve via SKU string from Catalog
