@@ -13,6 +13,8 @@ from .serializers import (
     BrandSerializer, FlashSaleSerializer, 
     SimpleCategorySerializer, NavigationCategorySerializer, HomeCategorySerializer
 )
+from rest_framework.exceptions import NotFound
+from django.db.models import Q
 from apps.warehouse.services import WarehouseService
 from apps.inventory.models import InventoryItem
 # ==============================================================================
@@ -149,6 +151,7 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
     """
     Product Detail Page.
     Injects Available Stock for the detected Warehouse.
+    Fixed: Supports numeric SKUs correctly.
     """
     permission_classes = [AllowAny]
     authentication_classes = [] 
@@ -163,12 +166,22 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
         lookup_val = self.kwargs.get('id')
         queryset = self.get_queryset()
         
-        if lookup_val.isdigit():
-            filter_kwargs = {'id': int(lookup_val)}
-        else:
-            filter_kwargs = {'sku': lookup_val}
+        # FIX: Check for numeric SKU vs ID ambiguity
+        # Pehle SKU match karein, phir ID match karein
+        
+        obj = None
+        
+        # 1. Try finding by SKU (Priority for Barcodes)
+        obj = queryset.filter(sku=lookup_val).first()
+        
+        # 2. If not found and value is numeric, try finding by Database ID
+        if not obj and lookup_val.isdigit():
+            # Use Q object to be safe or explicit ID check
+            obj = queryset.filter(id=int(lookup_val)).first()
 
-        obj = generics.get_object_or_404(queryset, **filter_kwargs)
+        if not obj:
+            raise NotFound(f"No Product matches the identifier: {lookup_val}")
+            
         return obj
 
     def retrieve(self, request, *args, **kwargs):
@@ -176,23 +189,25 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
         warehouse = getattr(request, 'warehouse', None)
         
         available_stock = 0
-        sale_price = instance.price # Default Base Price
+        # FIX: Product model has 'mrp', not 'price'. 
+        # Using getattr to be safe, defaulting to mrp.
+        sale_price = getattr(instance, 'mrp', 0) 
 
         if warehouse:
             # 1. Get Stock
-            # Note: Assuming InventoryItem has 'sku' and we join on Product via SKU logic if needed
-            # Or if you have a direct link. Based on error logs, InventoryItem uses 'sku'.
             stock_data = InventoryItem.objects.filter(
-                sku=instance.sku, # Adjusted to match SKU logic
+                sku=instance.sku, 
                 bin__rack__aisle__zone__warehouse=warehouse
             ).aggregate(total_stock=Sum('total_stock'), reserved=Sum('reserved_stock'))
             
-            # Safe calculation using aggregation results
             t_stock = stock_data.get('total_stock') or 0
-            r_stock = stock_data.get('reserved') or 0
-            available_stock = t_stock - r_stock
+            r_stock = stock_data.get('reserved') or 0 # Fix: aggregate key might be 'reserved' or 'reserved_stock' based on your query
+            
+            # Agar upar Sum('reserved_stock') use kiya hai bina keyword ke to key 'reserved_stock__sum' hogi
+            # Safety ke liye hum direct keys use kar rahe hain jo aggregate mein define ki hain
+            available_stock = t_stock - (stock_data.get('reserved') or 0)
 
-            # 2. Get Price
+            # 2. Get Price from Inventory (Store specific price)
             inv_item = InventoryItem.objects.filter(
                 sku=instance.sku,
                 bin__rack__aisle__zone__warehouse=warehouse
@@ -206,10 +221,12 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
         # Inject dynamic fields
         data['available_stock'] = available_stock
         data['sale_price'] = sale_price
+        
+        # Ensure effective_price is set for frontend consistency
+        if data.get('effective_price') is None:
+            data['effective_price'] = sale_price
 
         return Response(data)
-
-# backend/apps/catalog/views.py
 
 class StorefrontCatalogAPIView(APIView):
     """
