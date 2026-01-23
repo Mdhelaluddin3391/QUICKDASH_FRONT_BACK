@@ -5,28 +5,33 @@ let paymentMethod = 'COD';
 let resolvedWarehouseId = null; // Used only for UI state, not submitted
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Auth Check
     if (!localStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN)) {
         window.location.href = APP_CONFIG.ROUTES.LOGIN;
         return;
     }
     
+    // 2. Config Load
     if (window.AppConfigService && !window.AppConfigService.isLoaded) {
         await window.AppConfigService.load();
     }
 
+    // 3. Initial Data Load
     await Promise.all([loadAddresses(), loadSummary()]);
     
+    // 4. Order Button Listener
     const placeOrderBtn = document.getElementById('place-order-btn');
     if(placeOrderBtn) {
         placeOrderBtn.addEventListener('click', placeOrder);
     }
     
+    // 5. Restore Context (Serviceability Check)
     const deliveryCtx = JSON.parse(localStorage.getItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT) || 'null');
     if (deliveryCtx) {
         resolveWarehouse(deliveryCtx.lat, deliveryCtx.lng, deliveryCtx.city);
     }
 
-    // --- NEW: Address Form Submit Listener Add Karein ---
+    // 6. Address Form Submit Listener (The FIX)
     const addrForm = document.getElementById('address-form');
     if (addrForm) {
         addrForm.addEventListener('submit', handleSaveAddress);
@@ -34,15 +39,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ==========================================
-//  NEW: MAP & ADDRESS MODAL LOGIC
+//  NEW: MAP & ADDRESS MODAL LOGIC (The Fix)
 // ==========================================
 
-// 1. "Add New Address" button click hone par ye chalega
+// 1. "Add New Address" button click logic
 window.openAddressModal = function() {
     if (window.LocationPicker) {
-        // Pehle Map Picker open karein
+        // Map Picker open karein
         window.LocationPicker.open((data) => {
-            // Jab user Map par location confirm karega, ye data milega
+            // Jab user location confirm kare, form bharein
             showAddressFormModal(data);
         });
     } else {
@@ -50,73 +55,81 @@ window.openAddressModal = function() {
     }
 };
 
-// 2. Map se data lekar Form show karna
+// 2. Map data se Form fill karna
 function showAddressFormModal(mapData) {
     const modal = document.getElementById('address-modal');
     if(modal) modal.classList.remove('d-none');
 
-    // Form reset karein
     document.getElementById('address-form').reset();
 
-    // 1. Hidden Fields (Coordinates & Google Text)
+    // Hidden Fields
     document.getElementById('addr-lat').value = mapData.lat;
     document.getElementById('addr-lng').value = mapData.lng;
     document.getElementById('addr-google-text').value = mapData.address;
 
-    // 2. Display Label
+    // Display
     document.getElementById('display-map-address').innerText = mapData.address || "Pinned Location";
 
-    // 3. AUTO-FILL LOGIC
-    // City & Pincode
+    // Auto-fill Fields
     document.getElementById('addr-city').value = mapData.city || '';
     document.getElementById('addr-pin').value = mapData.pincode || '';
 
-    // House No (Agar map ne pakda hai toh)
     if (mapData.houseNo) {
         document.getElementById('addr-house').value = mapData.houseNo;
     }
 
-    // Building/Apartment Name
     let buildingInfo = [];
     if (mapData.building) buildingInfo.push(mapData.building);
     if (mapData.area) buildingInfo.push(mapData.area);
-    
     if (buildingInfo.length > 0) {
         document.getElementById('addr-building').value = buildingInfo.join(', ');
     }
 
-    // 4. User Personal Details (LocalStorage se)
+    // User Info Auto-fill
     try {
         const user = JSON.parse(localStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER) || '{}');
-        // Name Auto-fill
         if (user.first_name || user.last_name) {
             document.getElementById('addr-name').value = `${user.first_name || ''} ${user.last_name || ''}`.trim();
         }
-        // Phone Auto-fill
         if (user.phone) {
             document.getElementById('addr-phone').value = user.phone;
         }
     } catch (e) {
-        console.warn("User data not found for auto-fill");
+        console.warn("User data missing for auto-fill");
     }
 }
 
-// 3. Modal Close
+// 3. Close Modal
 window.closeAddressModal = function() {
     const modal = document.getElementById('address-modal');
     if(modal) modal.classList.add('d-none');
 };
 
-// 4. API Call karke Address Save karna
+// 4. Address Save Logic (with Fixes)
 async function handleSaveAddress(e) {
     e.preventDefault();
     
     const btn = e.target.querySelector('button[type="submit"]');
     const originalText = btn.innerText;
     btn.disabled = true;
-    btn.innerText = "Saving...";
+    btn.innerText = "Verifying...";
 
     try {
+        const lat = document.getElementById('addr-lat').value;
+        const lng = document.getElementById('addr-lng').value;
+
+        // --- FIX 1: Serviceability Check ---
+        const checkRes = await ApiService.post('/warehouse/find-serviceable/', { latitude: lat, longitude: lng });
+        
+        if (!checkRes.serviceable) {
+            Toast.error("We do not deliver to this location yet.");
+            btn.disabled = false;
+            btn.innerText = originalText;
+            return;
+        }
+
+        btn.innerText = "Saving...";
+
         const payload = {
             label: document.querySelector('input[name="addr-type"]:checked').value,
             receiver_name: document.getElementById('addr-name').value,
@@ -125,23 +138,29 @@ async function handleSaveAddress(e) {
             floor_no: document.getElementById('addr-floor').value,
             apartment_name: document.getElementById('addr-building').value,
             landmark: document.getElementById('addr-landmark').value,
-            address_line: document.getElementById('addr-google-text').value,
+            
+            // --- FIX 2: Correct Field Name for Backend ---
+            google_address_text: document.getElementById('addr-google-text').value,
+            
             city: document.getElementById('addr-city').value,
             pincode: document.getElementById('addr-pin').value,
-            latitude: document.getElementById('addr-lat').value,
-            longitude: document.getElementById('addr-lng').value,
+            latitude: lat,
+            longitude: lng,
             is_default: true
         };
 
-        // Backend API call
         await ApiService.post('/auth/customer/addresses/', payload);
         
         Toast.success("Address Saved!");
         closeAddressModal();
-        loadAddresses(); // Reload the address list
+        loadAddresses(); // Refresh list
     } catch (error) {
-        console.error("Save address error:", error);
-        Toast.error(error.message || "Failed to save address");
+        console.error("Save error:", error);
+        let msg = error.message || "Failed to save address";
+        if (error.data && error.data.error && error.data.error.details) {
+             msg = JSON.stringify(error.data.error.details);
+        }
+        Toast.error(msg);
     } finally {
         btn.disabled = false;
         btn.innerText = originalText;
@@ -170,7 +189,7 @@ async function loadSummary() {
 
         document.getElementById('summ-subtotal').innerText = Formatters.currency(cart.total_amount);
         document.getElementById('summ-total').innerText = Formatters.currency(cart.total_amount);
-    } catch(e) { console.error("Cart error", e); }
+    } catch(e) { console.error("Cart load error", e); }
 }
 
 async function loadAddresses() {
@@ -198,22 +217,20 @@ async function loadAddresses() {
                     ${addr.is_default ? '<span class="text-success small">Default</span>' : ''}
                 </div>
                 <p class="text-muted small mt-1">
-                    ${addr.address_line}<br>${addr.city} - ${addr.pincode}
+                    ${addr.address_line || addr.google_address_text}<br>${addr.city} - ${addr.pincode}
                 </p>
             </div>
         `).join('');
 
+        // Auto-select Default
         const def = addresses.find(a => a.is_default) || addresses[0];
         const storedCtx = JSON.parse(localStorage.getItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT) || 'null');
         
         let initialSelect = def;
+        // Agar context mein purana address saved hai toh wo use karein
         if (storedCtx) {
             const match = addresses.find(a => a.id == storedCtx.id);
             if (match) initialSelect = match;
-            else {
-                localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT);
-                window.dispatchEvent(new CustomEvent(APP_CONFIG.EVENTS.LOCATION_CHANGED, { detail: { source: 'ADDRESS_CLEANUP' } }));
-            }
         }
 
         if (initialSelect) {
@@ -246,7 +263,7 @@ function updateContextAndResolve(id, lat, lng, city, el) {
         if(p) fullText = p.innerText.split('\n')[0];
     }
     
-    // Update Global Location Manager for L2 Context
+    // Global Manager update (Serviceability Check ke liye zaroori hai)
     if (window.LocationManager) {
         window.LocationManager.setDeliveryAddress({
             id: id, label: label, address_line: fullText, city: city, latitude: lat, longitude: lng
@@ -290,8 +307,6 @@ async function resolveWarehouse(lat, lng, city) {
 async function placeOrder() {
     if (!selectedAddressId) {
         Toast.warning("⚠️ Delivery Address is Required!");
-        const stepHeader = document.querySelector('.step-header');
-        if(stepHeader) stepHeader.scrollIntoView({behavior: "smooth"});
         return;
     }
     
@@ -347,18 +362,6 @@ function handleRazorpay(rpConfig, orderId, btn) {
         "name": rpConfig.name || "QuickDash",
         "description": rpConfig.description || "Food Order",
         "order_id": rpConfig.id, 
-        "config": {
-            "display": {
-                "blocks": {
-                    "upi": {
-                        "name": "Pay via UPI",
-                        "instruments": [ { "method": "upi" } ]
-                    }
-                },
-                "sequence": ["block.upi"],
-                "preferences": { "show_default_blocks": false }
-            }
-        },
         "handler": async function (response) {
             btn.innerHTML = '<i class="fas fa-shield-alt"></i> Verifying...';
             try {
@@ -392,4 +395,15 @@ function handleRazorpay(rpConfig, orderId, btn) {
         btn.innerText = "Retry Payment";
     });
     rzp1.open();
+}
+
+// Helper to load Razorpay if not present
+function loadRazorpayScript() {
+    return new Promise((resolve) => {
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.onload = () => resolve(true);
+        script.onerror = () => resolve(false);
+        document.body.appendChild(script);
+    });
 }
