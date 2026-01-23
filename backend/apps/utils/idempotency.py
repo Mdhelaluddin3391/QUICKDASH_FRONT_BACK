@@ -4,6 +4,7 @@ import hashlib
 import json
 import zlib
 from django.core.cache import cache
+from django.core.serializers.json import DjangoJSONEncoder
 from rest_framework.response import Response
 from rest_framework import status
 
@@ -62,7 +63,7 @@ def idempotent(timeout=86400):
                 if 200 <= response.status_code < 300:
                     # PERFORMANCE FIX: Compress payload before storage
                     # Reduces Redis memory usage by ~90% for large JSONs
-                    response_json = json.dumps(response.data)
+                    response_json = json.dumps(response.data, cls=DjangoJSONEncoder)
                     compressed_data = zlib.compress(response_json.encode("utf-8"))
                     
                     cache.set(cache_key, {
