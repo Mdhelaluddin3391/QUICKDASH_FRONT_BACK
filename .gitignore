@@ -3,3 +3,4 @@ venv/
 celerybeat-schedule
 celerybeat-schedule
 celerybeat.pid
+backend/celerybeat-schedule

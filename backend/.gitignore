@@ -51,3 +51,4 @@ staticfiles/
 Thumbs.db
 celerybeat.pid
 celerybeat-schedule
+backend/celerybeat-schedule
