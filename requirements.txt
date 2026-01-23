@@ -3,38 +3,25 @@ djangorestframework>=3.14
 djangorestframework-simplejwt>=5.3
 django-filter>=23.0
 django-cors-headers>=4.0
-
-# Database & Cache
 psycopg2-binary>=2.9
 django-redis>=5.3
 redis>=5.0
-
-# Async & WebSockets
 channels[daphne]>=4.0
 uvicorn[standard]>=0.23
 gunicorn>=21.2
-
-# Tasks
 celery>=5.3
 django-celery-beat>=2.5
-
-# Geospatial & Utils
 Pillow>=10.0
 python-decouple>=3.8
-
-# Third Party Services
 razorpay>=1.4
 boto3>=1.28
 django-storages>=1.14
 requests>=2.31
 django-ipware>=5.0
-
-# Monitoring & Docs
 sentry-sdk>=1.30
 drf-spectacular>=0.26
 django-prometheus>=2.3
-
 python-magic==0.4.27
+Faker>=19.0.0
 geopy>=2.4
-
 django-leaflet>=0.29.0
