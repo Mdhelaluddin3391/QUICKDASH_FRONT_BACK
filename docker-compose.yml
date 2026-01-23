@@ -26,17 +26,16 @@ services:
   backend:
     build: ./backend
     container_name: quickdash_backend
-    # Run as root to allow chown of named volumes, then switch to non-root user
     env_file: .env
     environment:
-      - RUN_GUNICORN=1  # This line is crucial for starting the server
+      - RUN_GUNICORN=1
       - IS_PRIMARY=1
     ports:
-      - "5000:5000"   # Backend runs on 5000
+      - "5000:5000"
     volumes:
-      - ./backend:/app  # Bind mount for development - allows code changes without rebuild
-      - static_volume:/app/staticfiles  # Named volume for static files
-      - media_volume:/app/media  # Named volume for media files
+      - ./backend:/app  # Live code changes ke liye
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
     depends_on:
       db:
         condition: service_healthy
@@ -47,7 +46,6 @@ services:
   celery_worker:
     build: ./backend
     container_name: quickdash_celery_worker
-    # Run as root to allow chown, then switch
     command: celery -A config.celery worker -l info
     env_file: .env
     volumes:
@@ -61,7 +59,6 @@ services:
   celery_beat:
     build: ./backend
     container_name: quickdash_celery_beat
-    # Run as root to allow chown, then switch
     command: celery -A config.celery beat -l info
     env_file: .env
     volumes:
@@ -75,14 +72,15 @@ services:
   frontend:
     build: ./frontend
     container_name: quickdash_frontend
-    # user: 1000:1000  # Match UID to read shared volumes
     ports:
-      - "8000:80"   # Frontend runs on 8000
+      - "8000:80"
     environment:
-      - API_BASE_URL=http://localhost:5000/api/v1  # Tell frontend where backend is
+      # Browser side API URL
+      - API_BASE_URL=http://localhost:5000/api/v1
     volumes:
-      - static_volume:/usr/share/nginx/html/static  # Shared static files
-      - media_volume:/usr/share/nginx/html/media  # Shared media files
+      # Static/Media from backend volume (Admin panel CSS etc)
+      - static_volume:/usr/share/nginx/html/static
+      - media_volume:/usr/share/nginx/html/media
     depends_on:
       - backend
     restart: unless-stopped
@@ -91,8 +89,3 @@ volumes:
   postgres_data:
   static_volume:
   media_volume:
-
-
-
-
-  

@@ -1,7 +1,10 @@
-# Use Python 3.12 slim image for smaller size
+# Use Python 3.12 slim image
 FROM python:3.12-slim
 
-# Set environment variables for Python and Django
+# 1. Ye line add karne se 'debconf' wali red warnings chali jayengi
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DJANGO_ENV=production
@@ -10,11 +13,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # Install system dependencies
-# - gcc, libpq-dev for PostgreSQL
-# - netcat for health checks
-# - binutils, libproj-dev, gdal-bin, libgdal-dev for GeoDjango
-# - libmagic1 for file type detection
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# '-qq' flag output ko thoda shant rakhta hai
+RUN apt-get update && apt-get install -y --no-install-recommends -qq \
     gcc \
     libpq-dev \
     netcat-openbsd \
@@ -30,23 +30,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt \
-    && pip install gunicorn
+    && pip install gunicorn uvicorn
 
 # Copy application code
 COPY . .
 
-# Create non-root user with UID 1000 to match common host UID
-# This prevents permission issues with volume mounts
+# Create non-root user
 RUN addgroup --system --gid 1000 appgroup && adduser --system --uid 1000 --gid 1000 appuser
 
-# Create directories for static and media files
+# Create directories for static and media
 RUN mkdir -p /app/staticfiles /app/media
 
-# Change ownership of app directory to appuser
-# Note: This will be overridden by volume mounts, but ensures initial ownership
+# Change ownership
 RUN chown -R appuser:appgroup /app
 
-# Copy and set executable permissions for entrypoint script
+# Script permissions
 COPY ./scripts/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
