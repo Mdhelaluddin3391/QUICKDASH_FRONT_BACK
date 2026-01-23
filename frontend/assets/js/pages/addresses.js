@@ -17,7 +17,7 @@ async function loadAddresses() {
     container.innerHTML = '<div class="loader-spinner"></div>';
 
     try {
-        const res = await ApiService.get('/customers/addresses/');
+        const res = await ApiService.get('/auth/customer/addresses/');
         const addresses = Array.isArray(res) ? res : res.results;
 
         if (addresses.length === 0) {
@@ -79,15 +79,15 @@ function openAddressForm(data) {
     modal.classList.add('active');
 
     // Auto-Fill Form
-    document.getElementById('addr-lat').value = data.lat;
-    document.getElementById('addr-lng').value = data.lng;
-    document.getElementById('addr-text').value = data.address || '';
-    document.getElementById('addr-city').value = data.city || '';
-    document.getElementById('addr-pincode').value = data.pincode || '';
+    document.getElementById('a-lat').value = data.lat;
+    document.getElementById('a-lng').value = data.lng;
+    document.getElementById('a-google-text').value = data.address || '';
+    document.getElementById('a-city').value = data.city || '';
+    document.getElementById('a-pincode').value = data.pincode || '';
     
     // Reset other fields
-    document.getElementById('addr-house').value = '';
-    document.getElementById('addr-landmark').value = '';
+    document.getElementById('a-house').value = '';
+    document.getElementById('a-landmark').value = '';
 }
 
 // --- 3. Form Submission ---
@@ -98,21 +98,38 @@ async function saveAddress(e) {
     btn.disabled = true;
     btn.innerText = "Saving...";
 
+    const lat = document.getElementById('a-lat').value;
+    const lng = document.getElementById('a-lng').value;
+
+    // Serviceability Check
+    try {
+        const checkRes = await ApiService.post('/warehouse/find-serviceable/', { latitude: lat, longitude: lng });
+        if (!checkRes.serviceable) {
+            // Show warning but continue
+            alert("Location currently unserviceable, but address will be saved.");
+        }
+    } catch (checkError) {
+        console.warn("Serviceability check failed, proceeding with save", checkError);
+    }
+
     const payload = {
-        label: document.getElementById('addr-label').value,
-        house_no: document.getElementById('addr-house').value,
-        apartment_name: "", 
-        landmark: document.getElementById('addr-landmark').value,
-        address_line: document.getElementById('addr-text').value,
-        city: document.getElementById('addr-city').value,
-        pincode: document.getElementById('addr-pincode').value,
-        latitude: document.getElementById('addr-lat').value,
-        longitude: document.getElementById('addr-lng').value,
-        is_default: document.getElementById('addr-default').checked
+        label: document.querySelector('input[name="atype"]:checked').value,
+        house_no: document.getElementById('a-house').value,
+        apartment_name: document.getElementById('a-building').value,
+        landmark: document.getElementById('a-landmark').value,
+        google_address_text: document.getElementById('a-google-text').value,
+        city: document.getElementById('a-city').value,
+        pincode: document.getElementById('a-pincode').value,
+        latitude: lat,
+        longitude: lng,
+        receiver_name: document.getElementById('a-name').value,
+        receiver_phone: document.getElementById('a-phone').value,
+        floor_no: document.getElementById('a-floor').value,
+        is_default: false // or from a checkbox if added
     };
 
     try {
-        await ApiService.post('/customers/addresses/', payload);
+        await ApiService.post('/auth/customer/addresses/', payload);
         
         // Success
         document.getElementById('address-form-modal').classList.remove('active');
@@ -134,7 +151,7 @@ async function saveAddress(e) {
 window.deleteAddress = async function(id) {
     if (!confirm("Are you sure you want to delete this address?")) return;
     try {
-        await ApiService.delete(`/customers/addresses/${id}/`);
+        await ApiService.delete(`/auth/customer/addresses/${id}/`);
         loadAddresses();
     } catch (e) {
         alert("Failed to delete address");

@@ -122,10 +122,7 @@ async function handleSaveAddress(e) {
         const checkRes = await ApiService.post('/warehouse/find-serviceable/', { latitude: lat, longitude: lng });
         
         if (!checkRes.serviceable) {
-            Toast.error("We do not deliver to this location yet.");
-            btn.disabled = false;
-            btn.innerText = originalText;
-            return;
+            Toast.warning("Location currently unserviceable, but address will be saved.");
         }
 
         btn.innerText = "Saving...";
