@@ -1,12 +1,27 @@
 # apps/warehouse/admin.py
 from django.contrib import admin
 from .models import Warehouse, PickingTask, PackingTask, StorageZone, Aisle, Rack, Bin
+from leaflet.admin import LeafletGeoAdmin
+
+
+# @admin.register(Warehouse)
+# class WarehouseAdmin(admin.ModelAdmin):
+#     list_display = ("name", "code", "warehouse_type", "city", "is_active")
+#     list_filter = ("warehouse_type", "city", "is_active")
+#     search_fields = ("name", "code")
+
 
 @admin.register(Warehouse)
-class WarehouseAdmin(admin.ModelAdmin):
-    list_display = ("name", "code", "warehouse_type", "city", "is_active")
-    list_filter = ("warehouse_type", "city", "is_active")
-    search_fields = ("name", "code")
+class WarehouseAdmin(LeafletGeoAdmin):
+    list_display = ('name', 'city', 'warehouse_type', 'is_active')
+    search_fields = ('name', 'city', 'pincode')
+    list_filter = ('city', 'is_active', 'warehouse_type')
+    
+    # Ye settings map ko sahi tarah dikhane ke liye hain
+    settings_overrides = {
+        'DEFAULT_CENTER': (20.5937, 78.9629),
+        'DEFAULT_ZOOM': 5,
+    }
 
 @admin.register(PickingTask)
 class PickingTaskAdmin(admin.ModelAdmin):

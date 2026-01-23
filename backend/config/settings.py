@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     "django_prometheus",
     "storages",
     "django_celery_beat",
+    'leaflet',
 
     # Local Apps
     "apps.accounts",
@@ -295,3 +296,16 @@ RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "dummy_key")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "dummy_secret")
 RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
 GOOGLE_MAPS_KEY = os.getenv("GOOGLE_MAPS_KEY", "")
+
+
+
+
+# Leaflet Configuration (Optional but recommended for India)
+LEAFLET_CONFIG = {
+    'DEFAULT_CENTER': (22.5937, 78.9629), # India Center
+    'DEFAULT_ZOOM': 5,
+    'MIN_ZOOM': 3,
+    'MAX_ZOOM': 18,
+    'SCALE': 'both',
+    'ATTRIBUTION_PREFIX': 'QuickDash',
+}

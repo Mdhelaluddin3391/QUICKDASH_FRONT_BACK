@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,21 +13,124 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); z-index: 9999; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
-        .modal-overlay.active { opacity: 1; pointer-events: auto; }
-        .modal-box { background: #fff; width: 90%; max-width: 550px; max-height: 90vh; overflow-y: auto; border-radius: 16px; padding: 0; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2); }
-        .modal-header { padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; background: #fff; position: sticky; top: 0; z-index: 10; }
-        .modal-body { padding: 20px; }
-        .modal-footer { padding: 15px 20px; border-top: 1px solid #eee; background: #f9fafb; display: flex; justify-content: flex-end; gap: 15px; position: sticky; bottom: 0; }
-        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
-        .close-icon { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #999; padding: 5px; }
-        .map-preview-text { background: #f0fdf4; border: 1px solid #dcfce7; color: #166534; padding: 10px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 15px; display: flex; align-items: start; gap: 10px; }
-        .address-type-selector input[type="radio"] { display: none; }
-        .address-type-selector label { border: 1px solid #ddd; padding: 8px 16px; border-radius: 20px; cursor: pointer; font-size: 0.9rem; color: #666; transition: 0.2s; display: inline-block; }
-        .address-type-selector input[type="radio"]:checked + label { background: var(--primary-light); border-color: var(--primary); color: var(--primary-dark); font-weight: 600; }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-box {
+            background: #fff;
+            width: 90%;
+            max-width: 550px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border-radius: 16px;
+            padding: 0;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fff;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+            background: #f9fafb;
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+            position: sticky;
+            bottom: 0;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        @media (max-width: 600px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .close-icon {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            color: #999;
+            padding: 5px;
+        }
+
+        .map-preview-text {
+            background: #f0fdf4;
+            border: 1px solid #dcfce7;
+            color: #166534;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: start;
+            gap: 10px;
+        }
+
+        .address-type-selector input[type="radio"] {
+            display: none;
+        }
+
+        .address-type-selector label {
+            border: 1px solid #ddd;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #666;
+            transition: 0.2s;
+            display: inline-block;
+        }
+
+        .address-type-selector input[type="radio"]:checked+label {
+            background: var(--primary-light);
+            border-color: var(--primary);
+            color: var(--primary-dark);
+            font-weight: 600;
+        }
     </style>
 </head>
+
 <body>
     <div id="navbar-placeholder"></div>
     <main class="container">
@@ -35,16 +139,20 @@
                 <nav>
                     <a href="profile.html" class="sidebar-link"><i class="fas fa-th-large"></i> Dashboard</a>
                     <a href="orders.html" class="sidebar-link"><i class="fas fa-box"></i> My Orders</a>
-                    <a href="addresses.html" class="sidebar-link active"><i class="fas fa-map-marker-alt"></i> Addresses</a>
-                    <button onclick="logout()" class="sidebar-link logout w-100 border-0 bg-transparent text-left"><i class="fas fa-sign-out-alt"></i> Logout</button>
+                    <a href="addresses.html" class="sidebar-link active"><i class="fas fa-map-marker-alt"></i>
+                        Addresses</a>
+                    <button onclick="logout()" class="sidebar-link logout w-100 border-0 bg-transparent text-left"><i
+                            class="fas fa-sign-out-alt"></i> Logout</button>
                 </nav>
             </aside>
             <div class="account-content">
                 <div class="d-flex justify-between align-center mb-4">
                     <h2>Saved Addresses</h2>
-                    <button class="btn btn-primary btn-sm" onclick="openAddressModal()"><i class="fas fa-plus"></i> Add New Address</button>
+                    <button class="btn btn-primary btn-sm" onclick="openAddressModal()"><i class="fas fa-plus"></i> Add
+                        New Address</button>
                 </div>
-                <div id="addr-grid" class="d-grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+                <div id="addr-grid" class="d-grid gap-3"
+                    style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
                     <div class="loader-spinner"></div>
                 </div>
             </div>
@@ -53,22 +161,61 @@
 
     <div id="address-modal" class="modal-overlay">
         <div class="modal-box">
-            <div class="modal-header"><h3>Add New Address</h3><button type="button" class="close-icon" onclick="closeModal()"><i class="fas fa-times"></i></button></div>
+            <div class="modal-header">
+                <h3>Add New Address</h3><button type="button" class="close-icon" onclick="closeModal()"><i
+                        class="fas fa-times"></i></button>
+            </div>
             <form id="address-form">
                 <div class="modal-body">
-                    <input type="hidden" id="a-lat"><input type="hidden" id="a-lng"><input type="hidden" id="a-google-text">
-                    <div class="map-preview-text"><i class="fas fa-map-marker-alt mt-1"></i><div><strong style="display:block; margin-bottom:2px;">Selected Location:</strong><span id="display-map-address">...</span></div></div>
+                    <input type="hidden" id="a-lat"><input type="hidden" id="a-lng"><input type="hidden"
+                        id="a-google-text">
+                    <div class="map-preview-text"><i class="fas fa-map-marker-alt mt-1"></i>
+                        <div><strong style="display:block; margin-bottom:2px;">Selected Location:</strong><span
+                                id="display-map-address">...</span></div>
+                    </div>
                     <h5 class="mb-3 text-muted" style="font-size:0.9rem; text-transform:uppercase;">Contact Details</h5>
-                    <div class="form-grid"><div class="form-group mb-0"><label class="small">Name</label><input type="text" id="a-name" class="form-control" required></div><div class="form-group mb-0"><label class="small">Phone</label><input type="tel" id="a-phone" class="form-control" maxlength="10" required></div></div>
+                    <div class="form-grid">
+                        <div class="form-group mb-0"><label class="small">Name</label><input type="text" id="a-name"
+                                class="form-control" required></div>
+                        <div class="form-group mb-0"><label class="small">Phone</label><input type="tel" id="a-phone"
+                                class="form-control" maxlength="10" required></div>
+                    </div>
                     <hr style="margin: 20px 0; border:0; border-top:1px dashed #eee;">
                     <h5 class="mb-3 text-muted" style="font-size:0.9rem; text-transform:uppercase;">Address Details</h5>
-                    <div class="form-grid mb-3"><div class="form-group mb-0"><label class="small">House/Flat No *</label><input type="text" id="a-house" class="form-control" required></div><div class="form-group mb-0"><label class="small">Floor No</label><input type="text" id="a-floor" class="form-control"></div></div>
-                    <div class="form-group mb-3"><label class="small">Building Name *</label><input type="text" id="a-building" class="form-control" required></div>
-                    <div class="form-group mb-3"><label class="small">Landmark</label><input type="text" id="a-landmark" class="form-control"></div>
-                    <div class="form-grid mb-3"><div class="form-group mb-0"><label class="small">City</label><input type="text" id="a-city" class="form-control" readonly style="background:#f9f9f9;"></div><div class="form-group mb-0"><label class="small">Pincode</label><input type="text" id="a-pin" class="form-control" readonly style="background:#f9f9f9;"></div></div>
-                    <div class="form-group mb-0"><label class="small mb-2">Type</label><div class="address-type-selector d-flex gap-2"><div><input type="radio" id="type-home" name="atype" value="HOME" checked><label for="type-home">Home</label></div><div><input type="radio" id="type-work" name="atype" value="WORK"><label for="type-work">Work</label></div><div><input type="radio" id="type-other" name="atype" value="OTHER"><label for="type-other">Other</label></div></div></div>
+                    <div class="form-grid mb-3">
+                        <div class="form-group mb-0"><label class="small">House/Flat No *</label><input type="text"
+                                id="a-house" class="form-control" required></div>
+                        <div class="form-group mb-0"><label class="small">Floor No</label><input type="text"
+                                id="a-floor" class="form-control"></div>
+                    </div>
+                    <div class="form-group mb-3"><label class="small">Building Name *</label><input type="text"
+                            id="a-building" class="form-control" required></div>
+                    <div class="form-group mb-3"><label class="small">Landmark</label><input type="text" id="a-landmark"
+                            class="form-control"></div>
+                    <div class="form-grid mb-3">
+                        <div class="form-group mb-0">
+                            <label class="small">City</label>
+                            <input type="text" id="a-city" class="form-control" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="small">Pincode</label>
+                            <input type="text" id="a-pin" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="form-group mb-0"><label class="small mb-2">Type</label>
+                        <div class="address-type-selector d-flex gap-2">
+                            <div><input type="radio" id="type-home" name="atype" value="HOME" checked><label
+                                    for="type-home">Home</label></div>
+                            <div><input type="radio" id="type-work" name="atype" value="WORK"><label
+                                    for="type-work">Work</label></div>
+                            <div><input type="radio" id="type-other" name="atype" value="OTHER"><label
+                                    for="type-other">Other</label></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="modal-footer"><button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button><button type="submit" class="btn btn-primary">Save Address</button></div>
+                <div class="modal-footer"><button type="button" class="btn btn-outline"
+                        onclick="closeModal()">Cancel</button><button type="submit" class="btn btn-primary">Save
+                        Address</button></div>
             </form>
         </div>
     </div>
@@ -87,7 +234,7 @@
 
         async function loadAddresses() {
             const grid = document.getElementById('addr-grid');
-            if(!localStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN)) { window.location.href = 'auth.html'; return; }
+            if (!localStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN)) { window.location.href = 'auth.html'; return; }
             try {
                 const res = await ApiService.get('/auth/customer/addresses/');
                 const list = res.results || res;
@@ -111,56 +258,56 @@
         };
 
         function showFormModal(mapData) {
-    const modal = document.getElementById('address-modal');
-    // Form reset karein
-    document.getElementById('address-form').reset();
+            const modal = document.getElementById('address-modal');
+            // Form reset karein
+            document.getElementById('address-form').reset();
 
-    // 1. Hidden Fields (Coordinates & Google Text)
-    document.getElementById('a-lat').value = mapData.lat;
-    document.getElementById('a-lng').value = mapData.lng;
-    document.getElementById('a-google-text').value = mapData.address;
+            // 1. Hidden Fields (Coordinates & Google Text)
+            document.getElementById('a-lat').value = mapData.lat;
+            document.getElementById('a-lng').value = mapData.lng;
+            document.getElementById('a-google-text').value = mapData.address;
 
-    // 2. Display Label
-    document.getElementById('display-map-address').innerText = mapData.address || "Pinned Location";
+            // 2. Display Label
+            document.getElementById('display-map-address').innerText = mapData.address || "Pinned Location";
 
-    // 3. AUTO-FILL LOGIC
-    // City & Pincode
-    document.getElementById('a-city').value = mapData.city || '';
-    document.getElementById('a-pin').value = mapData.pincode || '';
+            // 3. AUTO-FILL LOGIC
+            // City & Pincode
+            document.getElementById('a-city').value = mapData.city || '';
+            document.getElementById('a-pin').value = mapData.pincode || '';
 
-    // House No (Agar map ne pakda hai toh)
-    if (mapData.houseNo) {
-        document.getElementById('a-house').value = mapData.houseNo;
-    }
+            // House No (Agar map ne pakda hai toh)
+            if (mapData.houseNo) {
+                document.getElementById('a-house').value = mapData.houseNo;
+            }
 
-    // Building/Apartment Name
-    // Hum "Road Name" aur "Area" ko combine karke yahan daal denge
-    // Example: "MG Road, Indiranagar"
-    let buildingInfo = [];
-    if (mapData.building) buildingInfo.push(mapData.building);
-    if (mapData.area) buildingInfo.push(mapData.area);
-    
-    if (buildingInfo.length > 0) {
-        document.getElementById('a-building').value = buildingInfo.join(', ');
-    }
+            // Building/Apartment Name
+            // Hum "Road Name" aur "Area" ko combine karke yahan daal denge
+            // Example: "MG Road, Indiranagar"
+            let buildingInfo = [];
+            if (mapData.building) buildingInfo.push(mapData.building);
+            if (mapData.area) buildingInfo.push(mapData.area);
 
-    // 4. User Personal Details (LocalStorage se)
-    try {
-        const user = JSON.parse(localStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER) || '{}');
-        // Name Auto-fill
-        if (user.first_name) {
-            const fullName = user.last_name ? `${user.first_name} ${user.last_name}` : user.first_name;
-            document.getElementById('a-name').value = fullName;
+            if (buildingInfo.length > 0) {
+                document.getElementById('a-building').value = buildingInfo.join(', ');
+            }
+
+            // 4. User Personal Details (LocalStorage se)
+            try {
+                const user = JSON.parse(localStorage.getItem(APP_CONFIG.STORAGE_KEYS.USER) || '{}');
+                // Name Auto-fill
+                if (user.first_name) {
+                    const fullName = user.last_name ? `${user.first_name} ${user.last_name}` : user.first_name;
+                    document.getElementById('a-name').value = fullName;
+                }
+                // Phone Auto-fill (Remove +91 if exists)
+                if (user.phone) {
+                    document.getElementById('a-phone').value = user.phone.replace('+91', '').replace(/\s/g, '');
+                }
+            } catch (e) { console.error("User data pre-fill failed", e); }
+
+            // Modal Show
+            modal.classList.add('active');
         }
-        // Phone Auto-fill (Remove +91 if exists)
-        if (user.phone) {
-            document.getElementById('a-phone').value = user.phone.replace('+91', '').replace(/\s/g, '');
-        }
-    } catch(e) { console.error("User data pre-fill failed", e); }
-
-    // Modal Show
-    modal.classList.add('active');
-}
 
         window.closeModal = () => document.getElementById('address-modal').classList.remove('active');
 
@@ -182,7 +329,7 @@
                 const checkRes = await ApiService.post('/warehouse/find-serviceable/', { latitude: lat, longitude: lng });
                 if (!checkRes.serviceable) {
                     Toast.error("We do not deliver to this location yet. Please choose another area.");
-                    btn.disabled = false; 
+                    btn.disabled = false;
                     btn.innerText = originalText;
                     return; // Stop Save
                 }
@@ -223,4 +370,5 @@
         }
     </script>
 </body>
+
 </html>

@@ -87,18 +87,12 @@ class WarehouseService:
 
     @staticmethod
     def find_nearest_serviceable_warehouse(lat, lon, city=None, delivery_type="express"):
-        """
-        Logic to assign a warehouse to a user session.
-        Prevents Geo-Fence Bypass.
-        """
         try:
             user_point = Point(float(lon), float(lat), srid=4326)
         except (ValueError, TypeError):
             return None
 
-        # ---------------------------------------------------------
-        # STRATEGY 1: Strict Polygon Check (Highest Priority)
-        # ---------------------------------------------------------
+        # 1. Check Strict Polygon First (Priority)
         warehouse_qs = Warehouse.objects.filter(
             is_active=True,
             delivery_zone__contains=user_point
@@ -112,13 +106,13 @@ class WarehouseService:
             return warehouse
 
         # ---------------------------------------------------------
-        # STRATEGY 2: Radius Fallback (Lowest Priority)
-        # ⚠️ SECURITY FIX: MUST EXCLUDE warehouses that have Polygons.
-        # If a warehouse has a Polygon, it MUST satisfy Strategy 1.
+        # FIX: Allow Radius Fallback even if Polygon exists
+        # (Comment out or remove 'delivery_zone__isnull=True')
         # ---------------------------------------------------------
         
         if delivery_type == "express":
-            radius_km = getattr(settings, "WAREHOUSE_DARK_STORE_RADIUS_KM", 3)
+            # Settings se radius lein ya default 5km karein
+            radius_km = getattr(settings, "WAREHOUSE_DARK_STORE_RADIUS_KM", 5) 
             warehouse_type_filter = ["dark_store"]
         else:
             radius_km = getattr(settings, "WAREHOUSE_MEGA_RADIUS_KM", 15)
@@ -128,7 +122,7 @@ class WarehouseService:
             is_active=True,
             warehouse_type__in=warehouse_type_filter,
             location__distance_lte=(user_point, D(km=radius_km)),
-            delivery_zone__isnull=True  # <--- CRITICAL FIX: Prevent bypass
+            # delivery_zone__isnull=True  <-- IS LINE KO COMMENT KAR DEIN YA HATA DEIN
         )
 
         if city:
