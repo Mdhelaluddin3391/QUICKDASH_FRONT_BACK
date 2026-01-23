@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        /* --- Modal Styling from Addresses Page (Matched Design) --- */
+        /* --- Modal Styling: Fixed Header/Footer with Scrollable Body --- */
         .modal-overlay {
             position: fixed;
             top: 0;
@@ -24,13 +24,12 @@
             background: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(4px);
             z-index: 9999;
-            display: flex; /* Flex for centering */
+            display: flex;
             align-items: center;
             justify-content: center;
             transition: opacity 0.3s ease;
         }
 
-        /* checkout.js uses 'd-none' class to toggle visibility */
         .modal-overlay.d-none {
             display: none !important;
         }
@@ -39,29 +38,53 @@
             background: #fff;
             width: 90%;
             max-width: 550px;
-            max-height: 90vh;
-            overflow-y: hidden; /* Header/Footer fixed, body scrollable */
-            border-radius: 16px;
-            padding: 0;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            /* Maximum height for the modal so it fits on screen */
+            max-height: 85vh; 
             display: flex;
-            flex-direction: column;
+            flex-direction: column; /* Stack children vertically */
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            overflow: hidden; /* Keep content inside the rounded corners */
         }
 
         .modal-header {
-            padding: 20px;
+            padding: 15px 20px;
             border-bottom: 1px solid #eee;
             display: flex;
             justify-content: space-between;
             align-items: center;
             background: #fff;
-            flex-shrink: 0;
+            flex-shrink: 0; /* Prevent header from shrinking */
+        }
+
+        /* IMPORTANT: Make the form fill the remaining space and handle inner layout */
+        #address-form {
+            display: flex;
+            flex-direction: column;
+            flex: 1;        /* Take up all remaining vertical space */
+            min-height: 0;  /* Crucial for nested flex scrolling */
+            overflow: hidden;
         }
 
         .modal-body {
             padding: 20px;
-            overflow-y: auto; /* Scroll inside modal body */
-            flex-grow: 1;
+            overflow-y: auto; /* Scroll ONLY this section */
+            flex: 1;          /* Grow to fill available space */
+        }
+
+        /* Scrollbar Styling */
+        .modal-body::-webkit-scrollbar {
+            width: 6px;
+        }
+        .modal-body::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .modal-body::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 4px;
+        }
+        .modal-body::-webkit-scrollbar-thumb:hover {
+            background: #aaa;
         }
 
         .modal-footer {
@@ -71,7 +94,7 @@
             display: flex;
             justify-content: flex-end;
             gap: 15px;
-            flex-shrink: 0;
+            flex-shrink: 0; /* Prevent footer from shrinking */
         }
 
         .close-icon {
