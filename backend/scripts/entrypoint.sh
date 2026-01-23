@@ -12,6 +12,12 @@ if [ -n "$POSTGRES_HOST" ]; then
   echo "PostgreSQL is available"
 fi
 
+# Change ownership of named volumes to appuser
+# This ensures backend can write to staticfiles and media
+# Named volumes are not host-mounted, so chown is safe
+# Use || true to avoid failure if chown not possible (e.g., permission issues)
+chown -R appuser:appgroup /app/staticfiles /app/media || true
+
 # Run tasks ONLY on primary container
 if [ "$IS_PRIMARY" = "1" ]; then
   echo "Collecting static files..."

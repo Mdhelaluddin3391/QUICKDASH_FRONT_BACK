@@ -328,21 +328,38 @@
         if (!navEl) return;
 
         const items = [];
-        // Trending Link (Static)
+        
+        // 1. Trending Link (Static) - इसे हमेशा सबसे ऊपर रखें
         items.push(
             `<a href="index.html" class="nav-item">
                 <i class="fas fa-fire"></i> Trending
              </a>`
         );
 
-        // Dynamic Categories
+        // 2. Duplicate Check के लिए Set बनाएं (Use category name for uniqueness)
+        const seenNames = new Set();
+
+        // 3. Dynamic Categories Loop
         categories.forEach(c => {
-            const slug = c.slug || (c.name || '').toLowerCase().replace(/\s+/g, '-');
             const name = c.name || 'Category';
+            
+            // अगर यह name पहले लिस्ट में आ चुका है, तो इसे छोड़ दें (Skip duplicate)
+            if (seenNames.has(name)) {
+                return; 
+            }
+            
+            // अगर नया है, तो इसे Set में नोट करें
+            seenNames.add(name);
+
+            // Slug बनाएं
+            const slug = c.slug || name.toLowerCase().replace(/\s+/g, '-');
+            
             let imgHtml = '';
             if (c.icon_url) {
                 imgHtml = `<img src="${c.icon_url}" alt="${name}" style="width:18px;height:18px;object-fit:cover;border-radius:4px;margin-right:8px;vertical-align:middle;">`;
             }
+            
+            // HTML लिस्ट में जोड़ें
             items.push(
                 `<a href="search_results.html?slug=${encodeURIComponent(slug)}" class="nav-item" title="${name}">
                     ${imgHtml}${name}
@@ -350,8 +367,10 @@
             );
         });
 
+        // HTML अपडेट करें
         navEl.innerHTML = items.join('');
-        // Render hone ke baad highlight karein
+        
+        // एक्टिव लिंक हाइलाइट करें
         highlightActiveLink(navEl);
     }
 
