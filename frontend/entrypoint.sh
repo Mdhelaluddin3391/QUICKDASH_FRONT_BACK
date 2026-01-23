@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # /frontend/entrypoint.sh
 
 set -e

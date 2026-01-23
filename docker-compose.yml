@@ -75,7 +75,7 @@ services:
   frontend:
     build: ./frontend
     container_name: quickdash_frontend
-    user: 1000:1000  # Match UID to read shared volumes
+    # user: 1000:1000  # Match UID to read shared volumes
     ports:
       - "8000:80"   # Frontend runs on 8000
     environment:
