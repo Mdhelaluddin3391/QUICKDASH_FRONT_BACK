@@ -1,2 +1,5 @@
 .venv/
 venv/
+celerybeat-schedule
+celerybeat-schedule
+celerybeat.pid
