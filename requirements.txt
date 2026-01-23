@@ -37,4 +37,4 @@ django-prometheus>=2.3
 python-magic==0.4.27
 geopy>=2.4
 
-django-leaflet
+django-leaflet>=0.29.0
