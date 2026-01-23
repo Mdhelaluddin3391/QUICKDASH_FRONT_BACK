@@ -25,3 +25,4 @@ python-magic==0.4.27
 Faker>=19.0.0
 geopy>=2.4
 django-leaflet>=0.29.0
+channels-redis>=4.1.0
