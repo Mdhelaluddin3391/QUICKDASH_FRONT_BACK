@@ -283,7 +283,7 @@ async function resolveWarehouse(lat, lng, city) {
     placeOrderBtn.innerText = "Checking Availability...";
 
     try {
-        const res = await ApiService.post('/warehouse/find-serviceable/', { latitude: lat, longitude: lng, city: city || 'Bengaluru' });
+        const res = await ApiService.post('/warehouse/find-serviceable/', { latitude: lat, longitude: lng, city: city });
 
         if (res.serviceable && res.warehouse && res.warehouse.id) {
             resolvedWarehouseId = res.warehouse.id; 
@@ -315,10 +315,17 @@ async function placeOrder() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
     try {
+        // Get cart total
+        const cart = await ApiService.get('/orders/cart/');
+        if (!cart || !cart.total_amount) {
+            throw new Error("Unable to get cart total");
+        }
+
         const orderPayload = {
             delivery_address_id: selectedAddressId, 
             payment_method: paymentMethod,
-            delivery_type: 'express'
+            delivery_type: 'express',
+            total_amount: cart.total_amount
         };
 
         const orderRes = await ApiService.post('/orders/create/', orderPayload);

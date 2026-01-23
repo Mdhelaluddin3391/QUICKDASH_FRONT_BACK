@@ -23,7 +23,7 @@ class CartItemSerializer(serializers.ModelSerializer):
     price = serializers.DecimalField(source='sku.price', max_digits=10, decimal_places=2, read_only=True)
     image = serializers.SerializerMethodField()
     sku_name = serializers.CharField(source='sku.product_name', read_only=True)
-    
+
     class Meta:
         model = CartItem
         fields = ('id', 'sku_code', 'sku_name','product_name', 'quantity', 'price', 'total_price', 'image')
@@ -115,7 +115,7 @@ class CreateOrderSerializer(serializers.Serializer):
     payment_method = serializers.ChoiceField(choices=Order.PAYMENT_METHOD_CHOICES, default="COD")
     
     # Address ID required for delivery validation
-    address_id = serializers.IntegerField(required=True)
+    delivery_address_id = serializers.IntegerField(required=True)
     
     # total_amount validation
     total_amount = serializers.DecimalField(max_digits=10, decimal_places=2) 

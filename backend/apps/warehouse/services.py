@@ -98,9 +98,6 @@ class WarehouseService:
             delivery_zone__contains=user_point
         ).order_by('id')
         
-        if city:
-            warehouse_qs = warehouse_qs.filter(city__iexact=city)
-
         warehouse = warehouse_qs.first()
         if warehouse:
             return warehouse
@@ -124,9 +121,6 @@ class WarehouseService:
             location__distance_lte=(user_point, D(km=radius_km)),
             # delivery_zone__isnull=True  <-- IS LINE KO COMMENT KAR DEIN YA HATA DEIN
         )
-
-        if city:
-            fallback_qs = fallback_qs.filter(city__iexact=city)
 
         warehouse = fallback_qs.annotate(
             distance=Distance("location", user_point)
