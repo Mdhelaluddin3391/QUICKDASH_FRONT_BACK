@@ -21,6 +21,7 @@ urlpatterns = [
     # Core Catalog
     path('skus/', SkuListAPIView.as_view()),
     path('skus/<str:id>/', SkuDetailAPIView.as_view()), 
+    path('products/<str:id>/', SkuDetailAPIView.as_view()),  # Added for frontend compatibility
     path('categories/', CategoryListAPIView.as_view()),
     
     # Storefront / Home Feed

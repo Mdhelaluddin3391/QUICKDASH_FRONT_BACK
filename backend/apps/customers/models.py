@@ -30,8 +30,8 @@ class CustomerAddress(models.Model):
     )
 
     # 1. Geospatial Data (The Pin)
-    latitude = models.DecimalField(max_digits=9, decimal_places=6)
-    longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    latitude = models.DecimalField(max_digits=18, decimal_places=15)
+    longitude = models.DecimalField(max_digits=18, decimal_places=15)
     
     # 2. Structured Address (For Rider Navigation)
     house_no = models.CharField(max_length=50, help_text="Flat/House No")

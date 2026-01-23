@@ -12,22 +12,23 @@ if [ -n "$POSTGRES_HOST" ]; then
   echo "PostgreSQL is available"
 fi
 
-# Change ownership of named volumes to appuser
-# This ensures backend can write to staticfiles and media
-# Named volumes are not host-mounted, so chown is safe
-# Use || true to avoid failure if chown not possible (e.g., permission issues)
+# Fix Permissions (Root का काम)
+# यह line ensure करती है कि host volumes पर appuser लिख सके
+echo "Fixing permissions..."
 chown -R appuser:appgroup /app/staticfiles /app/media || true
 
 # Run tasks ONLY on primary container
 if [ "$IS_PRIMARY" = "1" ]; then
   echo "Collecting static files..."
-  python manage.py collectstatic --noinput --clear
+  # gosu appuser का मतलब: यह कमांड appuser बनकर चलाओ
+  gosu appuser python manage.py collectstatic --noinput --clear
 fi
 
-# Start ASGI Server (for WebSockets support)
+# Start Server (Switch user to appuser)
 if [ "$RUN_GUNICORN" = "1" ]; then
-  echo "Starting ASGI Server on 0.0.0.0:5000"
-  exec gunicorn config.asgi:application \
+  echo "Starting ASGI Server on 0.0.0.0:5000 as appuser"
+  # 'exec gosu appuser' से पूरी प्रोसेस अब appuser बन जाएगी
+  exec gosu appuser gunicorn config.asgi:application \
     -k uvicorn.workers.UvicornWorker \
     --bind 0.0.0.0:5000 \
     --workers 3 \
@@ -35,6 +36,6 @@ if [ "$RUN_GUNICORN" = "1" ]; then
     --access-logfile - \
     --error-logfile -
 else
-  echo "Starting worker/beat process"
-  exec "$@"
+  echo "Starting worker/beat process as appuser"
+  exec gosu appuser "$@"
 fi
