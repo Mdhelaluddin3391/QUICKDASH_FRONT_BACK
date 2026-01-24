@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dashboard - QuickDash Rider</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="header-left">
+            <h3>Dashboard</h3>
+            <span id="rider-status" class="badge-offline">Offline</span>
+        </div>
+        <div class="header-right">
+            <label class="switch">
+                <input type="checkbox" id="online-toggle" onchange="toggleOnline(this)">
+                <span class="slider round"></span>
+            </label>
+            <button onclick="logout()" class="btn-icon"><i class="fas fa-power-off"></i></button>
+        </div>
+    </header>
+
+    <main class="app-content">
+        <div class="stats-row">
+            <div class="stat-card">
+                <h2 id="today-earnings">₹0</h2>
+                <span>Earnings</span>
+            </div>
+            <div class="stat-card">
+                <h2 id="today-orders">0</h2>
+                <span>Orders</span>
+            </div>
+        </div>
+
+        <div id="active-job-area" class="job-container">
+            <div class="no-job">
+                <i class="fas fa-motorcycle"></i>
+                <p>Waiting for new orders...</p>
+                <small>Go online to receive jobs</small>
+            </div>
+        </div>
+    </main>
+
+    <script src="assets/js/config.js"></script>
+    <script src="assets/js/api.service.js"></script>
+    <script>
+        // Rider Logic
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (!localStorage.getItem(RIDER_CONFIG.STORAGE_KEYS.TOKEN)) {
+                window.location.href = 'index.html';
+                return;
+            }
+            await initDashboard();
+            setInterval(checkActiveJobs, 10000); // Poll every 10s
+        });
+
+        async function initDashboard() {
+            try {
+                const profile = await ApiService.get('/riders/me/');
+                const toggle = document.getElementById('online-toggle');
+                const badge = document.getElementById('rider-status');
+                
+                toggle.checked = profile.is_available;
+                updateStatusUI(profile.is_available);
+                
+                await checkActiveJobs();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function updateStatusUI(isOnline) {
+            const badge = document.getElementById('rider-status');
+            if (isOnline) {
+                badge.innerText = "Online";
+                badge.className = "badge-online";
+                document.body.classList.remove('is-offline');
+            } else {
+                badge.innerText = "Offline";
+                badge.className = "badge-offline";
+                document.body.classList.add('is-offline');
+            }
+        }
+
+        window.toggleOnline = async function(el) {
+            const isOnline = el.checked;
+            try {
+                await ApiService.post('/riders/availability/', { is_available: isOnline });
+                updateStatusUI(isOnline);
+                if(isOnline) checkActiveJobs();
+            } catch (e) {
+                el.checked = !isOnline;
+                alert("Failed to update status");
+            }
+        };
+
+        async function checkActiveJobs() {
+            // Only check if online
+            if (!document.getElementById('online-toggle').checked) return;
+
+            try {
+                const deliveries = await ApiService.get('/delivery/me/');
+                // Find active job (assigned, picked_up, out_for_delivery)
+                const activeJob = deliveries.find(d => ['assigned', 'picked_up', 'out_for_delivery'].includes(d.status));
+                
+                const container = document.getElementById('active-job-area');
+                
+                if (activeJob) {
+                    renderJobCard(activeJob, container);
+                } else {
+                    container.innerHTML = `
+                        <div class="no-job">
+                            <i class="fas fa-motorcycle"></i>
+                            <p>Scanning for orders...</p>
+                        </div>`;
+                }
+            } catch (e) { console.error("Job fetch failed", e); }
+        }
+
+        function renderJobCard(job, container) {
+            const order = job.order;
+            const address = order.delivery_address_json;
+            const mapLink = `https://www.google.com/maps/search/?api=1&query=${address.lat},${address.lng}`;
+
+            let actionBtn = '';
+            if (job.status === 'assigned') {
+                actionBtn = `<button class="btn-action btn-pickup" onclick="alert('Please scan QR at warehouse')">At Warehouse (Scan QR)</button>`;
+            } else {
+                actionBtn = `
+                    <div class="otp-box">
+                        <input type="number" id="delivery-otp" placeholder="Enter OTP">
+                        <button onclick="completeOrder(${job.id})" class="btn-action btn-complete">Complete</button>
+                    </div>`;
+            }
+
+            container.innerHTML = `
+                <div class="job-card">
+                    <div class="job-header">
+                        <span class="order-id">Order #${order.id}</span>
+                        <span class="amount">₹${order.final_amount}</span>
+                    </div>
+                    <div class="customer-info">
+                        <h4>${address.receiver_name}</h4>
+                        <p><i class="fas fa-map-marker-alt"></i> ${address.full_address}</p>
+                        <div class="actions-row">
+                            <a href="tel:${address.receiver_phone}" class="btn-small"><i class="fas fa-phone"></i> Call</a>
+                            <a href="${mapLink}" target="_blank" class="btn-small"><i class="fas fa-location-arrow"></i> Map</a>
+                        </div>
+                    </div>
+                    <div class="job-footer">
+                        ${actionBtn}
+                    </div>
+                </div>
+            `;
+        }
+
+        window.completeOrder = async function(id) {
+            const otp = document.getElementById('delivery-otp').value;
+            if(!otp || otp.length !== 6) return alert("Enter valid 6-digit Customer OTP");
+            
+            try {
+                await ApiService.post(`/delivery/${id}/complete/`, { otp });
+                alert("Order Delivered Successfully!");
+                checkActiveJobs();
+            } catch(e) {
+                alert(e.message || "Failed to complete");
+            }
+        }
+
+        window.logout = function() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        };
+    </script>
+</body>
+</html>

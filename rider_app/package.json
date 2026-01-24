@@ -1,0 +1,11 @@
+{
+  "name": "quickdash-rider",
+  "version": "1.0.0",
+  "description": "QuickDash Rider Partner App",
+  "scripts": {
+    "start": "http-server -p 2000 -c-1 --cors"
+  },
+  "dependencies": {
+    "http-server": "^14.1.1"
+  }
+}

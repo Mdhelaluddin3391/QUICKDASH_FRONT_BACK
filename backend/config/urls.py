@@ -22,6 +22,14 @@ from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.core.views import health_check, AppConfigAPIView
+from django.contrib import admin
+
+admin.site.site_header = "QuickDash Master Admin"
+admin.site.site_title = "QuickDash Portal"
+admin.site.index_title = "Welcome to QuickDash Management"
+
+
+
 
 urlpatterns = [
     # Monitoring

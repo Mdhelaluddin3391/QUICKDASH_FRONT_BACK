@@ -1,17 +1,86 @@
 # apps/locations/admin.py
 from django.contrib import admin
+from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
 from .models import GeoLocation
+
 
 @admin.register(GeoLocation)
 class GeoLocationAdmin(admin.ModelAdmin):
     list_display = (
-        "id",
-        "user",
-        "label",
-        "latitude",
-        "longitude",
-        "is_active",
-        "created_at",
+        'id',
+        'user_phone',
+        'label',
+        'coordinates',
+        'address_preview',
+        'is_active_badge',
+        'created_at_date'
     )
-    list_filter = ("is_active", "created_at")
-    search_fields = ("address_text", "user__phone")
+    list_filter = (
+        'is_active',
+        'created_at'
+    )
+    search_fields = (
+        'user__phone',
+        'user__first_name',
+        'label',
+        'address_text'
+    )
+    list_select_related = ('user',)
+    raw_id_fields = ('user',)
+    list_per_page = 25
+    actions = ['activate_locations', 'deactivate_locations']
+
+    fieldsets = (
+        ('Location Information', {
+            'fields': ('user', 'label', 'address_text')
+        }),
+        ('Geographic Coordinates', {
+            'fields': ('latitude', 'longitude')
+        }),
+        ('Status', {
+            'fields': ('is_active',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+
+    readonly_fields = ('created_at',)
+
+    def user_phone(self, obj):
+        return obj.user.phone if obj.user else "Anonymous"
+    user_phone.short_description = "User"
+    user_phone.admin_order_field = 'user__phone'
+
+    def coordinates(self, obj):
+        return f"{obj.latitude}, {obj.longitude}"
+    coordinates.short_description = "Coordinates"
+
+    def address_preview(self, obj):
+        return obj.address_text[:50] + "..." if len(obj.address_text) > 50 else obj.address_text
+    address_preview.short_description = "Address"
+
+    def is_active_badge(self, obj):
+        if obj.is_active:
+            return format_html('<span style="color: green; font-weight: bold;">✓ Active</span>')
+        else:
+            return format_html('<span style="color: red; font-weight: bold;">✗ Inactive</span>')
+    is_active_badge.short_description = "Status"
+
+    def created_at_date(self, obj):
+        return obj.created_at.strftime('%d/%m/%Y %H:%M')
+    created_at_date.short_description = "Created"
+    created_at_date.admin_order_field = 'created_at'
+
+    # Admin Actions
+    @admin.action(description='Activate selected locations')
+    def activate_locations(self, request, queryset):
+        updated = queryset.update(is_active=True)
+        self.message_user(request, f"{updated} locations activated.")
+
+    @admin.action(description='Deactivate selected locations')
+    def deactivate_locations(self, request, queryset):
+        updated = queryset.update(is_active=False)
+        self.message_user(request, f"{updated} locations deactivated.")

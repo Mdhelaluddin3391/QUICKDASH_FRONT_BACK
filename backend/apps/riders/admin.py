@@ -1,46 +1,163 @@
-# apps/riders/admin.py
 from django.contrib import admin
-from django.utils import timezone
-from .models import RiderProfile, RiderEarning, RiderPayout, RiderDocument
+from django.db.models import Sum, Q
+from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
+from .models import RiderProfile, RiderDocument, RiderPayout
+
 
 class RiderDocumentInline(admin.TabularInline):
     model = RiderDocument
     extra = 0
+    readonly_fields = ('uploaded_at', 'updated_at')
+    fields = ('doc_type', 'status', 'admin_notes', 'uploaded_at')
+    can_delete = False
+    show_change_link = False
+
 
 @admin.register(RiderProfile)
 class RiderProfileAdmin(admin.ModelAdmin):
     list_display = (
-        "user",
-        "is_active",
-        "is_available",
-        "current_warehouse",
-        "created_at",
+        'rider_name',
+        'phone',
+        'availability_status',
+        'wallet_balance',
+        'assigned_warehouse',
+        'kyc_status',
+        'created_at_date'
     )
-    list_filter = ("is_active", "is_available", "current_warehouse")
-    search_fields = ("user__phone",)
-    autocomplete_fields = ["user", "current_warehouse"]
+    list_filter = (
+        'is_active',
+        'is_available',
+        'current_warehouse',
+        'created_at'
+    )
+    search_fields = (
+        'user__phone',
+        'user__first_name',
+        'user__last_name'
+    )
+    list_select_related = ('user', 'current_warehouse')
+    raw_id_fields = ('user', 'current_warehouse')
     inlines = [RiderDocumentInline]
+    list_per_page = 25
+    actions = ['approve_riders', 'suspend_riders', 'mark_available', 'mark_unavailable']
 
-@admin.register(RiderEarning)
-class RiderEarningAdmin(admin.ModelAdmin):
-    list_display = ("rider", "amount", "reference", "payout", "created_at")
-    list_filter = ("created_at",)
-    search_fields = ("rider__user__phone", "reference")
-    readonly_fields = ("rider", "amount", "reference", "created_at")
+    fieldsets = (
+        ('Personal Information', {
+            'fields': ('user', 'is_active')
+        }),
+        ('Operational Details', {
+            'fields': ('is_available', 'current_warehouse')
+        }),
+        ('Timestamps', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+
+    readonly_fields = ('created_at',)
+
+    def rider_name(self, obj):
+        return f"{obj.user.first_name} {obj.user.last_name}".strip() or "N/A"
+    rider_name.short_description = "Name"
+    rider_name.admin_order_field = 'user__first_name'
+
+    def phone(self, obj):
+        return obj.user.phone
+    phone.short_description = "Phone"
+    phone.admin_order_field = 'user__phone'
+
+    def availability_status(self, obj):
+        if obj.is_available:
+            return format_html('<span style="color: green; font-weight: bold;">● Online</span>')
+        else:
+            return format_html('<span style="color: red; font-weight: bold;">● Offline</span>')
+    availability_status.short_description = "Status"
+
+    def wallet_balance(self, obj):
+        # Calculate total earnings minus total payouts
+        total_earnings = obj.earnings.aggregate(total=Sum('amount'))['total'] or 0
+        total_payouts = obj.payouts.filter(status='completed').aggregate(total=Sum('amount'))['total'] or 0
+        balance = total_earnings - total_payouts
+        return f"₹{balance:.2f}"
+    wallet_balance.short_description = "Wallet Balance"
+
+    def assigned_warehouse(self, obj):
+        return obj.current_warehouse.name if obj.current_warehouse else "Unassigned"
+    assigned_warehouse.short_description = "Assigned Warehouse"
+    assigned_warehouse.admin_order_field = 'current_warehouse__name'
+
+    def kyc_status(self, obj):
+        if obj.is_kyc_verified:
+            return format_html('<span style="color: green;">✓ Verified</span>')
+        else:
+            return format_html('<span style="color: orange;">⚠ Pending</span>')
+    kyc_status.short_description = "KYC Status"
+
+    def created_at_date(self, obj):
+        return obj.created_at.strftime('%d/%m/%Y')
+    created_at_date.short_description = "Joined"
+    created_at_date.admin_order_field = 'created_at'
+
+    # Admin Actions
+    @admin.action(description='Approve selected riders')
+    def approve_riders(self, request, queryset):
+        # Assuming we add an is_approved field; for now, just activate
+        updated = queryset.update(is_active=True)
+        self.message_user(request, f"{updated} riders approved and activated.")
+
+    @admin.action(description='Suspend selected riders')
+    def suspend_riders(self, request, queryset):
+        updated = queryset.update(is_active=False, is_available=False)
+        self.message_user(request, f"{updated} riders suspended.")
+
+    @admin.action(description='Mark selected riders as available')
+    def mark_available(self, request, queryset):
+        updated = queryset.filter(is_active=True).update(is_available=True)
+        self.message_user(request, f"{updated} riders marked as available.")
+
+    @admin.action(description='Mark selected riders as unavailable')
+    def mark_unavailable(self, request, queryset):
+        updated = queryset.update(is_available=False)
+        self.message_user(request, f"{updated} riders marked as unavailable.")
+
 
 @admin.register(RiderPayout)
 class RiderPayoutAdmin(admin.ModelAdmin):
-    list_display = ("id", "rider", "amount", "status", "transaction_ref", "created_at")
-    list_filter = ("status", "created_at")
-    search_fields = ("rider__user__phone", "transaction_ref")
-    readonly_fields = ("rider", "amount", "created_at", "completed_at")
-    
-    actions = ["mark_completed", "mark_failed"]
+    list_display = ('rider_info', 'amount_display', 'status_badge', 'payout_method', 'created_at_date', 'completed_at')
+    list_filter = ('status', 'created_at', 'completed_at')
+    search_fields = ('rider__user__phone', 'rider__user__first_name', 'transaction_ref')
+    list_select_related = ('rider', 'rider__user')
+    raw_id_fields = ('rider',)
+    list_per_page = 25
 
-    @admin.action(description="Mark selected payouts as Completed")
-    def mark_completed(self, request, queryset):
-        queryset.update(status="completed", completed_at=timezone.now())
+    readonly_fields = ('created_at', 'completed_at')
 
-    @admin.action(description="Mark selected payouts as Failed")
-    def mark_failed(self, request, queryset):
-        queryset.update(status="failed")
+    def rider_info(self, obj):
+        return f"{obj.rider.user.phone} ({obj.rider.user.first_name})"
+    rider_info.short_description = "Rider"
+    rider_info.admin_order_field = 'rider__user__phone'
+
+    def amount_display(self, obj):
+        return f"₹{obj.amount:.2f}"
+    amount_display.short_description = "Amount"
+    amount_display.admin_order_field = 'amount'
+
+    def status_badge(self, obj):
+        colors = {
+            'processing': '#ffc107',
+            'completed': '#28a745',
+            'failed': '#dc3545',
+        }
+        color = colors.get(obj.status, '#6c757d')
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">{}</span>',
+            color,
+            obj.get_status_display()
+        )
+    status_badge.short_description = "Status"
+
+    def created_at_date(self, obj):
+        return obj.created_at.strftime('%d/%m/%Y %H:%M')
+    created_at_date.short_description = "Created"
+    created_at_date.admin_order_field = 'created_at'
