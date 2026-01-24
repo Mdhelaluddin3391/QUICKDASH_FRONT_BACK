@@ -132,14 +132,12 @@ class CustomUserAdmin(UserAdmin):
 
 @admin.register(UserRole)
 class UserRoleAdmin(admin.ModelAdmin):
-    list_display = ('user_phone', 'user_name', 'role_badge', 'created_at_date')
-    list_filter = ('role', 'created_at')
+    list_display = ('user_phone', 'user_name', 'role_badge')
+    list_filter = ('role',)
     search_fields = ('user__phone', 'user__first_name', 'user__last_name')
     list_select_related = ('user',)
     raw_id_fields = ('user',)
     list_per_page = 25
-
-    readonly_fields = ('created_at',)
 
     def user_phone(self, obj):
         return obj.user.phone

@@ -8,8 +8,8 @@ from .models import RiderProfile, RiderDocument, RiderPayout
 class RiderDocumentInline(admin.TabularInline):
     model = RiderDocument
     extra = 0
-    readonly_fields = ('uploaded_at', 'updated_at')
-    fields = ('doc_type', 'status', 'admin_notes', 'uploaded_at')
+    readonly_fields = ('updated_at',)
+    fields = ('doc_type', 'status', 'admin_notes')
     can_delete = False
     show_change_link = False
 
@@ -124,7 +124,7 @@ class RiderProfileAdmin(admin.ModelAdmin):
 
 @admin.register(RiderPayout)
 class RiderPayoutAdmin(admin.ModelAdmin):
-    list_display = ('rider_info', 'amount_display', 'status_badge', 'payout_method', 'created_at_date', 'completed_at')
+    list_display = ('rider_info', 'amount_display', 'status_badge', 'created_at_date', 'completed_at')
     list_filter = ('status', 'created_at', 'completed_at')
     search_fields = ('rider__user__phone', 'rider__user__first_name', 'transaction_ref')
     list_select_related = ('rider', 'rider__user')

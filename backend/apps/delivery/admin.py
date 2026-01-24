@@ -12,8 +12,7 @@ class DeliveryAdmin(admin.ModelAdmin):
         'status_badge',
         'job_status_badge',
         'delivery_type',
-        'created_at_date',
-        'completed_at'
+        'created_at_date'
     )
     list_filter = (
         'status',

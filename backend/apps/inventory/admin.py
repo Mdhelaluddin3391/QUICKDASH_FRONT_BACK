@@ -26,7 +26,7 @@ class InventoryItemAdmin(admin.ModelAdmin):
     search_fields = (
         'sku',
         'product_name',
-        'bin__bin_number',
+        'bin__bin_code',
         'bin__rack__rack_number'
     )
     list_select_related = ('bin', 'bin__rack', 'bin__rack__aisle', 'bin__rack__aisle__zone', 'bin__rack__aisle__zone__warehouse')
@@ -56,7 +56,7 @@ class InventoryItemAdmin(admin.ModelAdmin):
     warehouse_name.admin_order_field = 'bin__rack__aisle__zone__warehouse__name'
 
     def bin_location(self, obj):
-        return f"{obj.bin.rack.aisle.zone.name} - A{obj.bin.rack.aisle.aisle_number} - R{obj.bin.rack.rack_number} - B{obj.bin.bin_number}"
+        return f"{obj.bin.rack.aisle.zone.name} - A{obj.bin.rack.aisle.aisle_number} - R{obj.bin.rack.rack_number} - B{obj.bin.bin_code}"
     bin_location.short_description = "Bin Location"
 
     def available_stock(self, obj):

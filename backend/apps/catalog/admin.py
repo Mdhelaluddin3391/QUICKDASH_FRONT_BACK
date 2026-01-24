@@ -24,9 +24,9 @@ class ProductAdmin(admin.ModelAdmin):
         'name',
         'sku',
         'category_name',
-        'mrp_display',
+        'mrp',
         'stock_status',
-        'is_active_badge',
+        'is_active',
         'created_at_date'
     )
     list_filter = (
@@ -69,7 +69,6 @@ class ProductAdmin(admin.ModelAdmin):
     )
 
     readonly_fields = ('created_at',)
-    prepopulated_fields = {'slug': ('name',)}  # Assuming slug field exists
 
     def category_name(self, obj):
         return obj.category.name
@@ -138,8 +137,8 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'parent_name', 'is_active_badge', 'product_count', 'created_at_date')
-    list_filter = ('is_active', 'parent', 'created_at')
+    list_display = ('name', 'parent_name', 'is_active', 'product_count')
+    list_filter = ('is_active', 'parent')
     search_fields = ('name', 'parent__name')
     list_select_related = ('parent',)
     raw_id_fields = ('parent',)
@@ -195,8 +194,8 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):
-    list_display = ('name', 'is_active_badge', 'product_count', 'created_at_date')
-    list_filter = ('is_active', 'created_at')
+    list_display = ('name', 'is_active', 'product_count')
+    list_filter = ('is_active',)
     search_fields = ('name',)
     list_editable = ('is_active',)
     list_per_page = 25
@@ -245,8 +244,8 @@ class BrandAdmin(admin.ModelAdmin):
 
 @admin.register(Banner)
 class BannerAdmin(admin.ModelAdmin):
-    list_display = ('title', 'position', 'is_active_badge', 'created_at_date')
-    list_filter = ('position', 'is_active', 'created_at')
+    list_display = ('title', 'position', 'is_active')
+    list_filter = ('position', 'is_active')
     search_fields = ('title', 'target_url')
     list_editable = ('is_active',)
     list_per_page = 25
@@ -274,7 +273,7 @@ class BannerAdmin(admin.ModelAdmin):
 
 @admin.register(FlashSale)
 class FlashSaleAdmin(admin.ModelAdmin):
-    list_display = ('product_name', 'discount_percentage_display', 'end_time', 'is_active_badge')
+    list_display = ('product_name', 'discount_percentage_display', 'end_time', 'is_active')
     list_filter = ('is_active', 'end_time')
     search_fields = ('product__name', 'product__sku')
     list_select_related = ('product',)

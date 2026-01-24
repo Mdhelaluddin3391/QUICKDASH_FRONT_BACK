@@ -97,14 +97,14 @@ class WarehouseAdmin(LeafletGeoAdmin):
 @admin.register(PickingTask)
 class PickingTaskAdmin(admin.ModelAdmin):
     list_display = ("order_id", "item_sku", "status_badge", "picker_info", "picked_at", "target_bin")
-    list_filter = ("status", "picked_at", "created_at")
+    list_filter = ("status", "picked_at")
     search_fields = ("order__id", "item_sku", "picker__user__phone", "picker__user__first_name")
     list_select_related = ('order', 'picker__user', 'target_bin')
     raw_id_fields = ["order", "picker", "target_bin"]
     list_per_page = 25
     actions = ["reset_to_pending", "mark_as_completed"]
 
-    readonly_fields = ('created_at', 'picked_at')
+    readonly_fields = ('picked_at',)
 
     def order_id(self, obj):
         return f"#{obj.order.id}"
@@ -198,7 +198,7 @@ class PackingTaskAdmin(admin.ModelAdmin):
 # Physical Layout
 @admin.register(StorageZone)
 class StorageZoneAdmin(admin.ModelAdmin):
-    list_display = ('warehouse_code', 'name', 'created_at')
+    list_display = ('warehouse_code', 'name')
     list_filter = ('warehouse',)
     search_fields = ('warehouse__name', 'warehouse__code', 'name')
     list_select_related = ('warehouse',)
@@ -215,9 +215,9 @@ admin.site.register(Rack)
 
 @admin.register(Bin)
 class BinAdmin(admin.ModelAdmin):
-    list_display = ('rack_info', 'bin_number', 'is_occupied', 'current_sku')
-    list_filter = ('is_occupied', 'rack__aisle__zone__warehouse')
-    search_fields = ('rack__rack_number', 'bin_number', 'current_sku')
+    list_display = ('bin_code', 'capacity_units')
+    list_filter = ('rack__aisle__zone__warehouse',)
+    search_fields = ('bin_code',)
     list_select_related = ('rack__aisle__zone__warehouse',)
 
     def rack_info(self, obj):
