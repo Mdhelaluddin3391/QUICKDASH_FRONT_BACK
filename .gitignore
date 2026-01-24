@@ -4,3 +4,4 @@ celerybeat-schedule
 celerybeat-schedule
 celerybeat.pid
 backend/celerybeat-schedule
+rider_app/node_modules/
