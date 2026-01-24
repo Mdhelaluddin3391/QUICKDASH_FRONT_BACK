@@ -12,6 +12,8 @@ from apps.orders.models import Order
 from apps.inventory.models import InventoryItem, InventoryTransaction
 from apps.inventory.services import InventoryService
 from apps.utils.exceptions import BusinessLogicException
+# 1. Task Import किया गया है
+from apps.delivery.tasks import retry_auto_assign_rider
 import logging
 
 logger = logging.getLogger(__name__)
@@ -128,10 +130,8 @@ class WarehouseService:
 
         return warehouse
 
-# ... (WarehouseOperationsService remains unchanged) ...
+
 class WarehouseOperationsService:
-    # (The rest of WarehouseOperationsService provided in your original file is fine)
-    # Including here to ensure file completeness if copied
     @staticmethod
     @transaction.atomic
     def inward_stock_putaway(warehouse_id, barcode, quantity, bin_code, user):
@@ -190,12 +190,15 @@ class WarehouseOperationsService:
         task.status = "picked"; task.picker = picker_user; task.picked_at = timezone.now(); task.save()
         order = Order.objects.select_for_update().get(id=task.order_id)
         
+        # Check if all tasks are picked
         if PickingTask.objects.filter(order=order).exclude(status="picked").count() == 0:
             if order.status != "packed":
                 order.status = "packed"; order.save(update_fields=["status"])
-                from apps.delivery.services import DeliveryService
-                DeliveryService.initiate_delivery_search(order)
+                
+                # 2. Update: Directly Call Auto Assign Task
+                transaction.on_commit(lambda: retry_auto_assign_rider.delay(order.id))
                 return "Order Packed & Rider Search Started"
+        
         return "Item Picked"
 
     @staticmethod
@@ -209,9 +212,13 @@ class WarehouseOperationsService:
         task = PackingTask.objects.select_for_update().get(id=packing_task_id)
         task.is_completed = True; task.packer = user; task.save()
         order = task.order
-        order.status = "confirmed"; order.save(update_fields=["status"])
-        from apps.delivery.services import DeliveryService
-        DeliveryService.initiate_delivery_search(order)
+        
+        # 3. Update: Status should be 'packed', NOT 'confirmed'
+        order.status = "packed"
+        order.save(update_fields=["status"])
+        
+        # 4. Update: Trigger Rider Search
+        transaction.on_commit(lambda: retry_auto_assign_rider.delay(order.id))
 
     @staticmethod
     def get_active_handover_orders(warehouse):

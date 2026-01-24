@@ -2,7 +2,8 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from .models import Order, OrderItem
-
+# 1. Task Import करें
+from apps.delivery.tasks import retry_auto_assign_rider
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
@@ -13,6 +14,8 @@ class OrderItemInline(admin.TabularInline):
     show_change_link = False
 
     def subtotal(self, obj):
+        if obj.price is None or obj.quantity is None:
+            return "₹0.00"
         return f"₹{obj.price * obj.quantity:.2f}"
     subtotal.short_description = "Subtotal"
 
@@ -88,14 +91,14 @@ class OrderAdmin(admin.ModelAdmin):
 
     def status_badge(self, obj):
         colors = {
-            'created': '#6c757d',      # gray
-            'confirmed': '#007bff',    # blue
-            'picking': '#ffc107',      # yellow
-            'packed': '#28a745',       # green
-            'out_for_delivery': '#17a2b8',  # cyan
-            'delivered': '#28a745',    # green
-            'cancelled': '#dc3545',    # red
-            'failed': '#dc3545',       # red
+            'created': '#6c757d',
+            'confirmed': '#007bff',
+            'picking': '#ffc107',
+            'packed': '#28a745',
+            'out_for_delivery': '#17a2b8',
+            'delivered': '#28a745',
+            'cancelled': '#dc3545',
+            'failed': '#dc3545',
         }
         color = colors.get(obj.status, '#6c757d')
         return format_html(
@@ -115,7 +118,8 @@ class OrderAdmin(admin.ModelAdmin):
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
-    # Admin Actions for Order Progress Simulation
+    # --- Admin Actions Updates ---
+
     def mark_as_confirmed(self, request, queryset):
         updated = queryset.filter(status='created').update(status='confirmed')
         self.message_user(request, f"{updated} orders marked as confirmed.")
@@ -126,9 +130,24 @@ class OrderAdmin(admin.ModelAdmin):
         self.message_user(request, f"{updated} orders marked as picking.")
     mark_as_picking.short_description = "Mark selected orders as Picking"
 
+    # 2. Logic Update: Update status AND Trigger Rider Search
     def mark_as_packed(self, request, queryset):
-        updated = queryset.filter(status__in=['created', 'confirmed', 'picking']).update(status='packed')
-        self.message_user(request, f"{updated} orders marked as packed.")
+        # ऑर्डर्स की ID निकालें
+        orders_to_update = list(queryset.filter(status__in=['created', 'confirmed', 'picking']).values_list('id', flat=True))
+        
+        if not orders_to_update:
+            self.message_user(request, "No eligible orders found.")
+            return
+
+        # Status Update करें
+        updated = queryset.filter(id__in=orders_to_update).update(status='packed')
+        
+        # हर ऑर्डर के लिए राइडर ढूंढना शुरू करें
+        for order_id in orders_to_update:
+            retry_auto_assign_rider.delay(order_id)
+
+        self.message_user(request, f"{updated} orders marked as packed. Auto-assigning riders...")
+    
     mark_as_packed.short_description = "Mark selected orders as Packed"
 
     def mark_as_out_for_delivery(self, request, queryset):
