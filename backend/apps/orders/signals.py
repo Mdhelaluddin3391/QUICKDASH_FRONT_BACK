@@ -2,18 +2,17 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.db import transaction
 from .models import Order
-from apps.delivery.tasks import retry_auto_assign_rider
+from apps.delivery.tasks import assign_rider_to_order
 
 @receiver(post_save, sender=Order)
-def auto_assign_rider_on_admin_change(sender, instance, created, **kwargs):
+def auto_assign_rider_on_status_change(sender, instance, created, **kwargs):
     """
-    Agar Admin Panel se bhi status 'packed' change kiya gaya,
-    toh ye signal Rider dhoondhne wala task chala dega.
+    Triggers rider assignment when order status changes to 'packed'.
     """
     if created:
-        return  # Naye order par kuch nahi karna
+        return  # Skip for new orders
 
-    # Agar Order 'packed' status main hai
+    # Check if status changed to 'packed'
     if instance.status == "packed":
-        # Transaction complete hone ke baad task run karein
-        transaction.on_commit(lambda: retry_auto_assign_rider.delay(instance.id))
+        # Run the task after transaction commits
+        transaction.on_commit(lambda: assign_rider_to_order.delay(instance.id))

@@ -95,6 +95,10 @@ app.conf.beat_schedule = {
         'task': 'apps.core.tasks.monitor_stuck_orders',
         'schedule': crontab(minute='*/5'),
     },
+    'assign-unassigned-orders-every-5-mins': {
+        'task': 'apps.delivery.tasks.periodic_assign_unassigned_orders',
+        'schedule': crontab(minute='*/5'),
+    },
     'process-rider-payouts-daily': {
         'task': 'apps.riders.tasks.process_daily_payouts',
         'schedule': crontab(hour=1, minute=0), 
@@ -107,6 +111,8 @@ app.conf.beat_schedule = {
 
 app.conf.task_routes = {
     'apps.delivery.tasks.retry_auto_assign_rider': {'queue': 'high_priority'},
+    'apps.delivery.tasks.assign_rider_to_order': {'queue': 'high_priority'},
+    'apps.delivery.tasks.periodic_assign_unassigned_orders': {'queue': 'high_priority'},
     'apps.notifications.tasks.send_otp_sms': {'queue': 'high_priority'},
     'apps.orders.tasks.send_order_confirmation_email': {'queue': 'high_priority'},
     'apps.core.tasks.*': {'queue': 'default'},
