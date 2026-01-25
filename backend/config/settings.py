@@ -89,7 +89,7 @@ INSTALLED_APPS = [
     "storages",
     "django_celery_beat",
     'leaflet',
-    'apps.orders.apps.OrdersConfig',
+    # 'apps.orders.apps.OrdersConfig',
 
     # Local Apps
     "apps.accounts",
