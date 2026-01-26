@@ -53,21 +53,27 @@
                 return;
             }
             await initDashboard();
-            setInterval(checkActiveJobs, 10000); // Poll every 10s
+            // Poll frequently for updates
+            setInterval(checkActiveJobs, 10000); 
         });
 
         async function initDashboard() {
             try {
                 const profile = await ApiService.get('/riders/me/');
                 const toggle = document.getElementById('online-toggle');
-                const badge = document.getElementById('rider-status');
                 
                 toggle.checked = profile.is_available;
                 updateStatusUI(profile.is_available);
                 
+                // Update Earnings UI if available
+                if (profile.todays_earnings !== undefined) {
+                    document.getElementById('today-earnings').innerText = `₹${profile.todays_earnings}`;
+                }
+                
                 await checkActiveJobs();
             } catch (e) {
-                console.error(e);
+                console.error("Init Error:", e);
+                if(e.message && e.message.includes('401')) logout();
             }
         }
 
@@ -92,7 +98,7 @@
                 if(isOnline) checkActiveJobs();
             } catch (e) {
                 el.checked = !isOnline;
-                alert("Failed to update status");
+                alert("Failed to update status. Check connection.");
             }
         };
 
@@ -102,9 +108,9 @@
 
             try {
                 const deliveries = await ApiService.get('/delivery/me/');
-                // Find active job (assigned, picked_up, out_for_delivery)
-                const activeJob = deliveries.find(d => ['assigned', 'picked_up', 'out_for_delivery'].includes(d.status));
                 
+                // Prioritize active jobs
+                const activeJob = deliveries.find(d => ['assigned', 'picked_up', 'out_for_delivery'].includes(d.status));
                 const container = document.getElementById('active-job-area');
                 
                 if (activeJob) {
@@ -114,6 +120,7 @@
                         <div class="no-job">
                             <i class="fas fa-motorcycle"></i>
                             <p>Scanning for orders...</p>
+                            <div class="pulse-ring"></div>
                         </div>`;
                 }
             } catch (e) { console.error("Job fetch failed", e); }
@@ -121,33 +128,57 @@
 
         function renderJobCard(job, container) {
             const order = job.order;
-            const address = order.delivery_address_json;
-            const mapLink = `https://www.google.com/maps/search/?api=1&query=${address.lat},${address.lng}`;
+            // SAFE ACCESS: Handle cases where address or lat/lng is missing
+            const address = order.delivery_address_json || {};
+            const lat = address.lat || 0;
+            const lng = address.lng || 0;
+            
+            const mapLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+            const receiverName = address.receiver_name || "Customer";
+            const fullAddr = address.full_address || "Address details unavailable";
+            const phone = address.receiver_phone || "";
 
             let actionBtn = '';
+            let statusBadge = '';
+
             if (job.status === 'assigned') {
-                actionBtn = `<button class="btn-action btn-pickup" onclick="scanQR(${order.id})">At Warehouse (Scan QR)</button>`;
-            } else {
+                statusBadge = '<span class="status-tag tag-new">New Assignment</span>';
+                actionBtn = `<button class="btn-action btn-pickup" onclick="scanQR(${order.id})">
+                                <i class="fas fa-box"></i> Picked Up from Warehouse
+                             </button>`;
+            } else if (['picked_up', 'out_for_delivery'].includes(job.status)) {
+                statusBadge = '<span class="status-tag tag-progress">Out for Delivery</span>';
                 actionBtn = `
                     <div class="otp-box">
-                        <input type="number" id="delivery-otp" placeholder="Enter OTP">
-                        <button onclick="completeOrder(${job.id})" class="btn-action btn-complete">Complete</button>
+                        <label>Ask Customer for OTP:</label>
+                        <div class="otp-input-group">
+                            <input type="tel" id="delivery-otp" placeholder="Enter 6-digit OTP" maxlength="6">
+                            <button onclick="completeOrder(${job.id})" class="btn-action btn-complete">
+                                <i class="fas fa-check-circle"></i> Complete
+                            </button>
+                        </div>
                     </div>`;
             }
 
             container.innerHTML = `
                 <div class="job-card">
                     <div class="job-header">
-                        <span class="order-id">Order #${order.id}</span>
+                        <div>
+                            <span class="order-id">Order #${order.id}</span>
+                            ${statusBadge}
+                        </div>
                         <span class="amount">₹${order.final_amount}</span>
                     </div>
                     <div class="customer-info">
-                        <h4>${address.receiver_name}</h4>
-                        <p><i class="fas fa-map-marker-alt"></i> ${address.full_address}</p>
+                        <h4>${receiverName}</h4>
+                        <p><i class="fas fa-map-marker-alt"></i> ${fullAddr}</p>
                         <div class="actions-row">
-                            <a href="tel:${address.receiver_phone}" class="btn-small"><i class="fas fa-phone"></i> Call</a>
-                            <a href="${mapLink}" target="_blank" class="btn-small"><i class="fas fa-location-arrow"></i> Map</a>
+                            <a href="tel:${phone}" class="btn-small"><i class="fas fa-phone"></i> Call</a>
+                            <a href="${mapLink}" target="_blank" class="btn-small"><i class="fas fa-location-arrow"></i> Navigate</a>
                         </div>
+                    </div>
+                    <div class="job-items">
+                        <small>${order.items ? order.items.length : 0} Items in package</small>
                     </div>
                     <div class="job-footer">
                         ${actionBtn}
@@ -157,38 +188,60 @@
         }
 
         window.completeOrder = async function(id) {
-            const otp = document.getElementById('delivery-otp').value;
-            if(!otp || otp.length !== 6) return alert("Enter valid 6-digit Customer OTP");
+            const otpInput = document.getElementById('delivery-otp');
+            const otp = otpInput.value;
             
+            if(!otp || otp.length !== 6) {
+                alert("Please enter the valid 6-digit OTP provided by the customer.");
+                return;
+            }
+            
+            const btn = document.querySelector('.btn-complete');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+            btn.disabled = true;
+
             try {
                 await ApiService.post(`/delivery/${id}/complete/`, { otp });
-                alert("Order Delivered Successfully!");
-                checkActiveJobs();
+                alert("✅ Order Delivered Successfully!");
+                await checkActiveJobs();
+                // Refresh earnings logic here if needed
+                window.location.reload();
             } catch(e) {
-                alert(e.message || "Failed to complete");
+                console.error(e);
+                // Handle JSON error response vs generic error
+                let msg = "Failed to complete delivery.";
+                if(e.message) msg = e.message;
+                if(e.error && e.error.detail) msg = e.error.detail;
+                
+                alert("❌ Error: " + msg);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
             }
         }
 
         window.scanQR = async function(orderId) {
-            // Real app mein yahan Camera khulna chahiye, abhi hum simulate kar rahe hain
-            if(!confirm(`Simulate Scanning QR for Order #${orderId}?`)) return;
+            // Simulator for development
+            const confirmPickup = confirm(`Simulate Scanning QR Code for Order #${orderId}?\n\n(In production, this opens camera)`);
+            if(!confirmPickup) return;
 
             try {
-                // Backend API call to verify handover
-                // Note: URL path '/delivery/verify-handover/' backend urls.py mein hona chahiye
+                // We use the handover verification endpoint
                 await ApiService.post('/delivery/verify-handover/', { order_id: orderId });
                 
-                alert("Pickup Successful! Status Updated.");
-                // Refresh UI to show 'Complete' button
+                alert("✅ Pickup Verified! Status Updated.");
                 checkActiveJobs(); 
             } catch (e) {
-                alert(e.message || "Handover Failed. Try again.");
+                alert("❌ Handover Failed: " + (e.message || "Unknown error"));
             }
         };
 
         window.logout = function() {
-            localStorage.clear();
-            window.location.href = 'index.html';
+            if(confirm("Are you sure you want to logout?")) {
+                localStorage.clear();
+                window.location.href = 'index.html';
+            }
         };
     </script>
 </body>

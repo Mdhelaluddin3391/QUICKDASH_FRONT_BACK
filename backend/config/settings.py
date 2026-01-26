@@ -26,16 +26,14 @@ ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
 # ------------------------------------------------------------------------------
 # SECURITY HEADERS (PRODUCTION ONLY)
 # ------------------------------------------------------------------------------
-# इन सेटिंग्स को हटा दें या False कर दें ताकि लोकलहोस्ट पर HTTPS की मांग न हो
+# In settings ko hata de ya False kar de taki localhost par HTTPS ki maang na ho
 SECURE_PROXY_SSL_HEADER = None
 SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
-SECURE_HSTS_SECONDS = 0  # HSTS को बंद करें
+SECURE_HSTS_SECONDS = 0  # HSTS ko band kare
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 SECURE_HSTS_PRELOAD = False
-
-
 
 
 # ------------------------------------------------------------------------------
@@ -327,6 +325,9 @@ RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "dummy_key")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "dummy_secret")
 RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
 GOOGLE_MAPS_KEY = os.getenv("GOOGLE_MAPS_KEY", "")
+
+# ✅ Fix: Added this setting for Rider Earnings Calculation
+RIDER_FIXED_PAY_PER_ORDER = int(os.getenv("RIDER_FIXED_PAY_PER_ORDER", 50)) 
 
 # Leaflet Configuration
 LEAFLET_CONFIG = {

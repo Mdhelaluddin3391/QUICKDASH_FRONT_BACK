@@ -49,6 +49,7 @@
             margin-bottom: 25px;
             text-align: center;
             box-shadow: 0 2px 8px rgba(33, 150, 243, 0.1);
+            animation: fadeIn 0.5s ease-in;
         }
         .otp-code {
             font-size: 2rem;
@@ -62,10 +63,23 @@
             display: inline-block;
             margin: 10px 0;
         }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
 
         @media(max-width: 768px) {
             .od-grid {
                 grid-template-columns: 1fr;
+            }
+            .od-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .od-header .text-right {
+                text-align: left;
+                width: 100%;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
             }
         }
     </style>
@@ -90,8 +104,8 @@
                     </div>
                     <div class="text-right">
                         <span id="od-status" class="status-badge">...</span>
-                        <div class="mt-2">
-                            <a href="#" id="track-btn" class="btn btn-primary btn-sm">
+                        <div class="mt-2" id="action-buttons">
+                            <a href="#" id="track-btn" class="btn btn-primary btn-sm d-none">
                                 Track Order
                             </a>
                         </div>
@@ -144,15 +158,12 @@
 
     <div id="footer-placeholder"></div>
 
-<script src="./assets/js/config.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/utils/formatters.js?v=1.0.0" defer></script>
-<script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
-<script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+    <script src="./assets/js/config.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/formatters.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+    <script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+    <script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
 
     <script defer>
         document.addEventListener('DOMContentLoaded', async () => {
@@ -170,21 +181,21 @@
                 document.getElementById('od-date').innerText = Formatters.dateTime(order.created_at);
 
                 const statusEl = document.getElementById('od-status');
-                statusEl.innerText = order.status;
+                statusEl.innerText = order.status.replace(/_/g, ' ').toUpperCase();
                 statusEl.className = `status-badge status-${order.status.toLowerCase()}`;
 
-                // --- OTP Display Logic (Updated) ---
+                // --- OTP Display Logic ---
                 const otpContainer = document.getElementById('otp-container');
-                // OTP sirf tab dikhaye jab Rider assign ho (status check) aur OTP backend se aaye
+                // Check if OTP exists and status is appropriate
                 if (order.delivery_otp && ['confirmed', 'picking', 'packed', 'out_for_delivery'].includes(order.status)) {
                     otpContainer.innerHTML = `
                         <div class="otp-display-card">
                             <div class="mb-1 text-primary font-weight-bold">
-                                <i class="fas fa-key"></i> SHARE WITH RIDER
+                                <i class="fas fa-key"></i> DELIVERY OTP
                             </div>
                             <div class="otp-code">${order.delivery_otp}</div>
                             <div class="small text-muted">
-                                Only share this OTP when you receive your package.
+                                Share this code with the rider upon delivery.
                             </div>
                         </div>
                     `;
@@ -197,31 +208,16 @@
                 if (['confirmed', 'picking', 'packed', 'out_for_delivery'].includes(order.status)) {
                     trackBtn.href = `/track_order.html?id=${order.id}`;
                     trackBtn.classList.remove('d-none');
-                } else {
-                    trackBtn.classList.add('d-none');
                 }
 
-                // --- Cancellation UI Implementation ---
-                const actionContainer = document.querySelector('.text-right');
-
-                // Allow cancel only for specific statuses
+                // --- Cancellation Button Logic ---
+                const actionContainer = document.getElementById('action-buttons');
                 if (['created', 'confirmed'].includes(order.status)) {
-                    // Check if button already exists to prevent duplicate
-                    if(!actionContainer.querySelector('.btn-outline-danger')) {
-                        const cancelBtn = document.createElement('button');
-                        cancelBtn.className = 'btn btn-outline-danger btn-sm mt-2 ml-2';
-                        cancelBtn.innerHTML = '<i class="fas fa-times"></i> Cancel Order';
-                        cancelBtn.onclick = () => confirmCancellation(order.id);
-
-                        // Warning Text
-                        const warningText = document.createElement('div');
-                        warningText.className = 'text-muted small mt-1';
-                        warningText.style.fontSize = '0.75rem';
-                        warningText.innerHTML = '<i class="fas fa-exclamation-triangle text-warning"></i> Frequent cancellations may lead to account block.';
-
-                        actionContainer.appendChild(cancelBtn);
-                        actionContainer.appendChild(warningText);
-                    }
+                    const cancelBtn = document.createElement('button');
+                    cancelBtn.className = 'btn btn-outline-danger btn-sm ml-2';
+                    cancelBtn.innerHTML = '<i class="fas fa-times"></i> Cancel';
+                    cancelBtn.onclick = () => confirmCancellation(order.id);
+                    actionContainer.appendChild(cancelBtn);
                 }
 
                 // Items Rendering
@@ -238,22 +234,27 @@
 
                 // Summary Rendering
                 document.getElementById('val-total').innerText = Formatters.currency(order.final_amount);
+                // Calculate rough subtotal (assuming logic is correct)
                 const subtotal = order.items.reduce((acc, i) => acc + parseFloat(i.total_price), 0);
                 document.getElementById('val-sub').innerText = Formatters.currency(subtotal);
+                
+                // Calculate delivery fee difference
+                const deliveryFee = parseFloat(order.final_amount) - subtotal;
+                document.getElementById('val-del').innerText = deliveryFee > 0 ? Formatters.currency(deliveryFee) : 'Free';
 
                 // Address Rendering
                 if (order.delivery_address_json) {
                     const a = order.delivery_address_json;
                     document.getElementById('od-address').innerHTML = `
-                        <strong>${a.label || 'Address'}</strong><br>
-                        ${a.full_address || a.address_line}<br>
-                        ${a.city} - ${a.pincode}
+                        <strong>${a.label || 'Home'}</strong><br>
+                        ${a.full_address || a.address_line || ''}<br>
+                        ${a.city || ''} ${a.pincode || ''}
                     `;
                 }
 
                 // Payment Info
-                const paymentText = `Method: ${order.payment_method} | Status: ${order.payment_status}`;
-                document.getElementById('od-payment').innerText = paymentText;
+                document.getElementById('od-payment').innerText = 
+                    `Method: ${order.payment_method} | Status: ${order.payment_status}`;
 
                 // Refund Section
                 const refundSec = document.getElementById('refund-section');
@@ -278,38 +279,26 @@
 
             } catch (e) {
                 console.error(e);
-                loader.innerHTML = '<p class="text-danger text-center">Order load failed</p>';
+                loader.innerHTML = '<p class="text-danger text-center">Failed to load order details</p>';
             }
         });
 
-        // --- Hardened Cancellation Function ---
         async function confirmCancellation(orderId) {
-            const confirmed = confirm(
-                "⚠️ Are you sure you want to cancel?\n\n" +
-                "NOTE: Frequent cancellations will temporarily block your account."
-            );
-
-            if (!confirmed) return;
+            if (!confirm("⚠️ Are you sure you want to cancel this order?")) return;
 
             try {
                 await ApiService.post(`/orders/${orderId}/cancel/`);
-                Toast.success("Order cancelled successfully");
+                Toast.success("Order cancelled");
                 setTimeout(() => window.location.reload(), 1000);
-
             } catch (e) {
-                let errorMsg = e.message;
+                let errorMsg = e.message || "Failed to cancel";
                 try {
+                    // Try parsing structured backend error
                     const parsed = JSON.parse(e.message);
-                    if (parsed.error && parsed.error.message) {
-                        errorMsg = parsed.error.message;
-                    }
-                } catch (parseErr) {}
-
-                if (errorMsg.toLowerCase().includes("blocked")) {
-                    alert("⛔ ACCOUNT ACTION\n\n" + errorMsg);
-                } else {
-                    Toast.error(errorMsg || "Failed to cancel order");
-                }
+                    if(parsed.error && parsed.error.message) errorMsg = parsed.error.message;
+                } catch(err){}
+                
+                alert("Error: " + errorMsg);
             }
         }
     </script>
