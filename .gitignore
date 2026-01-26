@@ -5,3 +5,61 @@ celerybeat-schedule
 celerybeat.pid
 backend/celerybeat-schedule
 rider_app/node_modules/
+.env
+
+# ======================
+# Python & Core
+# ======================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+.Python
+
+# ======================
+# Virtual Environment
+# ======================
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# ======================
+# Django Setup
+# ======================
+*.sqlite3
+db.sqlite3
+local_settings.py
+settings_local.py
+
+# ======================
+# Django Migrations (IMPORTANT)
+# ======================
+# Yeh setting migrations ko ignore karegi par folder structure maintain karegi
+**/migrations/*.py
+!**/migrations/__init__.py
+
+# ======================
+# Media & Static
+# ======================
+media/
+staticfiles/
+
+# ======================
+# IDE & Editors
+# ======================
+.vscode/
+.idea/
+
+# ======================
+# OS Files
+# ======================
+.DS_Store
+Thumbs.db
+celerybeat.pid
+celerybeat-schedule
+backend/celerybeat-schedule
+rider_app/node_modules/
+.env    
