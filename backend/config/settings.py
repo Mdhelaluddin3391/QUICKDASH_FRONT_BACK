@@ -20,6 +20,24 @@ DJANGO_ENV = os.getenv("DJANGO_ENV", "development")
 DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-key-change-me")
 
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
+
+
+# ------------------------------------------------------------------------------
+# SECURITY HEADERS (PRODUCTION ONLY)
+# ------------------------------------------------------------------------------
+# इन सेटिंग्स को हटा दें या False कर दें ताकि लोकलहोस्ट पर HTTPS की मांग न हो
+SECURE_PROXY_SSL_HEADER = None
+SECURE_SSL_REDIRECT = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+SECURE_HSTS_SECONDS = 0  # HSTS को बंद करें
+SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+SECURE_HSTS_PRELOAD = False
+
+
+
+
 # ------------------------------------------------------------------------------
 # CORS CONFIG (SINGLE SOURCE OF TRUTH ✅)
 # ------------------------------------------------------------------------------
@@ -31,6 +49,7 @@ else:
     if allowed_origins:
         CORS_ALLOWED_ORIGINS = allowed_origins.split(",")
     else:
+        # Fallback defaults
         CORS_ALLOWED_ORIGINS = [
             "http://localhost:8000",
             "http://127.0.0.1:5500",
@@ -43,8 +62,6 @@ else:
             "https://www.quickdash.com",
             "http://localhost:8080",
             "http://127.0.0.1:8080",
-            "http://localhost:8000",
-            "http://127.0.0.1:8000",
             "http://localhost:2000",
             "http://127.0.0.1:2000",
             "http://localhost:3000",
@@ -55,7 +72,6 @@ else:
             "http://127.0.0.1:3002",
             "http://localhost:3003",
             "http://127.0.0.1:3003",
-                    
         ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -89,7 +105,6 @@ INSTALLED_APPS = [
     "storages",
     "django_celery_beat",
     'leaflet',
-    # 'apps.orders.apps.OrdersConfig',
 
     # Local Apps
     "apps.accounts",
@@ -110,26 +125,21 @@ INSTALLED_APPS = [
 ]
 
 # ------------------------------------------------------------------------------
-# MIDDLEWARE (ORDER MATTERS ⚠️)
+# MIDDLEWARE
 # ------------------------------------------------------------------------------
 MIDDLEWARE = [
     "django_prometheus.middleware.PrometheusBeforeMiddleware",
-
     "corsheaders.middleware.CorsMiddleware",  # MUST BE FIRST
     "django.middleware.common.CommonMiddleware",
-
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
-
     "apps.core.middleware.CorrelationIDMiddleware",
     "apps.core.middleware.GlobalKillSwitchMiddleware",
     "apps.core.middleware.LocationContextMiddleware",
-
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-
     "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
@@ -157,21 +167,29 @@ TEMPLATES = [
 ]
 
 # ------------------------------------------------------------------------------
-# DATABASE & CACHE
+# DATABASE
 # ------------------------------------------------------------------------------
+# Use environment variables for DB connection to match Docker service 'db'
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
         "NAME": os.getenv("POSTGRES_DB", "quickdash"),
         "USER": os.getenv("POSTGRES_USER", "quickdash"),
         "PASSWORD": os.getenv("POSTGRES_PASSWORD", "quickdash_secure"),
-        "HOST": os.getenv("POSTGRES_HOST", "db"),
+        "HOST": os.getenv("POSTGRES_HOST", "db"), # Default to docker service name
         "PORT": os.getenv("POSTGRES_PORT", "5432"),
-        "CONN_MAX_AGE": 0,
+        "CONN_MAX_AGE": 60,
     }
 }
 
+# ------------------------------------------------------------------------------
+# REDIS & CACHE & CELERY
+# ------------------------------------------------------------------------------
+# Default to docker service 'redis' if not set
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
 
 CACHES = {
     "default": {
@@ -231,14 +249,16 @@ else:
     }
 
 # ------------------------------------------------------------------------------
-# CELERY & CHANNELS
+# CELERY CONFIG
 # ------------------------------------------------------------------------------
-CELERY_BROKER_URL = REDIS_URL
-CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
+# ------------------------------------------------------------------------------
+# CHANNELS
+# ------------------------------------------------------------------------------
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
@@ -256,9 +276,6 @@ SIMPLE_JWT = {
     "ALGORITHM": "HS256",
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
-
-
-
 
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
@@ -281,11 +298,11 @@ REST_FRAMEWORK = {
         "location_ping": "100/minute", 
         "ai_assistant": "100/minute",
     },
-    # Use our custom exception handler to map BusinessLogicException -> 400 JSON
     "EXCEPTION_HANDLER": "apps.utils.exceptions.custom_exception_handler",
 }
+
 # ------------------------------------------------------------------------------
-# LOGGING & MONITORING
+# LOGGING
 # ------------------------------------------------------------------------------
 LOGGING = {
     "version": 1,
@@ -311,12 +328,9 @@ RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "dummy_secret")
 RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
 GOOGLE_MAPS_KEY = os.getenv("GOOGLE_MAPS_KEY", "")
 
-
-
-
-# Leaflet Configuration (Optional but recommended for India)
+# Leaflet Configuration
 LEAFLET_CONFIG = {
-    'DEFAULT_CENTER': (22.5937, 78.9629), # India Center
+    'DEFAULT_CENTER': (22.5937, 78.9629),
     'DEFAULT_ZOOM': 5,
     'MIN_ZOOM': 3,
     'MAX_ZOOM': 18,
@@ -324,11 +338,9 @@ LEAFLET_CONFIG = {
     'ATTRIBUTION_PREFIX': 'QuickDash',
 }
 
-
 # ------------------------------------------------------------------------------
 # CSRF CONFIGURATION
 # ------------------------------------------------------------------------------
-# This tells Django to trust requests coming from your localhost
 CSRF_TRUSTED_ORIGINS = os.getenv(
     "CSRF_TRUSTED_ORIGINS",
     "http://localhost:8000,http://127.0.0.1:8000"
