@@ -57,6 +57,6 @@ else
   echo "Starting auxiliary process (Celery Worker/Beat) as appuser"
   echo "Command: $@"
   exec gosu appuser gunicorn config.asgi:application \
-  --bind 0.0.0.0:${PORT}
+    --bind 0.0.0.0:${PORT}
 
 fi
