@@ -56,5 +56,7 @@ else
   # This executes the command passed from docker-compose (e.g., celery worker)
   echo "Starting auxiliary process (Celery Worker/Beat) as appuser"
   echo "Command: $@"
-  exec gosu appuser "$@"
+  exec gosu appuser gunicorn config.asgi:application \
+  --bind 0.0.0.0:${PORT}
+
 fi
