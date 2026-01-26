@@ -40,6 +40,29 @@
             border-bottom: none;
         }
 
+        /* OTP Card Style */
+        .otp-display-card {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            border: 2px dashed #2196f3;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 25px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(33, 150, 243, 0.1);
+        }
+        .otp-code {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #0d47a1;
+            letter-spacing: 8px;
+            font-family: 'Courier New', monospace;
+            background: rgba(255,255,255,0.6);
+            padding: 5px 20px;
+            border-radius: 8px;
+            display: inline-block;
+            margin: 10px 0;
+        }
+
         @media(max-width: 768px) {
             .od-grid {
                 grid-template-columns: 1fr;
@@ -74,6 +97,8 @@
                         </div>
                     </div>
                 </div>
+
+                <div id="otp-container"></div>
 
                 <div class="od-grid">
                     <div>
@@ -129,8 +154,7 @@
 
 <script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
 
-    <script defer>/* Script section inside order_detail.html */
-
+    <script defer>
         document.addEventListener('DOMContentLoaded', async () => {
             const id = new URLSearchParams(window.location.search).get('id');
             if (!id) return window.location.href = './orders.html';
@@ -149,6 +173,25 @@
                 statusEl.innerText = order.status;
                 statusEl.className = `status-badge status-${order.status.toLowerCase()}`;
 
+                // --- OTP Display Logic (Updated) ---
+                const otpContainer = document.getElementById('otp-container');
+                // OTP sirf tab dikhaye jab Rider assign ho (status check) aur OTP backend se aaye
+                if (order.delivery_otp && ['confirmed', 'picking', 'packed', 'out_for_delivery'].includes(order.status)) {
+                    otpContainer.innerHTML = `
+                        <div class="otp-display-card">
+                            <div class="mb-1 text-primary font-weight-bold">
+                                <i class="fas fa-key"></i> SHARE WITH RIDER
+                            </div>
+                            <div class="otp-code">${order.delivery_otp}</div>
+                            <div class="small text-muted">
+                                Only share this OTP when you receive your package.
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    otpContainer.innerHTML = '';
+                }
+
                 // Track Button Logic
                 const trackBtn = document.getElementById('track-btn');
                 if (['confirmed', 'picking', 'packed', 'out_for_delivery'].includes(order.status)) {
@@ -163,32 +206,35 @@
 
                 // Allow cancel only for specific statuses
                 if (['created', 'confirmed'].includes(order.status)) {
-                    const cancelBtn = document.createElement('button');
-                    cancelBtn.className = 'btn btn-outline-danger btn-sm mt-2 ml-2';
-                    cancelBtn.innerHTML = '<i class="fas fa-times"></i> Cancel Order';
-                    cancelBtn.onclick = () => confirmCancellation(order.id);
+                    // Check if button already exists to prevent duplicate
+                    if(!actionContainer.querySelector('.btn-outline-danger')) {
+                        const cancelBtn = document.createElement('button');
+                        cancelBtn.className = 'btn btn-outline-danger btn-sm mt-2 ml-2';
+                        cancelBtn.innerHTML = '<i class="fas fa-times"></i> Cancel Order';
+                        cancelBtn.onclick = () => confirmCancellation(order.id);
 
-                    // Warning Text
-                    const warningText = document.createElement('div');
-                    warningText.className = 'text-muted small mt-1';
-                    warningText.style.fontSize = '0.75rem';
-                    warningText.innerHTML = '<i class="fas fa-exclamation-triangle text-warning"></i> Frequent cancellations may lead to account block.';
+                        // Warning Text
+                        const warningText = document.createElement('div');
+                        warningText.className = 'text-muted small mt-1';
+                        warningText.style.fontSize = '0.75rem';
+                        warningText.innerHTML = '<i class="fas fa-exclamation-triangle text-warning"></i> Frequent cancellations may lead to account block.';
 
-                    actionContainer.appendChild(cancelBtn);
-                    actionContainer.appendChild(warningText);
+                        actionContainer.appendChild(cancelBtn);
+                        actionContainer.appendChild(warningText);
+                    }
                 }
 
                 // Items Rendering
                 document.getElementById('od-items').innerHTML = order.items.map(i => `
-            <div class="item-row">
-                <img src="${i.sku_image || 'https://via.placeholder.com/60'}" width="60" height="60" style="object-fit:contain; border-radius:8px; border:1px solid #eee;">
-                <div style="flex:1;">
-                    <div class="font-weight-600">${i.sku_name}</div>
-                    <div class="text-muted small">Qty: ${i.quantity}</div>
-                </div>
-                <div class="font-weight-bold">${Formatters.currency(i.total_price)}</div>
-            </div>
-        `).join('');
+                    <div class="item-row">
+                        <img src="${i.sku_image || 'https://via.placeholder.com/60'}" width="60" height="60" style="object-fit:contain; border-radius:8px; border:1px solid #eee;">
+                        <div style="flex:1;">
+                            <div class="font-weight-600">${i.sku_name}</div>
+                            <div class="text-muted small">Qty: ${i.quantity}</div>
+                        </div>
+                        <div class="font-weight-bold">${Formatters.currency(i.total_price)}</div>
+                    </div>
+                `).join('');
 
                 // Summary Rendering
                 document.getElementById('val-total').innerText = Formatters.currency(order.final_amount);
@@ -199,10 +245,10 @@
                 if (order.delivery_address_json) {
                     const a = order.delivery_address_json;
                     document.getElementById('od-address').innerHTML = `
-                <strong>${a.label || 'Address'}</strong><br>
-                ${a.full_address || a.address_line}<br>
-                ${a.city} - ${a.pincode}
-            `;
+                        <strong>${a.label || 'Address'}</strong><br>
+                        ${a.full_address || a.address_line}<br>
+                        ${a.city} - ${a.pincode}
+                    `;
                 }
 
                 // Payment Info
@@ -236,7 +282,7 @@
             }
         });
 
-        // --- NEW: Hardened Cancellation Function ---
+        // --- Hardened Cancellation Function ---
         async function confirmCancellation(orderId) {
             const confirmed = confirm(
                 "⚠️ Are you sure you want to cancel?\n\n" +
@@ -251,18 +297,14 @@
                 setTimeout(() => window.location.reload(), 1000);
 
             } catch (e) {
-                // Parse error object string from ApiService
                 let errorMsg = e.message;
                 try {
                     const parsed = JSON.parse(e.message);
                     if (parsed.error && parsed.error.message) {
                         errorMsg = parsed.error.message;
                     }
-                } catch (parseErr) {
-                    // Fallback if not JSON
-                }
+                } catch (parseErr) {}
 
-                // Handle Abuse Blocking specifically
                 if (errorMsg.toLowerCase().includes("blocked")) {
                     alert("⛔ ACCOUNT ACTION\n\n" + errorMsg);
                 } else {
@@ -272,5 +314,4 @@
         }
     </script>
 </body>
-
 </html>

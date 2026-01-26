@@ -208,10 +208,25 @@ class HandoverVerificationAPIView(APIView):
         if not order_id:
             return Response({"error": "Order ID required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Ensure order exists and is ready for handover
+        # 1. Order Check
         order = get_object_or_404(Order, id=order_id)
         
         if order.status != "packed":
-             return Response({"error": "Order is not ready for handover"}, status=status.HTTP_400_BAD_REQUEST)
+             return Response({"error": "Order is not ready for handover (Must be 'packed')"}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({"status": "verified", "order_id": order.id})
+        # 2. Delivery Update (Rider ke liye status change)
+        try:
+            delivery = Delivery.objects.get(order=order, rider__user=request.user)
+            
+            # Status Update
+            delivery.status = 'picked_up'
+            delivery.save()
+            
+            # Order Status Update
+            order.status = 'out_for_delivery'
+            order.save()
+            
+            return Response({"status": "verified", "order_id": order.id, "message": "Pickup Successful"})
+            
+        except Delivery.DoesNotExist:
+            return Response({"error": "Delivery not assigned to you"}, status=status.HTTP_403_FORBIDDEN)

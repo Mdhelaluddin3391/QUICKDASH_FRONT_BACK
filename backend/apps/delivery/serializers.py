@@ -1,11 +1,15 @@
 # apps/delivery/serializers.py
 from rest_framework import serializers
 from .models import Delivery
+from apps.orders.serializers import OrderSerializer
+
+
 
 class DeliverySerializer(serializers.ModelSerializer):
     """
     Standard serializer for Delivery instances.
     """
+    order = OrderSerializer(read_only=True)
     class Meta:
         model = Delivery
         fields = (

@@ -66,6 +66,9 @@ class OrderSerializer(serializers.ModelSerializer):
     payment_status = serializers.CharField(source='payment.status', read_only=True, default="N/A")
     refund_details = serializers.SerializerMethodField()
 
+    delivery_otp = serializers.SerializerMethodField()
+
+
     class Meta:
         model = Order
         fields = (
@@ -80,8 +83,15 @@ class OrderSerializer(serializers.ModelSerializer):
             "delivery_lat",
             "delivery_lng",
             "payment_status",
-            "refund_details"
+            "refund_details",
+            "delivery_otp"
         )
+
+    def get_delivery_otp(self, obj):
+        # Sirf tab dikhaye jab Delivery assign ho chuki ho
+        if hasattr(obj, 'delivery') and obj.delivery:
+            return obj.delivery.otp
+        return None
 
     def get_delivery_lat(self, obj):
         return obj.delivery_address_json.get('lat') 

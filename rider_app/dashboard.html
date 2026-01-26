@@ -126,7 +126,7 @@
 
             let actionBtn = '';
             if (job.status === 'assigned') {
-                actionBtn = `<button class="btn-action btn-pickup" onclick="alert('Please scan QR at warehouse')">At Warehouse (Scan QR)</button>`;
+                actionBtn = `<button class="btn-action btn-pickup" onclick="scanQR(${order.id})">At Warehouse (Scan QR)</button>`;
             } else {
                 actionBtn = `
                     <div class="otp-box">
@@ -168,6 +168,23 @@
                 alert(e.message || "Failed to complete");
             }
         }
+
+        window.scanQR = async function(orderId) {
+            // Real app mein yahan Camera khulna chahiye, abhi hum simulate kar rahe hain
+            if(!confirm(`Simulate Scanning QR for Order #${orderId}?`)) return;
+
+            try {
+                // Backend API call to verify handover
+                // Note: URL path '/delivery/verify-handover/' backend urls.py mein hona chahiye
+                await ApiService.post('/delivery/verify-handover/', { order_id: orderId });
+                
+                alert("Pickup Successful! Status Updated.");
+                // Refresh UI to show 'Complete' button
+                checkActiveJobs(); 
+            } catch (e) {
+                alert(e.message || "Handover Failed. Try again.");
+            }
+        };
 
         window.logout = function() {
             localStorage.clear();

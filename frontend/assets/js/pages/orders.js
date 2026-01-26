@@ -56,6 +56,13 @@ function createOrderCard(order) {
         day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 
+    // OTP Badge (If available in list view)
+    const otpBadge = order.delivery_otp 
+        ? `<div class="mt-2 px-2 py-1 bg-light border border-info rounded text-center text-primary font-weight-bold" style="font-size: 0.9em;">
+             📦 OTP: ${order.delivery_otp}
+           </div>`
+        : '';
+
     return `
         <div class="card mb-3 order-card shadow-sm">
             <div class="card-body">
@@ -72,6 +79,8 @@ function createOrderCard(order) {
                         ${order.item_count} Items | Total: <strong class="text-dark">${Formatters.currency(order.final_amount)}</strong>
                     </div>
                 </div>
+
+                ${otpBadge}
 
                 <hr class="my-2">
 
