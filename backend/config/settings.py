@@ -1,5 +1,3 @@
-# config/settings.py
-
 import os
 from pathlib import Path
 import sentry_sdk
@@ -9,7 +7,7 @@ from sentry_sdk.integrations.celery import CeleryIntegration
 from corsheaders.defaults import default_headers
 
 # ------------------------------------------------------------------------------
-# BASE & ENVIRONMENT
+# BASE
 # ------------------------------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
 DJANGO_ENV = os.getenv("DJANGO_ENV", "development")
@@ -17,63 +15,41 @@ DJANGO_ENV = os.getenv("DJANGO_ENV", "development")
 # ------------------------------------------------------------------------------
 # SECURITY
 # ------------------------------------------------------------------------------
-DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-key-change-me")
-
+DEBUG = os.getenv("DEBUG", "0") == "1"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-key")
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
 
+# ------------------------------------------------------------------------------
+# RAILWAY SSL / PROXY FIX
+# ------------------------------------------------------------------------------
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+else:
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
 
 # ------------------------------------------------------------------------------
-# SECURITY HEADERS (PRODUCTION ONLY)
-# ------------------------------------------------------------------------------
-# In settings ko hata de ya False kar de taki localhost par HTTPS ki maang na ho
-SECURE_PROXY_SSL_HEADER = None
-SECURE_SSL_REDIRECT = False
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
-SECURE_HSTS_SECONDS = 0  # HSTS ko band kare
-SECURE_HSTS_INCLUDE_SUBDOMAINS = False
-SECURE_HSTS_PRELOAD = False
-
-
-# ------------------------------------------------------------------------------
-# CORS CONFIG (SINGLE SOURCE OF TRUTH ✅)
+# CORS
 # ------------------------------------------------------------------------------
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
 else:
     CORS_ALLOW_ALL_ORIGINS = False
-    allowed_origins = os.getenv("CORS_ALLOWED_ORIGINS")
-    if allowed_origins:
-        CORS_ALLOWED_ORIGINS = allowed_origins.split(",")
-    else:
-        # Fallback defaults
-        CORS_ALLOWED_ORIGINS = [
-            "http://localhost:8000",
-            "http://127.0.0.1:5500",
-            "http://127.0.0.1:8000",
-            "http://0.0.0.0:8081",
-            "http://localhost:8081",
-            "http://localhost:5000",
-            "http://127.0.0.1:5000",
-            "https://quickdash.com",
-            "https://www.quickdash.com",
-            "http://localhost:8080",
-            "http://127.0.0.1:8080",
-            "http://localhost:2000",
-            "http://127.0.0.1:2000",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://localhost:3001",
-            "http://127.0.0.1:3001",
-            "http://localhost:3002",
-            "http://127.0.0.1:3002",
-            "http://localhost:3003",
-            "http://127.0.0.1:3003",
-        ]
+    CORS_ALLOWED_ORIGINS = os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "http://localhost:8000"
+    ).split(",")
 
 CORS_ALLOW_CREDENTIALS = True
-
 CORS_ALLOW_HEADERS = list(default_headers) + [
     "idempotency-key",
     "x-location-lat",
@@ -82,7 +58,7 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 ]
 
 # ------------------------------------------------------------------------------
-# APPLICATIONS
+# APPS
 # ------------------------------------------------------------------------------
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -93,7 +69,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.gis",
 
-    # Third Party
     "rest_framework",
     "django_filters",
     "corsheaders",
@@ -102,9 +77,8 @@ INSTALLED_APPS = [
     "django_prometheus",
     "storages",
     "django_celery_beat",
-    'leaflet',
+    "leaflet",
 
-    # Local Apps
     "apps.accounts",
     "apps.customers",
     "apps.orders",
@@ -127,7 +101,7 @@ INSTALLED_APPS = [
 # ------------------------------------------------------------------------------
 MIDDLEWARE = [
     "django_prometheus.middleware.PrometheusBeforeMiddleware",
-    "corsheaders.middleware.CorsMiddleware",  # MUST BE FIRST
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -142,117 +116,42 @@ MIDDLEWARE = [
 ]
 
 # ------------------------------------------------------------------------------
-# URL / TEMPLATES
+# URL / ASGI
 # ------------------------------------------------------------------------------
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-TEMPLATES = [
-    {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],
-        "APP_DIRS": True,
-        "OPTIONS": {
-            "context_processors": [
-                "django.template.context_processors.debug",
-                "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
-            ],
-        },
-    }
-]
-
 # ------------------------------------------------------------------------------
-# DATABASE
+# DATABASE (POSTGIS – SINGLE SOURCE OF TRUTH ✅)
 # ------------------------------------------------------------------------------
-# Use environment variables for DB connection to match Docker service 'db'
 DATABASES = {
     "default": {
         "ENGINE": "django.contrib.gis.db.backends.postgis",
         "NAME": os.getenv("POSTGRES_DB", "quickdash"),
-        "USER": os.getenv("POSTGRES_USER", "quickdash"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", "quickdash_secure"),
-        "HOST": os.getenv("POSTGRES_HOST", "db"), # Default to docker service name
+        "USER": os.getenv("POSTGRES_USER", "postgres"),
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
+        "HOST": os.getenv("POSTGRES_HOST"),
         "PORT": os.getenv("POSTGRES_PORT", "5432"),
         "CONN_MAX_AGE": 60,
     }
 }
 
 # ------------------------------------------------------------------------------
-# REDIS & CACHE & CELERY
+# REDIS / CACHE / CELERY
 # ------------------------------------------------------------------------------
-# Default to docker service 'redis' if not set
-REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+REDIS_URL = os.getenv("REDIS_URL")
 
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", REDIS_URL)
-CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", REDIS_URL)
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = REDIS_URL
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
         "LOCATION": REDIS_URL,
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "SOCKET_CONNECT_TIMEOUT": 5,
-            "SOCKET_TIMEOUT": 5,
-        }
     }
 }
-
-# ------------------------------------------------------------------------------
-# SECURITY HEADERS (PRODUCTION ONLY)
-# ------------------------------------------------------------------------------
-if not DEBUG:
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-
-# ------------------------------------------------------------------------------
-# STATIC & MEDIA
-# ------------------------------------------------------------------------------
-USE_S3 = os.getenv("USE_S3", "0") == "1"
-
-STATIC_URL = "/static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
-
-if USE_S3:
-    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
-    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-    AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
-    AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "ap-south-1")
-    AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
-
-    AWS_DEFAULT_ACL = None
-    AWS_QUERYSTRING_AUTH = True
-
-    STORAGES = {
-        "default": {"BACKEND": "storages.backends.s3boto3.S3Boto3Storage"},
-        "staticfiles": {"BACKEND": "storages.backends.s3boto3.S3StaticStorage"},
-    }
-
-    STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/static/"
-    MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/media/"
-else:
-    STORAGES = {
-        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
-    }
-
-# ------------------------------------------------------------------------------
-# CELERY CONFIG
-# ------------------------------------------------------------------------------
-CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_TASK_SERIALIZER = "json"
-CELERY_RESULT_SERIALIZER = "json"
-CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 
 # ------------------------------------------------------------------------------
 # CHANNELS
@@ -265,50 +164,31 @@ CHANNEL_LAYERS = {
 }
 
 # ------------------------------------------------------------------------------
-# AUTH & DRF
+# STATIC / MEDIA (RAILWAY EPHEMERAL OK)
+# ------------------------------------------------------------------------------
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# ------------------------------------------------------------------------------
+# AUTH / JWT / DRF
 # ------------------------------------------------------------------------------
 AUTH_USER_MODEL = "accounts.User"
 
 SIMPLE_JWT = {
-    "SIGNING_KEY": os.getenv("JWT_SIGNING_KEY", "dev-signing-key"),
-    "ALGORITHM": "HS256",
-    "AUTH_HEADER_TYPES": ("Bearer",),
+    "SIGNING_KEY": os.getenv("JWT_SIGNING_KEY", SECRET_KEY),
 }
 
 REST_FRAMEWORK = {
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "apps.accounts.authentication.SecureJWTAuthentication",
-    ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
-    "DEFAULT_THROTTLE_CLASSES": [
-        "rest_framework.throttling.AnonRateThrottle",
-        "rest_framework.throttling.UserRateThrottle",
-        "rest_framework.throttling.ScopedRateThrottle",
-    ],
-    "DEFAULT_THROTTLE_RATES": {
-        "anon": "1000/min", 
-        "user": "10000/day",
-        "otp_send": "100/minute",      
-        "registration": "1000/minute",
-        "location_ping": "100/minute", 
-        "ai_assistant": "100/minute",
-    },
-    "EXCEPTION_HANDLER": "apps.utils.exceptions.custom_exception_handler",
 }
 
 # ------------------------------------------------------------------------------
-# LOGGING
+# SENTRY (OPTIONAL)
 # ------------------------------------------------------------------------------
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
-    "root": {"handlers": ["console"], "level": "INFO"},
-}
-
 if not DEBUG and os.getenv("SENTRY_DSN"):
     sentry_sdk.init(
         dsn=os.getenv("SENTRY_DSN"),
@@ -321,40 +201,4 @@ if not DEBUG and os.getenv("SENTRY_DSN"):
 # BUSINESS
 # ------------------------------------------------------------------------------
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "dummy_key")
-RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "dummy_secret")
-RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
-GOOGLE_MAPS_KEY = os.getenv("GOOGLE_MAPS_KEY", "")
-
-# ✅ Fix: Added this setting for Rider Earnings Calculation
-RIDER_FIXED_PAY_PER_ORDER = int(os.getenv("RIDER_FIXED_PAY_PER_ORDER", 50)) 
-
-# Leaflet Configuration
-LEAFLET_CONFIG = {
-    'DEFAULT_CENTER': (22.5937, 78.9629),
-    'DEFAULT_ZOOM': 5,
-    'MIN_ZOOM': 3,
-    'MAX_ZOOM': 18,
-    'SCALE': 'both',
-    'ATTRIBUTION_PREFIX': 'QuickDash',
-}
-
-# ------------------------------------------------------------------------------
-# CSRF CONFIGURATION
-# ------------------------------------------------------------------------------
-CSRF_TRUSTED_ORIGINS = os.getenv(
-    "CSRF_TRUSTED_ORIGINS",
-    "http://localhost:8000,http://127.0.0.1:8000"
-).split(",")
-
-
-
-
-
-
-import os
-import dj_database_url
-
-DATABASES = {
-    "default": dj_database_url.parse(os.environ.get("DATABASE_URL"))
-}
+RIDER_FIXED_PAY_PER_ORDER = int(os.getenv("RIDER_FIXED_PAY_PER_ORDER", 50))

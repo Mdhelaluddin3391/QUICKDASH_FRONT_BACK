@@ -1,19 +1,24 @@
-# Use Python 3.12 slim image
+# ------------------------------------------------------------
+# Base image
+# ------------------------------------------------------------
 FROM python:3.12-slim
 
-# 1. Ye line add karne se 'debconf' wali red warnings chali jayengi
+# Prevent interactive prompts during apt install
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Set environment variables
+# Python & Django env
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DJANGO_ENV=production
 
-# Set work directory
+# ------------------------------------------------------------
+# Work directory
+# ------------------------------------------------------------
 WORKDIR /app
 
-# Install system dependencies
-# '-qq' flag output ko thoda shant rakhta hai
+# ------------------------------------------------------------
+# System dependencies
+# ------------------------------------------------------------
 RUN apt-get update && apt-get install -y --no-install-recommends -qq \
     gcc \
     libpq-dev \
@@ -24,32 +29,49 @@ RUN apt-get update && apt-get install -y --no-install-recommends -qq \
     libgdal-dev \
     libmagic1 \
     gosu \
+    redis-tools \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
+# ------------------------------------------------------------
+# Python dependencies
+# ------------------------------------------------------------
 COPY requirements.txt .
 RUN pip install --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt \
     && pip install gunicorn uvicorn
 
-# Copy application code
+# ------------------------------------------------------------
+# Copy project code (repo root → /app)
+# ------------------------------------------------------------
 COPY . .
 
+# ------------------------------------------------------------
 # Create non-root user
-RUN addgroup --system --gid 1000 appgroup && adduser --system --uid 1000 --gid 1000 appuser
+# ------------------------------------------------------------
+RUN addgroup --system --gid 1000 appgroup \
+    && adduser --system --uid 1000 --gid 1000 appuser
 
-# Create directories for static and media
+# ------------------------------------------------------------
+# Static & media directories
+# ------------------------------------------------------------
 RUN mkdir -p /app/staticfiles /app/media
 
-# Change ownership
+# Fix ownership
 RUN chown -R appuser:appgroup /app
 
-# Script permissions
-COPY ./scripts/entrypoint.sh /entrypoint.sh
+# ------------------------------------------------------------
+# Entrypoint (IMPORTANT FIX)
+# File exists at: backend/scripts/entrypoint.sh
+# ------------------------------------------------------------
+COPY backend/scripts/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Expose port
+# ------------------------------------------------------------
+# Expose port (Railway will map this)
+# ------------------------------------------------------------
 EXPOSE 5000
 
-# Set entrypoint
+# ------------------------------------------------------------
+# Entrypoint
+# ------------------------------------------------------------
 ENTRYPOINT ["/entrypoint.sh"]
