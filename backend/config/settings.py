@@ -1,5 +1,7 @@
+# config/settings.py
 import os
 from pathlib import Path
+
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
@@ -20,7 +22,7 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-insecure-key")
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "*").split(",")
 
 # ------------------------------------------------------------------------------
-# RAILWAY SSL / PROXY FIX
+# RAILWAY / SSL / PROXY
 # ------------------------------------------------------------------------------
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
@@ -69,6 +71,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.gis",
 
+    # Third-party
     "rest_framework",
     "django_filters",
     "corsheaders",
@@ -79,6 +82,7 @@ INSTALLED_APPS = [
     "django_celery_beat",
     "leaflet",
 
+    # Local apps
     "apps.accounts",
     "apps.customers",
     "apps.orders",
@@ -123,7 +127,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 # ------------------------------------------------------------------------------
-# DATABASE (POSTGIS – SINGLE SOURCE OF TRUTH ✅)
+# DATABASE (POSTGIS – SINGLE SOURCE OF TRUTH)
 # ------------------------------------------------------------------------------
 DATABASES = {
     "default": {
@@ -138,9 +142,9 @@ DATABASES = {
 }
 
 # ------------------------------------------------------------------------------
-# REDIS / CACHE / CELERY
+# REDIS / CACHE / CELERY (SAFE)
 # ------------------------------------------------------------------------------
-REDIS_URL = os.getenv("REDIS_URL")
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
@@ -164,7 +168,7 @@ CHANNEL_LAYERS = {
 }
 
 # ------------------------------------------------------------------------------
-# STATIC / MEDIA (RAILWAY EPHEMERAL OK)
+# STATIC / MEDIA
 # ------------------------------------------------------------------------------
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -187,6 +191,31 @@ REST_FRAMEWORK = {
 }
 
 # ------------------------------------------------------------------------------
+# BUSINESS / PAYMENTS
+# ------------------------------------------------------------------------------
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+RIDER_FIXED_PAY_PER_ORDER = int(os.getenv("RIDER_FIXED_PAY_PER_ORDER", 50))
+
+# ------------------------------------------------------------------------------
+# RAZORPAY (FIXED)
+# ------------------------------------------------------------------------------
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "dummy_key")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "dummy_secret")
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+
+# ------------------------------------------------------------------------------
+# SMS / OTP / NOTIFICATIONS (ADDED)
+# ------------------------------------------------------------------------------
+SMS_PROVIDER = os.getenv("SMS_PROVIDER", "dummy")
+SMS_PROVIDER_KEY = os.getenv("SMS_PROVIDER_KEY", "")
+SMS_PROVIDER_SECRET = os.getenv("SMS_PROVIDER_SECRET", "")
+SMS_PROVIDER_SENDER_ID = os.getenv("SMS_PROVIDER_SENDER_ID", "QUICKD")
+SMS_PROVIDER_URL = os.getenv("SMS_PROVIDER_URL", "")
+
+OTP_EXPIRY_SECONDS = int(os.getenv("OTP_EXPIRY_SECONDS", 300))
+OTP_RESEND_COOLDOWN = int(os.getenv("OTP_RESEND_COOLDOWN", 60))
+
+# ------------------------------------------------------------------------------
 # SENTRY (OPTIONAL)
 # ------------------------------------------------------------------------------
 if not DEBUG and os.getenv("SENTRY_DSN"):
@@ -196,9 +225,3 @@ if not DEBUG and os.getenv("SENTRY_DSN"):
         environment=DJANGO_ENV,
         traces_sample_rate=0.1,
     )
-
-# ------------------------------------------------------------------------------
-# BUSINESS
-# ------------------------------------------------------------------------------
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-RIDER_FIXED_PAY_PER_ORDER = int(os.getenv("RIDER_FIXED_PAY_PER_ORDER", 50))
