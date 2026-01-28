@@ -4,12 +4,20 @@ set -e
 echo "🚀 Starting Entrypoint..."
 
 # --------------------------------------------------
-# 1. WAIT FOR POSTGRES
+# 1. WAIT FOR POSTGRES (Railway-safe)
 # --------------------------------------------------
-if [ -n "$POSTGRES_HOST" ]; then
-  echo "⏳ Waiting for PostgreSQL ($POSTGRES_HOST:$POSTGRES_PORT)..."
-  while ! nc -z "$POSTGRES_HOST" "$POSTGRES_PORT"; do
-    sleep 0.5
+if [ -n "$DATABASE_URL" ]; then
+  echo "⏳ Waiting for PostgreSQL (via DATABASE_URL)..."
+  until python - <<EOF
+import sys, psycopg2, os
+try:
+    psycopg2.connect(os.environ["DATABASE_URL"])
+    sys.exit(0)
+except Exception:
+    sys.exit(1)
+EOF
+  do
+    sleep 1
   done
   echo "✅ PostgreSQL is available"
 fi
@@ -20,7 +28,7 @@ fi
 if [ -n "$REDIS_URL" ]; then
   echo "⏳ Waiting for Redis..."
   until redis-cli -u "$REDIS_URL" ping | grep -q PONG; do
-    sleep 0.5
+    sleep 1
   done
   echo "✅ Redis is available"
 fi
@@ -43,9 +51,9 @@ if [ "$IS_PRIMARY" = "1" ]; then
 fi
 
 # --------------------------------------------------
-# 5. START SERVER
+# 5. START SERVER (ASGI)
 # --------------------------------------------------
-if [ "$RUN_GUNICORN" = "1" ]; then
+if [ "$RUN_GUNICORN" = "1" ] || [ "$RUN_GUNICORN" = "true" ]; then
   echo "🌐 Starting Gunicorn ASGI server"
   exec gosu appuser gunicorn config.asgi:application \
     -k uvicorn.workers.UvicornWorker \

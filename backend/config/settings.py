@@ -1,6 +1,7 @@
 # config/settings.py
 import os
 from pathlib import Path
+import dj_database_url
 
 import sentry_sdk
 from sentry_sdk.integrations.django import DjangoIntegration
@@ -130,16 +131,13 @@ ASGI_APPLICATION = "config.asgi.application"
 # DATABASE (POSTGIS – SINGLE SOURCE OF TRUTH)
 # ------------------------------------------------------------------------------
 DATABASES = {
-    "default": {
-        "ENGINE": "django.contrib.gis.db.backends.postgis",
-        "NAME": os.getenv("POSTGRES_DB"),
-        "USER": os.getenv("POSTGRES_USER"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD"),
-        "HOST": os.getenv("POSTGRES_HOST"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
-        "CONN_MAX_AGE": 60,
-    }
+    "default": dj_database_url.config(
+        default=os.getenv("DATABASE_URL"),
+        conn_max_age=60,
+        engine="django.contrib.gis.db.backends.postgis",
+    )
 }
+
 
 
 
