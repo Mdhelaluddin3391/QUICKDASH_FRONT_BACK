@@ -153,8 +153,38 @@ fi
 
 log_success "Permissions set"
 
+
+
 # ==============================================================================
 # PHASE 5: RUN MIGRATIONS (PRIMARY INSTANCE ONLY)
+# ==============================================================================
+if [ "$IS_PRIMARY" = "1" ] || [ "$IS_PRIMARY" = "true" ]; then
+    log_info "Ensuring migrations exist..."
+    
+    # Accounts app ki migration pehle create karein (dependency issue fix karne ke liye)
+    log_info "Creating migrations for accounts app..."
+    python3 manage.py makemigrations accounts
+    
+    # Baaki apps ki migrations create karein
+    log_info "Creating remaining migrations..."
+    python3 manage.py makemigrations
+
+    # Ab database migrate karein
+    log_info "Running database migrations (PRIMARY INSTANCE)..."
+    if python3 manage.py migrate --noinput; then
+        log_success "Migrations completed successfully"
+    else
+        log_error "Migrations failed"
+        exit 1
+    fi
+else
+    log_info "Skipping migrations (non-primary instance)"
+fi
+
+
+
+# ==============================================================================
+# PHASE 6: RUN MIGRATIONS (PRIMARY INSTANCE ONLY)
 # ==============================================================================
 if [ "$IS_PRIMARY" = "1" ] || [ "$IS_PRIMARY" = "true" ]; then
     log_info "Running database migrations (PRIMARY INSTANCE)..."
@@ -170,7 +200,7 @@ else
 fi
 
 # ==============================================================================
-# PHASE 6: COLLECT STATIC FILES (PRIMARY INSTANCE ONLY)
+# PHASE 7: COLLECT STATIC FILES (PRIMARY INSTANCE ONLY)
 # ==============================================================================
 if [ "$IS_PRIMARY" = "1" ] || [ "$IS_PRIMARY" = "true" ]; then
     log_info "Collecting static files (PRIMARY INSTANCE)..."
@@ -185,7 +215,7 @@ else
 fi
 
 # ==============================================================================
-# PHASE 7: START APPLICATION
+# PHASE 8: START APPLICATION
 # ==============================================================================
 log_info "Starting application server..."
 
