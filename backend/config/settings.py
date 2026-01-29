@@ -1,6 +1,5 @@
 # config/settings.py - PRODUCTION READY
-# This is a comprehensive production-grade Django settings file
-# Designed for Railway, AWS ECS, and Docker deployments
+# Optimized for Railway, AWS ECS, and Docker deployments
 import os
 import sys
 import logging
@@ -33,13 +32,12 @@ logger.info(f"🚀 Django initializing in {DJANGO_ENV} environment")
 # ==============================================================================
 
 # DEBUG - MUST DEFAULT TO FALSE
-# Only enable if explicitly required in development
 DEBUG = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
 
 if DEBUG:
     logger.warning("⚠️  DEBUG mode is enabled - NEVER use in production")
 
-# SECRET_KEY - REQUIRED IN PRODUCTION
+# SECRET_KEY - REQUIRED
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
     if DEBUG:
@@ -49,16 +47,15 @@ if not SECRET_KEY:
         logger.critical("❌ DJANGO_SECRET_KEY environment variable is REQUIRED in production")
         sys.exit(1)
 
-# ALLOWED_HOSTS - STRICT FOR PRODUCTION
-# Default to localhost in dev, must be explicit in production
+# ALLOWED_HOSTS
 ALLOWED_HOSTS_STR = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1" if DEBUG else "")
-if not ALLOWED_HOSTS_STR and not DEBUG:
-    logger.critical("❌ ALLOWED_HOSTS environment variable is REQUIRED in production")
-    sys.exit(1)
 ALLOWED_HOSTS = [h.strip() for h in ALLOWED_HOSTS_STR.split(",") if h.strip()] if ALLOWED_HOSTS_STR else []
 
+# CSRF TRUSTED ORIGINS (Critical for Production)
+CSRF_TRUSTED_ORIGINS_STR = os.getenv("CSRF_TRUSTED_ORIGINS", "")
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in CSRF_TRUSTED_ORIGINS_STR.split(",") if o.strip()]
+
 # HTTPS / PROXY / SSL CONFIGURATION
-# Critical for Railway, AWS ECS, and cloud deployments
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_FOR = True
@@ -156,42 +153,33 @@ ASGI_APPLICATION = "config.asgi.application"
 
 # ==============================================================================
 # PHASE 6: DATABASE CONFIGURATION
-# Support both DATABASE_URL and POSTGRES_* environment variables
 # ==============================================================================
-database_url = os.getenv("DATABASE_URL")
-
-if not database_url:
-    # Fallback to individual POSTGRES_* environment variables
-    postgres_user = os.getenv("POSTGRES_USER")
-    postgres_password = os.getenv("POSTGRES_PASSWORD")
-    postgres_host = os.getenv("POSTGRES_HOST", "localhost")
-    postgres_port = os.getenv("POSTGRES_PORT", "5432")
-    postgres_db = os.getenv("POSTGRES_DB")
-    
-    if postgres_user and postgres_password and postgres_db:
-        database_url = (
-            f"postgis://{postgres_user}:{postgres_password}"
-            f"@{postgres_host}:{postgres_port}/{postgres_db}"
-        )
-        logger.info(f"Built DATABASE_URL from POSTGRES_* env vars")
-    elif not DEBUG:
-        logger.critical("❌ DATABASE_URL or POSTGRES_* env vars are REQUIRED in production")
-        sys.exit(1)
-    else:
-        database_url = "postgis://postgres:postgres@localhost:5432/quickdash_dev"
-        logger.warning("⚠️  Using development database URL")
-
+# dj_database_url handles 'postgres://' and 'postgresql://' prefixes automatically
 DATABASES = {
     "default": dj_database_url.config(
-        default=database_url,
         conn_max_age=600,
+        conn_health_checks=True,
         engine="django.contrib.gis.db.backends.postgis",
     )
 }
 
+if not DATABASES["default"]:
+    # Fallback for manual configuration if DATABASE_URL is missing but PG* vars exist
+    if os.getenv("PGHOST"):
+        DATABASES["default"] = {
+            "ENGINE": "django.contrib.gis.db.backends.postgis",
+            "NAME": os.getenv("PGDATABASE", os.getenv("POSTGRES_DB")),
+            "USER": os.getenv("PGUSER", os.getenv("POSTGRES_USER")),
+            "PASSWORD": os.getenv("PGPASSWORD", os.getenv("POSTGRES_PASSWORD")),
+            "HOST": os.getenv("PGHOST", os.getenv("POSTGRES_HOST")),
+            "PORT": os.getenv("PGPORT", os.getenv("POSTGRES_PORT", "5432")),
+        }
+
 if "default" in DATABASES and DATABASES["default"]:
     db_config = DATABASES["default"]
     logger.info(f"Database configured: {db_config.get('HOST')}:{db_config.get('PORT')}/{db_config.get('NAME')}")
+else:
+    logger.critical("❌ Database configuration failed. Check DATABASE_URL or PG* variables.")
 
 # ==============================================================================
 # PHASE 7: TEMPLATES
@@ -214,7 +202,6 @@ TEMPLATES = [
 
 # ==============================================================================
 # PHASE 8: REDIS / CACHE / CELERY
-# Gracefully handle Redis unavailability
 # ==============================================================================
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0" if DEBUG else None)
 
@@ -223,7 +210,7 @@ if not REDIS_URL and not DEBUG:
     sys.exit(1)
 
 if REDIS_URL:
-    logger.info(f"Redis configured: {REDIS_URL.split('@')[0] if '@' in REDIS_URL else REDIS_URL.split('/')[0]}")
+    logger.info(f"Redis configured")
     
     CELERY_BROKER_URL = REDIS_URL
     CELERY_RESULT_BACKEND = REDIS_URL
@@ -263,31 +250,23 @@ else:
             "LOCATION": "unique-snowflake",
         }
     }
-    
     CELERY_BROKER_URL = None
     CELERY_RESULT_BACKEND = None
-    
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels.layers.InMemoryChannelLayer"
-        }
-    }
+    CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 
 # ==============================================================================
 # PHASE 9: CORS CONFIGURATION
-# Critical for cloud deployments - explicit allow list
 # ==============================================================================
 if DEBUG:
     CORS_ALLOW_ALL_ORIGINS = True
-    logger.warning("⚠️  CORS_ALLOW_ALL_ORIGINS enabled in DEBUG mode")
 else:
     CORS_ALLOW_ALL_ORIGINS = False
     cors_origins_str = os.getenv("CORS_ALLOWED_ORIGINS", "")
-    if not cors_origins_str:
-        logger.critical("❌ CORS_ALLOWED_ORIGINS environment variable is REQUIRED in production")
-        sys.exit(1)
-    CORS_ALLOWED_ORIGINS = [o.strip() for o in cors_origins_str.split(",") if o.strip()]
-    logger.info(f"CORS configured for {len(CORS_ALLOWED_ORIGINS)} origins")
+    if cors_origins_str:
+        CORS_ALLOWED_ORIGINS = [o.strip() for o in cors_origins_str.split(",") if o.strip()]
+        logger.info(f"CORS configured for {len(CORS_ALLOWED_ORIGINS)} origins")
+    else:
+        logger.warning("⚠️ CORS_ALLOWED_ORIGINS not set. CORS blocked.")
 
 CORS_ALLOW_CREDENTIALS = True
 CORS_EXPOSE_HEADERS = ["Content-Type", "X-CSRFToken"]
@@ -300,7 +279,6 @@ CORS_ALLOW_HEADERS = list(default_headers) + [
 
 # ==============================================================================
 # PHASE 10: LOGGING CONFIGURATION
-# Stdout/stderr for container environments
 # ==============================================================================
 LOGGING = {
     "version": 1,
@@ -326,11 +304,6 @@ LOGGING = {
         "django": {
             "handlers": ["console"],
             "level": "INFO" if not DEBUG else "DEBUG",
-            "propagate": False,
-        },
-        "django.db.backends": {
-            "handlers": ["console"],
-            "level": "WARNING",
             "propagate": False,
         },
         "celery": {
@@ -431,4 +404,5 @@ logger.info(f"✅ Django configuration loaded successfully")
 logger.info(f"   Environment: {DJANGO_ENV}")
 logger.info(f"   DEBUG: {DEBUG}")
 logger.info(f"   Allowed Hosts: {ALLOWED_HOSTS}")
+logger.info(f"   CSRF Trusted Origins: {CSRF_TRUSTED_ORIGINS}")
 logger.info(f"   Database: {DATABASES.get('default', {}).get('HOST', 'unknown')}")
