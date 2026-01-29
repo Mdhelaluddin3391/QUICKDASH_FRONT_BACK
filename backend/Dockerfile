@@ -41,9 +41,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     netcat-openbsd \
     binutils \
-    libproj25 \
     gdal-bin \
-    libgdal32 \
     libmagic1 \
     gosu \
     redis-tools \
