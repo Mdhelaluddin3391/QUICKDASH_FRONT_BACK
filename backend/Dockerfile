@@ -80,7 +80,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD netcat -z localhost 5000 || exit 1
 
 # Switch to non-root user
-USER appuser
+# USER appuser
 
 # Entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
