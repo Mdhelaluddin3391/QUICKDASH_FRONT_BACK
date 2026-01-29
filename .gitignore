@@ -38,8 +38,7 @@ settings_local.py
 # Django Migrations (IMPORTANT)
 # ======================
 # Yeh setting migrations ko ignore karegi par folder structure maintain karegi
-**/migrations/*.py
-!**/migrations/__init__.py
+
 
 # ======================
 # Media & Static
