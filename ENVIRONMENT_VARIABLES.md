@@ -197,3 +197,4 @@ PORT=5000
 4. **CORS_ALLOWED_ORIGINS must not include "*"** in production
 5. **Always use HTTPS** - Set SECURE_SSL_REDIRECT=true automatically when DEBUG=false
 6. **Test locally before deploying** - Use docker-compose with these env vars first
+   
