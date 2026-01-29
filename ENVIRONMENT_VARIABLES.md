@@ -60,10 +60,8 @@ RAZORPAY_WEBHOOK_SECRET=<webhook-secret>      # [optional] For webhook verificat
 
 ### SMS Provider Configuration
 SMS_PROVIDER=twilio                           # [optional] Provider: twilio, aws_sns, etc. Default: dummy
-SMS_PROVIDER_KEY=<api-key>                    # [optional] For SMS provider
-SMS_PROVIDER_SECRET=<api-secret>              # [optional] For SMS provider
-SMS_PROVIDER_SENDER_ID=QUICKD                 # [optional] Sender ID. Default: QUICKD
-SMS_PROVIDER_URL=<api-endpoint>               # [optional] API endpoint URL
+SMS_PROVIDER_KEY=<api-key>                    # [optional] For SMS provider (used by code)
+SMS_PROVIDER_URL=<api-endpoint>               # [optional] API endpoint URL (used by code)
 
 ### OTP Settings
 OTP_EXPIRY_SECONDS=300                        # [optional] OTP validity in seconds. Default: 300 (5 minutes)

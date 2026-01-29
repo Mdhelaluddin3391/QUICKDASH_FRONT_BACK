@@ -18,7 +18,7 @@ from apps.utils.exceptions import BusinessLogicException
 
 # Initialize Client safely
 try:
-    client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_SECRET))
+    client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
 except Exception:
     client = None
 

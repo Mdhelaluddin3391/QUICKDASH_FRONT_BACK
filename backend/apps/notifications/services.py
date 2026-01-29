@@ -50,7 +50,8 @@ class NotificationService:
 
 class OTPService:
     MAX_ATTEMPTS = 5
-    RESEND_COOLDOWN_SECONDS = 60
+    RESEND_COOLDOWN_SECONDS = getattr(settings, "OTP_RESEND_COOLDOWN", 60)
+    EXPIRY_SECONDS = getattr(settings, "OTP_EXPIRY_SECONDS", 300)
 
     @staticmethod
     def generate_otp():
@@ -106,7 +107,8 @@ class OTPService:
             cache.set(cooldown_key, "1", timeout=OTPService.RESEND_COOLDOWN_SECONDS)
 
             # 5. Queue Async Task
-            msg = f"Your login code is {otp}. Valid for 5 mins."
+            minutes = max(1, OTPService.EXPIRY_SECONDS // 60)
+            msg = f"Your login code is {otp}. Valid for {minutes} minute(s)."
             transaction.on_commit(lambda: send_otp_sms.delay(phone, msg))
 
     @staticmethod
