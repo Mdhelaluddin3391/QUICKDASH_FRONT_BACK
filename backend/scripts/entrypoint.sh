@@ -154,22 +154,22 @@ fi
 log_success "Permissions set"
 
 # ==============================================================================
-# PHASE 5: RUN MIGRATIONS (PRIMARY INSTANCE ONLY)
+# PHASE 5: RUN MIGRATIONS (DISABLED TO PREVENT CRASH)
 # ==============================================================================
+# ⚠️ NOTE: Migrations are disabled in entrypoint to prevent Out-Of-Memory crashes 
+# on Railway Starter Plan. You MUST run 'python manage.py migrate' manually via CLI.
+
 if [ "$IS_PRIMARY" = "1" ] || [ "$IS_PRIMARY" = "true" ]; then
-    log_info "Ensuring migrations exist..."
+    log_info "Skipping automatic migrations to prevent boot crash..."
     
-    # ⚠️ CRITICAL CHANGE: Removed 'makemigrations' to prevent deployment hangs.
-    # Migrations should ALWAYS be committed to the repo locally.
-    
-    # Database migrate
-    log_info "Running database migrations (PRIMARY INSTANCE)..."
-    if python3 manage.py migrate --noinput; then
-        log_success "Migrations completed successfully"
-    else
-        log_error "Migrations failed"
-        exit 1
-    fi
+    # Original migration code (Commented out)
+    # log_info "Running database migrations (PRIMARY INSTANCE)..."
+    # if python3 manage.py migrate --noinput; then
+    #     log_success "Migrations completed successfully"
+    # else
+    #     log_error "Migrations failed"
+    #     exit 1
+    # fi
 else
     log_info "Skipping migrations (non-primary instance)"
 fi
