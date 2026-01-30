@@ -36,10 +36,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Set working directory
 WORKDIR /app
 
-# Install runtime dependencies only (no build tools)
+# Install runtime dependencies only
+# Removed 'netcat-openbsd' as internal healthcheck is removed
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
-    netcat-openbsd \
     binutils \
     gdal-bin \
     libmagic1 \
@@ -53,12 +53,12 @@ COPY --from=builder /build/wheels /wheels
 # Copy requirements
 COPY backend/requirements.txt ./
 
-# Install Python packages from wheels (fast, no compilation)
+# Install Python packages from wheels
 RUN pip install --no-cache-dir /wheels/* \
     && pip install --no-cache-dir gunicorn uvicorn \
     && rm -rf /wheels
 
-# Copy application code (IMPORTANT: /app/manage.py exists)
+# Copy application code
 COPY backend/ /app/
 
 # Create non-root user for security
@@ -72,18 +72,16 @@ COPY backend/scripts/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh && \
     chown appuser:appgroup /entrypoint.sh
 
-# Expose port
+# Expose port (Documentation purpose mostly, Railway ignores this and injects PORT env var)
 EXPOSE 5000
 
-# Health check (fast endpoint check)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD netcat -z localhost 5000 || exit 1
-
-# Switch to non-root user
-# USER appuser
+# --- FIX: REMOVED HEALTHCHECK ---
+# Railway handles healthchecks automatically via HTTP requests.
+# Hardcoding port 5000 here caused crashes because Railway uses random ports.
+# --------------------------------
 
 # Entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
 
-# Default command (can be overridden by docker-compose or orchestrator)
+# Default command
 CMD ["gunicorn"]

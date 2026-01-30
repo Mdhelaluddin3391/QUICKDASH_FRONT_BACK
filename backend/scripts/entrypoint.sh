@@ -159,15 +159,10 @@ log_success "Permissions set"
 if [ "$IS_PRIMARY" = "1" ] || [ "$IS_PRIMARY" = "true" ]; then
     log_info "Ensuring migrations exist..."
     
-    # 1. Accounts app ki migration manual create - Fix for dependency issue
-    log_info "Creating migrations for accounts app..."
-    python3 manage.py makemigrations accounts
+    # ⚠️ CRITICAL CHANGE: Removed 'makemigrations' to prevent deployment hangs.
+    # Migrations should ALWAYS be committed to the repo locally.
     
-    # 2. Baaki apps ki migrations create
-    log_info "Creating remaining migrations..."
-    python3 manage.py makemigrations
-
-    # 3. Database migrate
+    # Database migrate
     log_info "Running database migrations (PRIMARY INSTANCE)..."
     if python3 manage.py migrate --noinput; then
         log_success "Migrations completed successfully"
