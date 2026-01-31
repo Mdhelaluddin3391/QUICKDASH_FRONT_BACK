@@ -34,11 +34,6 @@ db.sqlite3
 local_settings.py
 settings_local.py
 
-# ======================
-# Django Migrations (IMPORTANT)
-# ======================
-# Yeh setting migrations ko ignore karegi par folder structure maintain karegi
-
 
 # ======================
 # Media & Static
