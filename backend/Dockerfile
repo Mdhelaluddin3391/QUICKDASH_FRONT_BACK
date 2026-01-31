@@ -1,55 +1,87 @@
-# Use Python 3.12 slim image
+# ==============================================================================
+# PRODUCTION-GRADE DOCKERFILE FOR DJANGO + POSTGIS
+# Optimized for Railway, AWS ECS, Docker Compose
+# ==============================================================================
+
+# Stage 1: Builder (compile Python dependencies)
+FROM python:3.12-slim as builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    g++ \
+    libpq-dev \
+    libproj-dev \
+    libgdal-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and build wheels
+COPY backend/requirements.txt ./
+RUN pip wheel --no-cache-dir --no-deps --wheel-dir /build/wheels -r requirements.txt
+
+# ==============================================================================
+# Stage 2: Runtime (minimal production image)
 FROM python:3.12-slim
 
-# 1. Ye line add karne se 'debconf' wali red warnings chali jayengi
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 \
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DJANGO_ENV=production
 
-# Set work directory
+# Set working directory
 WORKDIR /app
 
-# Install system dependencies
-# '-qq' flag output ko thoda shant rakhta hai
-RUN apt-get update && apt-get install -y --no-install-recommends -qq \
-    gcc \
-    libpq-dev \
-    netcat-openbsd \
+# Install runtime dependencies only
+# Removed 'netcat-openbsd' as internal healthcheck is removed
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
     binutils \
-    libproj-dev \
     gdal-bin \
-    libgdal-dev \
     libmagic1 \
     gosu \
+    redis-tools \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt \
-    && pip install gunicorn uvicorn
+# Copy wheels from builder
+COPY --from=builder /build/wheels /wheels
+
+# Copy requirements
+COPY backend/requirements.txt ./
+
+# Install Python packages from wheels
+RUN pip install --no-cache-dir /wheels/* \
+    && pip install --no-cache-dir gunicorn uvicorn \
+    && rm -rf /wheels
 
 # Copy application code
-COPY . .
+COPY backend/ /app/
 
-# Create non-root user
-RUN addgroup --system --gid 1000 appgroup && adduser --system --uid 1000 --gid 1000 appuser
+# Create non-root user for security
+RUN groupadd --system --gid 1000 appgroup && \
+    useradd --system --uid 1000 --gid 1000 appuser && \
+    mkdir -p /app/staticfiles /app/media /app/logs && \
+    chown -R appuser:appgroup /app
 
-# Create directories for static and media
-RUN mkdir -p /app/staticfiles /app/media
+# Copy entrypoint script
+COPY backend/scripts/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && \
+    chown appuser:appgroup /entrypoint.sh
 
-# Change ownership
-RUN chown -R appuser:appgroup /app
-
-# Script permissions
-COPY ./scripts/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
-
-# Expose port
+# Expose port (Documentation purpose mostly, Railway ignores this and injects PORT env var)
 EXPOSE 5000
 
-# Set entrypoint
+# --- FIX: REMOVED HEALTHCHECK ---
+# Railway handles healthchecks automatically via HTTP requests.
+# Hardcoding port 5000 here caused crashes because Railway uses random ports.
+# --------------------------------
+
+# Entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
+
+# Default command
+CMD ["gunicorn"]
