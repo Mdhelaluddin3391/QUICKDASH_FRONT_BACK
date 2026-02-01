@@ -49,11 +49,30 @@ if not SECRET_KEY:
 
 # ALLOWED_HOSTS
 ALLOWED_HOSTS_STR = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1" if DEBUG else "")
-ALLOWED_HOSTS = [h.strip() for h in ALLOWED_HOSTS_STR.split(",") if h.strip()] if ALLOWED_HOSTS_STR else []
+# ALLOWED_HOSTS = [h.strip() for h in ALLOWED_HOSTS_STR.split(",") if h.strip()] if ALLOWED_HOSTS_STR else []
+
+ALLOWED_HOSTS = [
+    ".railway.app",
+    "quickdash.up.railway.app",
+    "quickdashbackend.up.railway.app",
+    ".railway.internal",  # Important for internal communication
+    "*"
+]
+
+
+
 
 # CSRF TRUSTED ORIGINS (Critical for Production)
-CSRF_TRUSTED_ORIGINS_STR = os.getenv("CSRF_TRUSTED_ORIGINS", "")
-CSRF_TRUSTED_ORIGINS = [o.strip() for o in CSRF_TRUSTED_ORIGINS_STR.split(",") if o.strip()]
+# CSRF_TRUSTED_ORIGINS_STR = os.getenv("CSRF_TRUSTED_ORIGINS", "")
+CSRF_TRUSTED_ORIGINS = [
+    "https://quickdash.up.railway.app", 
+    "https://quickdashbackend.up.railway.app"
+]
+
+# CSRF_TRUSTED_ORIGINS = [o.strip() for o in CSRF_TRUSTED_ORIGINS_STR.split(",") if o.strip()]
+CORS_ALLOWED_ORIGINS = [
+    "https://quickdash.up.railway.app"
+]
 
 # HTTPS / PROXY / SSL CONFIGURATION
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
