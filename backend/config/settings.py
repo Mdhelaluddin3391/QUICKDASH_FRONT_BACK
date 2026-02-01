@@ -64,15 +64,9 @@ ALLOWED_HOSTS = [
 
 # CSRF TRUSTED ORIGINS (Critical for Production)
 # CSRF_TRUSTED_ORIGINS_STR = os.getenv("CSRF_TRUSTED_ORIGINS", "")
-CSRF_TRUSTED_ORIGINS = [
-    "https://quickdash.up.railway.app", 
-    "https://quickdashbackend.up.railway.app"
-]
+CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
 
-# CSRF_TRUSTED_ORIGINS = [o.strip() for o in CSRF_TRUSTED_ORIGINS_STR.split(",") if o.strip()]
-CORS_ALLOWED_ORIGINS = [
-    "https://quickdash.up.railway.app"
-]
 
 # HTTPS / PROXY / SSL CONFIGURATION
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
