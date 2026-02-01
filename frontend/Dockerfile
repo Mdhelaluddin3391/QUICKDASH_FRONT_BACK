@@ -16,9 +16,7 @@ RUN rm /etc/nginx/conf.d/default.conf
 # Copy your Nginx Site Config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# -----------------------------------------------------------
-# FIX: Generate Main Nginx Config WITH mime.types
-# -----------------------------------------------------------
+# Generate Main Nginx Config
 RUN chown -R appuser:appgroup /var/cache/nginx \
     && chown -R appuser:appgroup /var/log/nginx \
     && chown -R appuser:appgroup /etc/nginx/conf.d \
