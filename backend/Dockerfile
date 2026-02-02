@@ -21,7 +21,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgdal-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY backend/requirements.txt .
+# FIXED: Removed 'backend/' prefix
+COPY requirements.txt .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /build/wheels -r requirements.txt
 
 # ----------------------------
@@ -45,13 +46,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /build/wheels /wheels
-COPY backend/requirements.txt .
-
+# FIXED: Removed 'backend/' prefix
+COPY requirements.txt .
 RUN pip install --no-cache-dir /wheels/* \
     && pip install --no-cache-dir gunicorn uvicorn \
     && rm -rf /wheels
 
-COPY backend/ /app/
+# FIXED: Changed 'COPY backend/ /app/' to 'COPY . /app/'
+COPY . /app/
 
 # Non-root user
 RUN groupadd --system --gid 1000 appgroup && \
@@ -60,7 +62,8 @@ RUN groupadd --system --gid 1000 appgroup && \
     chown -R appuser:appgroup /app
 
 # Entrypoint
-COPY backend/scripts/entrypoint.sh /entrypoint.sh
+# FIXED: Removed 'backend/' prefix
+COPY scripts/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh && chown appuser:appgroup /entrypoint.sh
 
 USER appuser
