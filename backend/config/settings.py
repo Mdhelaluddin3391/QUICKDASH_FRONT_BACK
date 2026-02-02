@@ -64,9 +64,14 @@ ALLOWED_HOSTS = [
 
 # CSRF TRUSTED ORIGINS (Critical for Production)
 # CSRF_TRUSTED_ORIGINS_STR = os.getenv("CSRF_TRUSTED_ORIGINS", "")
-CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
-CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+CSRF_TRUSTED_ORIGINS = [
+    url.strip() for url in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if url.strip()
+]
 
+
+CORS_ALLOWED_ORIGINS = [
+    url.strip() for url in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if url.strip()
+]
 
 # HTTPS / PROXY / SSL CONFIGURATION
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
