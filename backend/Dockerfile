@@ -75,10 +75,7 @@ RUN chmod +x /entrypoint.sh && \
 # Expose port (Documentation purpose mostly, Railway ignores this and injects PORT env var)
 EXPOSE 5000
 
-# --- FIX: REMOVED HEALTHCHECK ---
-# Railway handles healthchecks automatically via HTTP requests.
-# Hardcoding port 5000 here caused crashes because Railway uses random ports.
-# --------------------------------
+
 
 # Entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
