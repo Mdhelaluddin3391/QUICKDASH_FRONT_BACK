@@ -1,5 +1,4 @@
-
-
+#!/bin/sh
 set -e
 
 echo "🚀 Starting Django Production Entrypoint..."
@@ -12,8 +11,8 @@ if [ -z "$DJANGO_SECRET_KEY" ]; then
     exit 1
 fi
 
-if [ -z "$DATABASE_URL" ] && [ -z "$POSTGRES_USER" ]; then
-    echo "❌ DATABASE_URL or POSTGRES_* variables required"
+if [ -z "$DATABASE_URL" ]; then
+    echo "❌ DATABASE_URL is required"
     exit 1
 fi
 
@@ -30,16 +29,7 @@ COUNT=0
 until python3 - <<'EOF'
 import psycopg2, os, sys
 try:
-    if os.getenv("DATABASE_URL"):
-        psycopg2.connect(os.getenv("DATABASE_URL"))
-    else:
-        psycopg2.connect(
-            host=os.getenv("POSTGRES_HOST", "localhost"),
-            port=os.getenv("POSTGRES_PORT", "5432"),
-            user=os.getenv("POSTGRES_USER"),
-            password=os.getenv("POSTGRES_PASSWORD"),
-            database=os.getenv("POSTGRES_DB"),
-        )
+    psycopg2.connect(os.getenv("DATABASE_URL"))
     sys.exit(0)
 except Exception:
     sys.exit(1)
@@ -57,23 +47,23 @@ done
 echo "✅ PostgreSQL ready"
 
 # ------------------------------------------------------------
-# 3. RUN MIGRATIONS (PRODUCTION SAFE)
+# 3. RUN MIGRATIONS
 # ------------------------------------------------------------
 echo "🧱 Running database migrations..."
-python3 manage.py migrate --noinput
+python manage.py migrate --noinput
 echo "✅ Migrations completed"
 
 # ------------------------------------------------------------
 # 4. COLLECT STATIC FILES
 # ------------------------------------------------------------
 echo "🎨 Collecting static files..."
-python3 manage.py collectstatic --noinput --clear
+python manage.py collectstatic --noinput --clear
 echo "✅ Static files collected"
 
 # ------------------------------------------------------------
 # 5. START GUNICORN
 # ------------------------------------------------------------
-PORT=${PORT:-8000}
+PORT=${PORT:-10000}     # Render usually uses 10000
 WORKERS=${WORKERS:-3}
 
 echo "🚀 Starting Gunicorn on port $PORT..."
