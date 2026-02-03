@@ -21,8 +21,7 @@ def send_otp_sms(self, phone, content):
 
     # 1. Dev Mode Bypass
     if settings.DEBUG:
-        # Humne is line ko comment kar diya taaki terminal saaf rahe (Duplicate log hat gaya)
-        # logger.info(f"[DEV-SMS] To: {phone} | Msg: {content}")
+        
         return "Dev Sent"
 
     if not sms_key or not sms_url:
@@ -38,7 +37,7 @@ def send_otp_sms(self, phone, content):
                 "message": content, 
                 "api_key": sms_key
             },
-            timeout=5 # Fast timeout to prevent worker clogging
+            timeout=5 
         )
         response.raise_for_status()
         return "Sent"

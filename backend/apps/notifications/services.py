@@ -26,8 +26,7 @@ class NotificationService:
             message=message,
         )
         
-        # FIX: Robust Transaction Handling
-        # Schedule task only after DB commit to ensure data consistency
+        
         if transaction.get_connection().in_atomic_block:
             transaction.on_commit(lambda: send_otp_sms.delay(user.phone, message))
         else:
@@ -184,3 +183,8 @@ class OTPAbuseService:
     @staticmethod
     def reset(phone):
         OTPAbuseLog.objects.filter(phone=phone).delete()
+
+
+
+
+    
