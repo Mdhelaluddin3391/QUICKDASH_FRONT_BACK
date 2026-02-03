@@ -213,7 +213,7 @@ window.LocationPicker = {
     },
 
     // ---------------------------------------------------------
-    // ✅ ROBUST GPS LOGIC (Fallbacks included)
+    // ✅ ROBUST GPS LOGIC (High Accuracy Fix)
     // ---------------------------------------------------------
     
     async detectRealLocation(isSilent = false) {
@@ -228,10 +228,11 @@ window.LocationPicker = {
         if (icon) icon.className = 'fas fa-circle-notch fa-spin text-primary';
 
         try {
-            // 2. Attempt 1: High Accuracy (GPS) with 5s Timeout
+            // 2. Attempt 1: High Accuracy (GPS) with 15s Timeout
+            // (Increased from 5000 to 15000 for better mobile accuracy)
             const position = await this._getPosition({ 
                 enableHighAccuracy: true, 
-                timeout: 5000, 
+                timeout: 15000, 
                 maximumAge: 0 
             });
             this._handleGpsSuccess(position, isSilent, icon);
