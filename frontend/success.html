@@ -15,8 +15,7 @@
 
     <main class="container text-center py-5">
         <div style="margin-top: 50px;">
-            <div
-                style="width: 80px; height: 80px; background: #e6f7ef; color: #32CD32; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 40px; margin: 0 auto 20px;">
+            <div style="width: 80px; height: 80px; background: #e6f7ef; color: #32CD32; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 40px; margin: 0 auto 20px;">
                 ✓
             </div>
             <h1 class="mb-2">Order Placed Successfully!</h1>
@@ -32,29 +31,15 @@
         </div>
     </main>
 
-  <script src="./assets/js/config.js?v=1.0.0" defer></script>
+    <div id="footer-placeholder"></div>
 
-<script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
-<script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
-<script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
-
-    <script defer>
-        document.addEventListener("DOMContentLoaded", () => {
-            // Logic to extract Order ID from URL (?order_id=123)
-            const params = new URLSearchParams(window.location.search);
-            const orderId = params.get('order_id');
-
-            if (orderId) {
-                // Display simplified Order ID (e.g., first 8 chars)
-                const displayId = orderId.length > 8 ? orderId.substring(0, 8).toUpperCase() : orderId;
-                document.getElementById('display-order-id').innerText = `Order #${displayId}`;
-            }
-        });
-    </script>
+    <script src="./assets/js/config.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+    <script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+    <script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+    <script src="./assets/js/pages/success.js?v=1.0.0" defer></script>
 </body>
 
 </html>
