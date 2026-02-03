@@ -1,9 +1,11 @@
 // frontend/assets/js/config.js
 
-(function() {
+(function () {
     // This line is designed to be replaced by the Docker entrypoint script.
     // Default to a sensible local development URL.
-    const apiBase = "http://localhost:5000/api/v1";
+    // const apiBase = "http://localhost:5000/api/v1";
+    const apiBase = "https://quickdash-frontend.onrender.com/api/v1";
+
 
     window.APP_CONFIG = {
         // The API_BASE_URL is now set directly from the constant above.
@@ -48,7 +50,7 @@
                 let response = null;
                 try {
                     response = await fetch(configUrl);
-                } catch(err) {
+                } catch (err) {
                     response = null;
                 }
 
@@ -75,7 +77,7 @@
                         console.warn('App Config: Loaded local fallback config (config.local.json).');
                         return;
                     }
-                } catch(err) {
+                } catch (err) {
                     // ignore local fallback failure
                 }
 
