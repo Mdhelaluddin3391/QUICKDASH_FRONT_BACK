@@ -373,3 +373,37 @@
         min-width: auto;
     }
 }
+
+
+
+/* Dev OTP Toast Styling */
+#dev-toast-container {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%); /* बिल्कुल Center करने के लिए */
+    z-index: 10001; /* बाकि सब से ऊपर */
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 90%;
+    max-width: 400px;
+    pointer-events: none;
+}
+
+.toast-dev {
+    background: #fff;
+    border-left: 5px solid #7209b7; /* अलग दिखने के लिए Purple रंग */
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    animation: slideDown 0.5s ease forwards;
+}
+
+.toast-dev .toast-icon {
+    color: #7209b7;
+    font-size: 1.5rem;
+}
+
+@keyframes slideDown {
+    from { transform: translateY(-100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}

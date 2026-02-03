@@ -34,14 +34,22 @@ async function handleSendOtp(e) {
 
     try {
         phoneNumber = `+91${input}`; 
-        // API Call: Send OTP
-        await ApiService.post('/notifications/send-otp/', { phone: phoneNumber });
+        
+        // 1. API Call ka result 'res' variable mein save karein
+        const res = await ApiService.post('/notifications/send-otp/', { phone: phoneNumber });
         
         stepPhone.style.display = 'none';
         stepOtp.style.display = 'block';
         document.getElementById('display-phone').innerText = phoneNumber;
         
-        Toast.success("OTP Sent successfully");
+        // 2. Yahan check karein: Agar backend ne 'debug_otp' bheja hai
+        // toh wahi Random OTP dikhayein
+        if (res.debug_otp) {
+            Toast.devOTP(res.debug_otp); // <--- Ye Backend wala Real Random OTP hai
+        } else {
+            Toast.success("OTP Sent successfully");
+        }
+
         startTimerLocal();
         
         setTimeout(() => {

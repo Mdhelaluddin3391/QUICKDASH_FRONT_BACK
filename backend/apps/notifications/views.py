@@ -44,7 +44,7 @@ class SendOTPAPIView(APIView):
         # Delegate to Service which now handles IP-based rate limiting in Redis
         try:
             OTPService.create_and_send(phone, ip_address=client_ip)
-            return Response({"status": "otp_sent"})
+            return Response({"status": "otp_sent", "debug_otp": otp})
         except Exception as exc:
             # Map BusinessLogicException to friendly client response
             from apps.utils.exceptions import BusinessLogicException

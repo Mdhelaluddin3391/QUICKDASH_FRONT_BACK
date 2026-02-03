@@ -91,7 +91,6 @@ class OTPService:
             otp = OTPService.generate_otp()
 
 
-# Debug-only OTP output (development only)
             if settings.DEBUG:
                 logger.info("\n" + "="*40)
                 logger.info(f" [DEV OTP] Phone: {phone}")
@@ -109,6 +108,8 @@ class OTPService:
             minutes = max(1, OTPService.EXPIRY_SECONDS // 60)
             msg = f"Your login code is {otp}. Valid for {minutes} minute(s)."
             transaction.on_commit(lambda: send_otp_sms.delay(phone, msg))
+
+            return otp
 
     @staticmethod
     def verify(phone: str, otp: str) -> bool:
