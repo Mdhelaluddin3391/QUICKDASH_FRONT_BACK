@@ -411,3 +411,33 @@ function loadRazorpayScript() {
         document.body.appendChild(script);
     });
 }
+
+
+
+// --- Disable Online Payment Script ---
+document.addEventListener('DOMContentLoaded', () => {
+    // Thoda wait karein taaki elements load ho jayein
+    setTimeout(() => {
+        // Online Payment Radio Button dhoondhein (Value 'ONLINE' ya 'RAZORPAY' ho sakti hai)
+        const onlineInputs = document.querySelectorAll('input[name="payment_method"][value="ONLINE"], input[name="payment_method"][value="RAZORPAY"], input[name="payment_method"][value="STRIPE"]');
+        
+        onlineInputs.forEach(input => {
+            input.disabled = true; // Disable karein
+            
+            // Visual feedback ke liye parent element ko grey karein
+            const parent = input.closest('label') || input.parentElement;
+            if (parent) {
+                parent.style.opacity = "0.5";
+                parent.style.cursor = "not-allowed";
+                parent.title = "Currently Unavailable";
+            }
+        });
+
+        // Auto-select COD (Cash on Delivery)
+        const codInput = document.querySelector('input[name="payment_method"][value="COD"]');
+        if (codInput) {
+            codInput.checked = true;
+            codInput.click(); // Trigger change event if needed
+        }
+    }, 500); // 500ms delay to ensure elements exist
+});

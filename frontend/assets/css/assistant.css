@@ -102,3 +102,12 @@
 @media(max-width: 480px) {
     .ast-box { width: 90%; right: 5%; bottom: 20px; height: 60vh; }
 }
+
+
+/* Assistant ko visually disable karein */
+#assistant-root, .assistant-launcher, #ai-assistant-btn {
+    pointer-events: none !important;  /* Click band karega */
+    opacity: 0.5 !important;          /* Dhundhla dikhayega */
+    filter: grayscale(100%) !important; /* Black & White karega */
+    cursor: not-allowed !important;
+}

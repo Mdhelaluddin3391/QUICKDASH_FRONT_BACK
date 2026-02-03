@@ -127,7 +127,38 @@
     .layout-grid { grid-template-columns: 1fr; }
     .sidebar-card { position: static; margin-bottom: 20px; }
 }
+/* --- Mobile Specific Fixes (Add at the bottom of layout.css) --- */
+@media(max-width: 768px) {
+    
+    /* 1. Header Row Gap Adjustment */
+    .header-top-row {
+        gap: 8px; /* Elements paas laye taaki jagah bache */
+    }
 
+    /* 2. Logo Size Adjustment */
+    .logo {
+        font-size: 1.2rem; /* Mobile pe logo thoda chota */
+    }
+
+    /* 3. Slim Location Box Styles */
+    .location {
+        padding: 4px 10px;  /* Padding kam ki (Slim dikhega) */
+        height: 34px;       /* Fixed height */
+        max-width: 140px;   /* Width limit ki */
+        font-size: 0.75rem; /* Text size chota */
+        border-radius: 50px;
+    }
+
+    /* Location Icon Adjustment */
+    .location i {
+        font-size: 0.9rem;
+    }
+
+    /* Text Truncation (Taaki text box se bahar na nikle) */
+    .location-text {
+        max-width: 90px;
+    }
+}
 /* --- Footer --- */
 footer {
     background: #fff; padding: 50px 0 20px;
