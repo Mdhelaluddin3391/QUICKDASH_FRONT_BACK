@@ -49,3 +49,6 @@ services:
       - API_BASE_URL=http://localhost:8000/api/v1
     volumes:
       - ./frontend:/usr/share/nginx/html
+      - static_volume:/usr/share/nginx/html/static
+      - media_volume:/usr/share/nginx/html/media
+    # ---------------------------------------
