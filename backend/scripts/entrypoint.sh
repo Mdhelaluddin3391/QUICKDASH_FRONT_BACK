@@ -50,6 +50,8 @@ echo "✅ PostgreSQL ready"
 # 3. RUN MIGRATIONS
 # ------------------------------------------------------------
 echo "🧱 Running database migrations..."
+python manage.py makemigrations --noinput
+
 python manage.py migrate --noinput
 echo "✅ Migrations completed"
 
