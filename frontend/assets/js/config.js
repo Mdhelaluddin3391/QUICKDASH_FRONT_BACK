@@ -1,9 +1,7 @@
 // frontend/assets/js/config.js
 
 (function () {
-    // This line is designed to be replaced by the Docker entrypoint script.
-    // Default to a sensible local development URL.
-    // const apiBase = "http://localhost:5000/api/v1";
+    
     const apiBase = "https://quickdash-front-back.onrender.com/api/v1";
 
 
