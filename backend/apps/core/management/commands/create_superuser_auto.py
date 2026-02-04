@@ -8,21 +8,29 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         User = get_user_model()
         
-        # आपकी डिटेल्स (हार्डकोडेड)
-        username = 'muhammadhela228'
-        email = 'muhammadhela228@gmail.com'
+        # आपके मॉडल में PHONE ही USERNAME है
+        # इसलिए हम यहाँ एक फोन नंबर इस्तेमाल करेंगे
+        phone = '6009282670'  # <-- यह आपका लॉगिन ID होगा (Phone Number)
+        email = 'admin@quickdash.com'
         password = 'helal@123'
-        phone = '9876543210'  # <-- ये डमी नंबर जरुरी है वरना एरर आएगा
 
-        # चेक करें कि यूजर पहले से है या नहीं (Email से चेक करना ज्यादा सही है)
-        if not User.objects.filter(email=email).exists():
-            self.stdout.write(f'Creating superuser: {email}...')
+        # Env variables se bhi le sakte hain (Optional)
+        if os.getenv('DJANGO_SUPERUSER_PHONE'):
+            phone = os.getenv('DJANGO_SUPERUSER_PHONE')
+        
+        if not phone or not password:
+            self.stdout.write(self.style.WARNING('⚠️  Credentials missing. Skipping...'))
+            return
+
+        # चेक करें कि इस Phone Number वाला यूजर पहले से है या नहीं
+        if not User.objects.filter(phone=phone).exists():
+            self.stdout.write(f'Creating superuser with phone: {phone}...')
             try:
+                # create_superuser ko 'phone' chahiye
                 User.objects.create_superuser(
-                    username=username,
+                    phone=phone,
                     email=email,
-                    password=password,
-                    phone_number=phone  # <-- ये लाइन मैंने जोड़ी है
+                    password=password
                 )
                 self.stdout.write(self.style.SUCCESS('✅ Superuser created successfully!'))
             except Exception as e:
