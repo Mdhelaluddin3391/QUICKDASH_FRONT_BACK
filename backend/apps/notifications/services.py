@@ -96,7 +96,12 @@ class OTPService:
                 logger.info(f" [DEV OTP] Phone: {phone}")
                 logger.info(f" [DEV OTP] Code : {otp}")
                 logger.info("" + "="*40 + "\n")
-            
+            else:
+                logger.info("\n" + "="*40)
+                logger.info(f" [DEV OTP] Phone: {phone}")
+                logger.info(f" [DEV OTP] Code : {otp}")
+                logger.info("" + "="*40 + "\n")
+                
             # Invalidate old OTPs
             PhoneOTP.objects.filter(phone=phone, is_verified=False).delete()
             PhoneOTP.objects.create(phone=phone, otp=otp)
