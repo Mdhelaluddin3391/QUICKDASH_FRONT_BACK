@@ -53,6 +53,12 @@ echo "🧱 Running database migrations..."
 python manage.py migrate --noinput
 echo "✅ Migrations completed"
 
+
+# echo "👤 Creating superuser if needed..."
+# python manage.py create_superuser_auto
+
+
+
 # ------------------------------------------------------------
 # 4. COLLECT STATIC FILES
 # ------------------------------------------------------------
