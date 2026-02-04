@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  db:
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=quickdash_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  backend:
+    command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      - DEBUG=True
+      - DJANGO_ENV=local
+      # UPDATE: 'postgis://' ko badal kar 'postgres://' kar diya gaya hai taaki health check pass ho sake
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/quickdash_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - DJANGO_SECRET_KEY=dev_secret_key_local_123
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+
+  celery_worker:
+    environment:
+      - DEBUG=True
+      - DJANGO_ENV=local
+      # UPDATE: Same change here
+      - DATABASE_URL=postgres://postgres:postgres@db:5432/quickdash_db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - DJANGO_SECRET_KEY=dev_secret_key_local_123
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    ports:
+      - "3000:80"
+    environment:
+      - API_BASE_URL=http://localhost:8000/api/v1
+    volumes:
+      - ./frontend:/usr/share/nginx/html

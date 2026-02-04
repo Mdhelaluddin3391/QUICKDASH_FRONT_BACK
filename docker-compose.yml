@@ -1,25 +1,16 @@
 version: "3.8"
 
-networks:
-  quickdash_net:
-    driver: bridge
-
 services:
   db:
     image: postgis/postgis:15-3.3
     container_name: quickdash_db
     env_file: .env
     environment:
-      # Pass these explicitly for the healthcheck to work
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    networks:
-      - quickdash_net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
@@ -30,10 +21,6 @@ services:
   redis:
     image: redis:7.2-alpine
     container_name: quickdash_redis
-    ports:
-      - "6379:6379"
-    networks:
-      - quickdash_net
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -42,16 +29,13 @@ services:
     restart: unless-stopped
 
   backend:
-    build: ./backend
+    build: 
+      context: ./backend
     container_name: quickdash_backend
     env_file: .env
     environment:
-      - RUN_GUNICORN=1
-      - IS_PRIMARY=1
-    ports:
-      - "5000:5000"
+      - DJANGO_ENV=production
     volumes:
-      - ./backend:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     depends_on:
@@ -59,68 +43,32 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    networks:
-      - quickdash_net
     restart: unless-stopped
 
   celery_worker:
-    build: ./backend
+    build: 
+      context: ./backend
     container_name: quickdash_celery_worker
-    # Explicitly run celery worker command
     command: celery -A config.celery worker -l info --concurrency=2
     env_file: .env
-    environment:
-      - RUN_GUNICORN=0
-      - IS_PRIMARY=0
     volumes:
-      - ./backend:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/media
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - quickdash_net
-    restart: unless-stopped
-
-  celery_beat:
-    build: ./backend
-    container_name: quickdash_celery_beat
-    # Explicitly run celery beat command
-    command: celery -A config.celery beat -l info
-    env_file: .env
-    environment:
-      - RUN_GUNICORN=0
-      - IS_PRIMARY=0
-    volumes:
-      - ./backend:/app
-      - static_volume:/app/staticfiles
-      - media_volume:/app/media
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - quickdash_net
+      backend:
+        condition: service_started
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build: 
+      context: ./frontend
     container_name: quickdash_frontend
     ports:
-      - "8000:80"
+      - "80:80"
     environment:
-      - API_BASE_URL=http://localhost:5000/api/v1
-    volumes:
-      - static_volume:/usr/share/nginx/html/static
-      - media_volume:/usr/share/nginx/html/media
+      - API_BASE_URL=https://quickdash-front-back.onrender.com/api/v1
     depends_on:
       - backend
-    networks:
-      - quickdash_net
     restart: unless-stopped
 
 volumes:

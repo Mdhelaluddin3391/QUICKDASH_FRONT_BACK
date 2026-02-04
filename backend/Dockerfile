@@ -1,11 +1,4 @@
-# ==============================================================================
-# PRODUCTION-GRADE DOCKERFILE FOR DJANGO + POSTGIS
-# Compatible with Render, Railway, ECS
-# ==============================================================================
-
-# ----------------------------
 # Stage 1: Builder
-# ----------------------------
 FROM python:3.12-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -21,13 +14,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgdal-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# FIXED: Removed 'backend/' prefix
 COPY requirements.txt .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /build/wheels -r requirements.txt
 
-# ----------------------------
 # Stage 2: Runtime
-# ----------------------------
 FROM python:3.12-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -43,26 +33,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gdal-bin \
     libmagic1 \
     redis-tools \
+    netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /build/wheels /wheels
-# FIXED: Removed 'backend/' prefix
 COPY requirements.txt .
 RUN pip install --no-cache-dir /wheels/* \
     && pip install --no-cache-dir gunicorn uvicorn \
     && rm -rf /wheels
 
-# FIXED: Changed 'COPY backend/ /app/' to 'COPY . /app/'
+# Copy project code
 COPY . /app/
 
-# Non-root user
+# Non-root user setup
 RUN groupadd --system --gid 1000 appgroup && \
     useradd --system --uid 1000 --gid 1000 appuser && \
     mkdir -p /app/staticfiles /app/media /app/logs && \
     chown -R appuser:appgroup /app
 
-# Entrypoint
-# FIXED: Removed 'backend/' prefix
+# Entrypoint setup
 COPY scripts/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh && chown appuser:appgroup /entrypoint.sh
 

@@ -1,12 +1,11 @@
-// frontend/assets/js/config.js
-
 (function () {
+    // Priority: Injected Env (Docker/Local) > Global Var > Default Production
+    const envApiBase = (window.env && window.env.API_BASE_URL) ? window.env.API_BASE_URL : null;
+    const defaultApiBase = "https://quickdash-front-back.onrender.com/api/v1";
     
-    const apiBase = "https://quickdash-front-back.onrender.com/api/v1";
-
+    const apiBase = envApiBase || defaultApiBase;
 
     window.APP_CONFIG = {
-        // The API_BASE_URL is now set directly from the constant above.
         API_BASE_URL: apiBase,
         TIMEOUT: 15000,
         GOOGLE_MAPS_KEY: null,
@@ -32,7 +31,6 @@
         }
     };
 
-    // STATIC_BASE is derived from <base> if present, otherwise '/'
     window.APP_CONFIG.STATIC_BASE = (document.querySelector('base') && document.querySelector('base').href) ? document.querySelector('base').href : '/';
 
     window.AppConfigService = {
@@ -42,14 +40,13 @@
             if (this.isLoaded) return;
 
             try {
-                // Construct config URL from the determined API Base
                 const configUrl = `${window.APP_CONFIG.API_BASE_URL.replace('/v1', '')}/config/`;
 
                 let response = null;
                 try {
                     response = await fetch(configUrl);
                 } catch (err) {
-                    response = null;
+                    console.warn("Backend config fetch failed, using defaults");
                 }
 
                 if (response && response.ok) {
@@ -58,31 +55,23 @@
                         window.APP_CONFIG.GOOGLE_MAPS_KEY = data.keys.google_maps;
                     }
                     this.isLoaded = true;
-                    console.log("App Config Loaded Successfully");
                     return;
                 }
-
-                // Try local fallback config (use Asset if present to resolve paths)
-                const localConfigUrl = (window.Asset && window.Asset.url) ? window.Asset.url('config.local.json') : new URL('config.local.json', window.location.href).href;
+                
+                // Fallback to local config
+                const localConfigUrl = '/config.local.json';
                 try {
                     const localResp = await fetch(localConfigUrl);
-                    if (localResp && localResp.ok) {
-                        const data = await localResp.json();
-                        if (data.keys && data.keys.google_maps) {
-                            window.APP_CONFIG.GOOGLE_MAPS_KEY = data.keys.google_maps;
-                        }
-                        this.isLoaded = true;
-                        console.warn('App Config: Loaded local fallback config (config.local.json).');
-                        return;
+                    if(localResp.ok) {
+                         const data = await localResp.json();
+                         if (data.keys) window.APP_CONFIG.GOOGLE_MAPS_KEY = data.keys.google_maps;
                     }
-                } catch (err) {
-                    // ignore local fallback failure
-                }
+                } catch(e) {}
 
-                throw new Error(`Config fetch failed${response ? ' with status ' + response.status : ''}`);
+                this.isLoaded = true;
 
             } catch (e) {
-                console.error("CRITICAL: Failed to load app config. Some features may not work.", e.message);
+                console.error("Config load error", e);
             }
         }
     };

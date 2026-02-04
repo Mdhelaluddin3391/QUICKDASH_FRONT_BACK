@@ -1,31 +1,20 @@
 #!/bin/sh
 set -e
 
-echo "🚀 Starting Django Production Entrypoint..."
+echo "🚀 Starting Entrypoint..."
 
 # ------------------------------------------------------------
 # 1. ENV VALIDATION
 # ------------------------------------------------------------
-if [ -z "$DJANGO_SECRET_KEY" ]; then
-    echo "❌ DJANGO_SECRET_KEY is required"
-    exit 1
-fi
-
 if [ -z "$DATABASE_URL" ]; then
     echo "❌ DATABASE_URL is required"
     exit 1
 fi
 
-echo "✅ Environment validated"
-
 # ------------------------------------------------------------
 # 2. WAIT FOR POSTGRES
 # ------------------------------------------------------------
 echo "⏳ Waiting for PostgreSQL..."
-
-MAX_RETRIES=30
-COUNT=0
-
 until python3 - <<'EOF'
 import psycopg2, os, sys
 try:
@@ -35,52 +24,44 @@ except Exception:
     sys.exit(1)
 EOF
 do
-    COUNT=$((COUNT+1))
-    if [ $COUNT -ge $MAX_RETRIES ]; then
-        echo "❌ PostgreSQL not available after retries"
-        exit 1
-    fi
-    echo "⏳ Postgres not ready ($COUNT/$MAX_RETRIES)..."
+    echo "⏳ Postgres not ready, sleeping..."
     sleep 2
 done
-
 echo "✅ PostgreSQL ready"
 
 # ------------------------------------------------------------
 # 3. RUN MIGRATIONS
 # ------------------------------------------------------------
 echo "🧱 Running database migrations..."
-python manage.py makemigrations --noinput
-
 python manage.py migrate --noinput
 echo "✅ Migrations completed"
 
+# Create superuser if configured (Optional, safe to keep)
+if [ "$CREATE_SUPERUSER" = "True" ]; then
+    python manage.py create_superuser_auto || true
+fi
 
-# echo "👤 Creating superuser if needed..."
-python manage.py create_superuser_auto
-
-
-
-# ------------------------------------------------------------
-# 4. COLLECT STATIC FILES
-# ------------------------------------------------------------
+# Collect static files
 echo "🎨 Collecting static files..."
 python manage.py collectstatic --noinput --clear
-echo "✅ Static files collected"
 
 # ------------------------------------------------------------
-# 5. START GUNICORN
+# 4. EXECUTE COMMAND
 # ------------------------------------------------------------
-PORT=${PORT:-10000}     # Render usually uses 10000
-WORKERS=${WORKERS:-3}
-
-echo "🚀 Starting Gunicorn on port $PORT..."
-
-exec gunicorn config.asgi:application \
-    -k uvicorn.workers.UvicornWorker \
-    --bind 0.0.0.0:$PORT \
-    --workers $WORKERS \
-    --timeout 120 \
-    --graceful-timeout 30 \
-    --access-logfile - \
-    --error-logfile -
+# Agar command arguments ($@) pass kiye gaye hain (jaise local dev mein runserver), toh wo run karein.
+if [ "$#" -gt 0 ]; then
+    echo "⚙️ Executing command: $@"
+    exec "$@"
+else
+    # Default Production Command (Gunicorn)
+    PORT=${PORT:-8000}
+    WORKERS=${WORKERS:-3}
+    echo "🚀 Starting Gunicorn on port $PORT..."
+    exec gunicorn config.asgi:application \
+        -k uvicorn.workers.UvicornWorker \
+        --bind 0.0.0.0:$PORT \
+        --workers $WORKERS \
+        --timeout 120 \
+        --access-logfile - \
+        --error-logfile -
+fi
