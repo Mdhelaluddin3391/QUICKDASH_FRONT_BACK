@@ -57,7 +57,7 @@ echo "✅ Migrations completed"
 
 
 # echo "👤 Creating superuser if needed..."
-# python manage.py create_superuser_auto
+python manage.py create_superuser_auto
 
 
 
