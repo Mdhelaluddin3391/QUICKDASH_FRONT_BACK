@@ -47,9 +47,10 @@ if [ "$1" != "celery" ]; then
     gosu appuser python manage.py migrate --noinput
     echo "✅ Migrations completed"
 
-    if [ "$CREATE_SUPERUSER" = "True" ]; then
-        gosu appuser python manage.py create_superuser_auto || true
-    fi
+    # --- AUTO SUPERUSER CREATION ---
+    echo "👤 Checking/Creating Superuser..."
+    gosu appuser python manage.py create_superuser_auto || true
+    # -------------------------------
 
     echo "🎨 Collecting static files..."
     gosu appuser python manage.py collectstatic --noinput --clear
