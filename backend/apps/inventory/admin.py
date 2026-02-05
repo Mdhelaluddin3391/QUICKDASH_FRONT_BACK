@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
+from django.db import models
 from .models import InventoryItem, InventoryTransaction
 
 
@@ -27,9 +28,16 @@ class InventoryItemAdmin(admin.ModelAdmin):
         'sku',
         'product_name',
         'bin__bin_code',
-        'bin__rack__rack_number'
+        'bin__rack__number'  # Fixed: changed from rack_number to number
     )
-    list_select_related = ('bin', 'bin__rack', 'bin__rack__aisle', 'bin__rack__aisle__zone', 'bin__rack__aisle__zone__warehouse')
+    # Optimized to prevent N+1 queries
+    list_select_related = (
+        'bin', 
+        'bin__rack', 
+        'bin__rack__aisle', 
+        'bin__rack__aisle__zone', 
+        'bin__rack__aisle__zone__warehouse'
+    )
     raw_id_fields = ('bin',)
     list_per_page = 25
     list_editable = ('total_stock', 'reserved_stock')
@@ -56,7 +64,8 @@ class InventoryItemAdmin(admin.ModelAdmin):
     warehouse_name.admin_order_field = 'bin__rack__aisle__zone__warehouse__name'
 
     def bin_location(self, obj):
-        return f"{obj.bin.rack.aisle.zone.name} - A{obj.bin.rack.aisle.aisle_number} - R{obj.bin.rack.rack_number} - B{obj.bin.bin_code}"
+        # FIXED: uses .number for both Aisle and Rack based on your warehouse/models.py
+        return f"{obj.bin.rack.aisle.zone.name} - A{obj.bin.rack.aisle.number} - R{obj.bin.rack.number} - B{obj.bin.bin_code}"
     bin_location.short_description = "Bin Location"
 
     def available_stock(self, obj):
