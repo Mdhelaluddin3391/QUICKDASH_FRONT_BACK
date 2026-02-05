@@ -27,6 +27,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 WORKDIR /app
 
+# UPDATE: Added 'gosu' here
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     binutils \
@@ -34,6 +35,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libmagic1 \
     redis-tools \
     netcat-openbsd \
+    gosu \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /build/wheels /wheels
@@ -53,10 +55,9 @@ RUN groupadd --system --gid 1000 appgroup && \
 
 # Entrypoint setup
 COPY scripts/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh && chown appuser:appgroup /entrypoint.sh
-
-USER appuser
+RUN chmod +x /entrypoint.sh
 
 EXPOSE 8000
 
+# UPDATE: Removed 'USER appuser' so we start as root to fix perms in entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
