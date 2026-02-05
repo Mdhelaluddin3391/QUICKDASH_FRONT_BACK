@@ -11,8 +11,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- 1. Load & Render Addresses ---
 async function loadAddresses() {
-    const container = document.getElementById('address-grid');
-    if (!container) return; // May be on a different page
+    // FIX: HTML mein ID 'addr-grid' hai
+    const container = document.getElementById('addr-grid'); 
+    if (!container) return; 
 
     container.innerHTML = '<div class="loader-spinner"></div>';
 
@@ -22,10 +23,10 @@ async function loadAddresses() {
 
         if (addresses.length === 0) {
             container.innerHTML = `
-                <div class="empty-state">
-                    <i class="fas fa-map-marked-alt"></i>
-                    <p>No addresses saved yet.</p>
-                    <button class="btn btn-primary" onclick="openAddAddressFlow()">Add New Address</button>
+                <div class="empty-state" style="grid-column: 1 / -1; text-align:center; padding: 40px;">
+                    <i class="fas fa-map-marked-alt" style="font-size:3rem; color:#eee; margin-bottom:15px;"></i>
+                    <p class="text-muted">No addresses saved yet.</p>
+                    <button class="btn btn-primary" onclick="openAddressModal()">Add New Address</button>
                 </div>`;
             return;
         }
@@ -38,7 +39,7 @@ async function loadAddresses() {
                 </div>
                 <div class="card-body">
                     <p class="mb-1"><strong>${addr.house_no || ''} ${addr.apartment_name || ''}</strong></p>
-                    <p class="text-muted small">${addr.address_line}</p>
+                    <p class="text-muted small">${addr.google_address_text || addr.address_line || 'No details'}</p>
                     <p class="text-muted small">${addr.city} - ${addr.pincode}</p>
                 </div>
                 <div class="card-actions">
@@ -46,7 +47,7 @@ async function loadAddresses() {
                 </div>
             </div>
         `).join('') + `
-            <div class="address-card add-new-card" onclick="openAddAddressFlow()">
+            <div class="address-card add-new-card" onclick="openAddressModal()">
                 <div class="dashed-border">
                     <i class="fas fa-plus-circle"></i>
                     <span>Add New Address</span>
@@ -61,7 +62,8 @@ async function loadAddresses() {
 }
 
 // --- 2. Add Address Flow (Map First) ---
-window.openAddAddressFlow = function() {
+// FIX: Function rename kiya taaki HTML ke 'onclick' se match kare
+window.openAddressModal = function() {
     // Step 1: Open Location Picker
     if (window.LocationPicker) {
         window.LocationPicker.open('PICKER', (locationData) => {
@@ -74,20 +76,35 @@ window.openAddAddressFlow = function() {
 };
 
 function openAddressForm(data) {
-    // Show the form modal
-    const modal = document.getElementById('address-form-modal');
-    modal.classList.add('active');
+    // FIX: HTML mein ID 'address-modal' hai
+    const modal = document.getElementById('address-modal');
+    if(modal) modal.classList.add('active');
 
     // Auto-Fill Form
     document.getElementById('a-lat').value = data.lat;
     document.getElementById('a-lng').value = data.lng;
+    
+    // FIX: Address display ke liye span tag update
+    const displaySpan = document.getElementById('display-map-address');
+    if(displaySpan) displaySpan.innerText = data.address || 'Selected Location';
+    
     document.getElementById('a-google-text').value = data.address || '';
     document.getElementById('a-city').value = data.city || '';
-    document.getElementById('a-pincode').value = data.pincode || '';
+    
+    // FIX: HTML mein ID 'a-pin' hai ('a-pincode' nahi)
+    const pinEl = document.getElementById('a-pin');
+    if(pinEl) pinEl.value = data.pincode || ''; 
     
     // Reset other fields
     document.getElementById('a-house').value = '';
+    document.getElementById('a-building').value = '';
     document.getElementById('a-landmark').value = '';
+}
+
+// FIX: Close Modal Function (HTML mein onclick="closeModal()" hai)
+window.closeModal = function() {
+    const modal = document.getElementById('address-modal');
+    if(modal) modal.classList.remove('active');
 }
 
 // --- 3. Form Submission ---
@@ -119,28 +136,25 @@ async function saveAddress(e) {
         landmark: document.getElementById('a-landmark').value,
         google_address_text: document.getElementById('a-google-text').value,
         city: document.getElementById('a-city').value,
-        pincode: document.getElementById('a-pincode').value,
+        pincode: document.getElementById('a-pin').value, // FIX: Correct ID
         latitude: lat,
         longitude: lng,
         receiver_name: document.getElementById('a-name').value,
         receiver_phone: document.getElementById('a-phone').value,
         floor_no: document.getElementById('a-floor').value,
-        is_default: false // or from a checkbox if added
+        is_default: false 
     };
 
     try {
         await ApiService.post('/auth/customer/addresses/', payload);
         
         // Success
-        document.getElementById('address-form-modal').classList.remove('active');
+        closeModal();
         loadAddresses(); // Reload list
+        if(window.Toast) Toast.success("Address saved successfully");
         
-        // If this was the first address, sync location context
-        if (payload.is_default) {
-            // Optional: Auto-select this location
-            // window.LocationManager.setDeliveryAddress(...) 
-        }
     } catch (err) {
+        console.error(err);
         alert(err.message || "Failed to save address");
     } finally {
         btn.disabled = false;
@@ -152,6 +166,7 @@ window.deleteAddress = async function(id) {
     if (!confirm("Are you sure you want to delete this address?")) return;
     try {
         await ApiService.delete(`/auth/customer/addresses/${id}/`);
+        if(window.Toast) Toast.success("Address deleted");
         loadAddresses();
     } catch (e) {
         alert("Failed to delete address");
@@ -159,12 +174,7 @@ window.deleteAddress = async function(id) {
 }
 
 function setupModalHandlers() {
-    const form = document.getElementById('new-address-form');
+    // FIX: HTML mein Form ID 'address-form' hai
+    const form = document.getElementById('address-form');
     if (form) form.addEventListener('submit', saveAddress);
-
-    document.querySelectorAll('.modal-close').forEach(btn => {
-        btn.onclick = () => {
-            document.getElementById('address-form-modal').classList.remove('active');
-        };
-    });
 }

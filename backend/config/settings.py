@@ -32,7 +32,7 @@ logger.info(f"🚀 Django initializing in {DJANGO_ENV} environment")
 # ==============================================================================
 
 # DEBUG - MUST DEFAULT TO FALSE
-DEBUG = os.getenv("DEBUG", "false").lower() in ("true", "1", "yes")
+DEBUG = os.getenv("DEBUG", "true").lower() in ("true", "1", "yes")
 
 if DEBUG:
     logger.warning("⚠️  DEBUG mode is enabled - NEVER use in production")
@@ -353,10 +353,28 @@ SIMPLE_JWT = {
     "ALGORITHM": "HS256",
 }
 
+# backend/config/settings.py
+
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
+    # 👇 Ye Throttling Classes add karein
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+        "rest_framework.throttling.ScopedRateThrottle",
+    ],
+    # 👇 Ye Rates define karna zaroori hai (Yahan aapka fix hai)
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "100/day",
+        "user": "1000/day",
+        "otp_send": "5/hour",  # <--- Is line se wo 500 error hat jayega
+        "registration": "5/hour",
+    },
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
     "DEFAULT_FILTER_BACKENDS": [
