@@ -134,7 +134,6 @@ class ProductAdmin(admin.ModelAdmin):
         else:
             self.message_user(request, "is_featured field not available.")
 
-
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
     list_display = ('name', 'parent_name', 'is_active', 'product_count')
@@ -146,9 +145,10 @@ class CategoryAdmin(admin.ModelAdmin):
     list_per_page = 25
     actions = ['activate_categories', 'deactivate_categories']
 
+    # FIX: Added 'slug' to fields below
     fieldsets = (
         ('Basic Information', {
-            'fields': ('name', 'parent')
+            'fields': ('name', 'slug', 'parent') 
         }),
         ('Media', {
             'fields': ('icon',),
@@ -191,7 +191,6 @@ class CategoryAdmin(admin.ModelAdmin):
         updated = queryset.update(is_active=False)
         self.message_user(request, f"{updated} categories deactivated.")
 
-
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):
     list_display = ('name', 'is_active', 'product_count')
@@ -201,9 +200,10 @@ class BrandAdmin(admin.ModelAdmin):
     list_per_page = 25
     actions = ['activate_brands', 'deactivate_brands']
 
+    # FIX: Added 'slug' to fields below
     fieldsets = (
         ('Basic Information', {
-            'fields': ('name',)
+            'fields': ('name', 'slug')
         }),
         ('Media', {
             'fields': ('logo',),
@@ -240,7 +240,6 @@ class BrandAdmin(admin.ModelAdmin):
     def deactivate_brands(self, request, queryset):
         updated = queryset.update(is_active=False)
         self.message_user(request, f"{updated} brands deactivated.")
-
 
 @admin.register(Banner)
 class BannerAdmin(admin.ModelAdmin):
