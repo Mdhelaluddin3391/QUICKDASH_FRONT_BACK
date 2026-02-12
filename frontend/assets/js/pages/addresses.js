@@ -11,7 +11,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // --- 1. Load & Render Addresses ---
 async function loadAddresses() {
-    // FIX: HTML mein ID 'addr-grid' hai
     const container = document.getElementById('addr-grid'); 
     if (!container) return; 
 
@@ -62,7 +61,6 @@ async function loadAddresses() {
 }
 
 // --- 2. Add Address Flow (Map First) ---
-// FIX: Function rename kiya taaki HTML ke 'onclick' se match kare
 window.openAddressModal = function() {
     // Step 1: Open Location Picker
     if (window.LocationPicker) {
@@ -76,7 +74,6 @@ window.openAddressModal = function() {
 };
 
 function openAddressForm(data) {
-    // FIX: HTML mein ID 'address-modal' hai
     const modal = document.getElementById('address-modal');
     if(modal) modal.classList.add('active');
 
@@ -84,14 +81,13 @@ function openAddressForm(data) {
     document.getElementById('a-lat').value = data.lat;
     document.getElementById('a-lng').value = data.lng;
     
-    // FIX: Address display ke liye span tag update
+    // Address display ke liye span tag update
     const displaySpan = document.getElementById('display-map-address');
     if(displaySpan) displaySpan.innerText = data.address || 'Selected Location';
     
     document.getElementById('a-google-text').value = data.address || '';
     document.getElementById('a-city').value = data.city || '';
     
-    // FIX: HTML mein ID 'a-pin' hai ('a-pincode' nahi)
     const pinEl = document.getElementById('a-pin');
     if(pinEl) pinEl.value = data.pincode || ''; 
     
@@ -101,13 +97,13 @@ function openAddressForm(data) {
     document.getElementById('a-landmark').value = '';
 }
 
-// FIX: Close Modal Function (HTML mein onclick="closeModal()" hai)
+// Close Modal Function
 window.closeModal = function() {
     const modal = document.getElementById('address-modal');
     if(modal) modal.classList.remove('active');
 }
 
-// --- 3. Form Submission ---
+// --- 3. Form Submission (UPDATED) ---
 async function saveAddress(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
@@ -129,14 +125,28 @@ async function saveAddress(e) {
         console.warn("Serviceability check failed, proceeding with save", checkError);
     }
 
+    // --- FIX START: Form Data ko combine karke address banana ---
+    const house = document.getElementById('a-house').value;
+    const building = document.getElementById('a-building').value;
+    const landmark = document.getElementById('a-landmark').value;
+    const city = document.getElementById('a-city').value;
+    const pincode = document.getElementById('a-pin').value;
+
+    // Hum Map wale purane text ko ignore karke, user ne jo form me bhara hai 
+    // usse naya address text bana rahe hain.
+    let fullAddressText = `${house}, ${building}`;
+    if (landmark) fullAddressText += `, ${landmark}`;
+    fullAddressText += `, ${city}, ${pincode}`;
+    // --- FIX END ---
+
     const payload = {
         label: document.querySelector('input[name="atype"]:checked').value,
-        house_no: document.getElementById('a-house').value,
-        apartment_name: document.getElementById('a-building').value,
-        landmark: document.getElementById('a-landmark').value,
-        google_address_text: document.getElementById('a-google-text').value,
-        city: document.getElementById('a-city').value,
-        pincode: document.getElementById('a-pin').value, // FIX: Correct ID
+        house_no: house,
+        apartment_name: building,
+        landmark: landmark,
+        google_address_text: fullAddressText, // Updated Address here
+        city: city,
+        pincode: pincode,
         latitude: lat,
         longitude: lng,
         receiver_name: document.getElementById('a-name').value,
@@ -174,7 +184,6 @@ window.deleteAddress = async function(id) {
 }
 
 function setupModalHandlers() {
-    // FIX: HTML mein Form ID 'address-form' hai
     const form = document.getElementById('address-form');
     if (form) form.addEventListener('submit', saveAddress);
 }
