@@ -73,23 +73,31 @@ window.openAddressModal = function() {
     }
 };
 
+// --- FIX APPLIED HERE: Form open logic updated to clear old map address ---
 function openAddressForm(data) {
     const modal = document.getElementById('address-modal');
     if(modal) modal.classList.add('active');
 
-    // Auto-Fill Form
+    // Auto-Fill Form (Lat/Lng is required for backend)
     document.getElementById('a-lat').value = data.lat;
     document.getElementById('a-lng').value = data.lng;
     
-    // Address display ke liye span tag update
+    // FIX 1: Display generic text instead of the specific map address "Malhanwara..."
     const displaySpan = document.getElementById('display-map-address');
-    if(displaySpan) displaySpan.innerText = data.address || 'Selected Location';
+    if(displaySpan) {
+        displaySpan.innerText = "Pin Location Selected (Fill details below)";
+        displaySpan.style.color = "#2c3e50"; // Darker color for better visibility
+    }
     
+    // Hidden field value (backup)
     document.getElementById('a-google-text').value = data.address || '';
-    document.getElementById('a-city').value = data.city || '';
+
+    // FIX 2: Clear City and Pincode inputs so the user fills them manually
+    // This removes the confusion of seeing the old map data
+    document.getElementById('a-city').value = ''; 
     
     const pinEl = document.getElementById('a-pin');
-    if(pinEl) pinEl.value = data.pincode || ''; 
+    if(pinEl) pinEl.value = ''; 
     
     // Reset other fields
     document.getElementById('a-house').value = '';
@@ -103,7 +111,7 @@ window.closeModal = function() {
     if(modal) modal.classList.remove('active');
 }
 
-// --- 3. Form Submission (UPDATED) ---
+// --- 3. Form Submission ---
 async function saveAddress(e) {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
@@ -125,7 +133,7 @@ async function saveAddress(e) {
         console.warn("Serviceability check failed, proceeding with save", checkError);
     }
 
-    // --- FIX START: Form Data ko combine karke address banana ---
+    // --- LOGIC KEPT: Form Data ko combine karke address banana ---
     const house = document.getElementById('a-house').value;
     const building = document.getElementById('a-building').value;
     const landmark = document.getElementById('a-landmark').value;
@@ -137,7 +145,7 @@ async function saveAddress(e) {
     let fullAddressText = `${house}, ${building}`;
     if (landmark) fullAddressText += `, ${landmark}`;
     fullAddressText += `, ${city}, ${pincode}`;
-    // --- FIX END ---
+    // -----------------------------------------------------------
 
     const payload = {
         label: document.querySelector('input[name="atype"]:checked').value,
