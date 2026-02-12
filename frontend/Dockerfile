@@ -1,7 +1,7 @@
 FROM nginx:stable-alpine
 
-# Install utilities
-RUN apk add --no-cache bash
+# 1. Install utilities (bash aur dos2unix add kiya hai line-endings fix karne ke liye)
+RUN apk add --no-cache bash dos2unix
 
 # Remove default config
 RUN rm /etc/nginx/conf.d/default.conf
@@ -14,7 +14,9 @@ COPY . /usr/share/nginx/html
 
 # Entrypoint setup
 COPY entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
+
+# 2. IMPORTANT FIX: Convert script to Unix format & Make executable
+RUN dos2unix /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
 
 # Ensure env.js exists and is writable
 RUN touch /usr/share/nginx/html/assets/js/env.js && \
