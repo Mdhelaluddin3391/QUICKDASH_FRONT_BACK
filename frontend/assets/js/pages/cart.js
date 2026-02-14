@@ -1,3 +1,6 @@
+// ✅ Delivery Fee Variable add kiya gaya hai
+const DELIVERY_FEE = 5.00;
+
 document.addEventListener('DOMContentLoaded', async () => {
     // Auth Check
     if (!localStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN)) {
@@ -59,9 +62,24 @@ async function loadCart() {
     </div>
 `}).join('');
 
-        // Update Summary
-        document.getElementById('subtotal').innerText = Formatters.currency(cart.total_amount);
-        document.getElementById('total').innerText = Formatters.currency(cart.total_amount);
+        // ✅ Update Summary (Delivery Fee logic added)
+        const subtotal = parseFloat(cart.total_amount || 0);
+        const total = subtotal + DELIVERY_FEE;
+
+        document.getElementById('subtotal').innerText = Formatters.currency(subtotal);
+        
+        const delEl = document.getElementById('summ-delivery');
+        if (delEl) {
+            if (DELIVERY_FEE > 0) {
+                delEl.innerText = Formatters.currency(DELIVERY_FEE);
+                delEl.classList.remove('text-success'); // हरा रंग हटाएं
+            } else {
+                delEl.innerText = 'FREE';
+                delEl.classList.add('text-success'); // हरा रंग लगाएं
+            }
+        }
+
+        document.getElementById('total').innerText = Formatters.currency(total);
 
     } catch (e) {
         console.error(e);
