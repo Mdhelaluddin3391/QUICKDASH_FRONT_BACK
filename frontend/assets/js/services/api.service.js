@@ -83,7 +83,6 @@
                 if (response.status === 409) {
                     const resData = await response.clone().json().catch(() => ({}));
                     if (resData.code === 'WAREHOUSE_MISMATCH') {
-                        // Cart belongs to Old Warehouse -> User moved to New Warehouse
                         if (confirm(resData.message || "Your location has changed. Clear cart to proceed?")) {
                              window.location.reload(); 
                         }
@@ -94,9 +93,14 @@
                 // [Existing Logic] Handle 401 Unauthorized (Token Refresh Flow)
                 if (response.status === 401 && !isRetry) {
                     if (ApiService.isRefreshing) {
-                        return new Promise((resolve) => {
-                            ApiService.refreshSubscribers.push(() => {
-                                resolve(ApiService.request(endpoint, method, body, true));
+                        // ✅ FIX 2A: Resolve और Reject दोनों पास करें ताकि ऐप हैंग ना हो
+                        return new Promise((resolve, reject) => {
+                            ApiService.refreshSubscribers.push((wasRefreshed) => {
+                                if (wasRefreshed) {
+                                    resolve(ApiService.request(endpoint, method, body, true));
+                                } else {
+                                    reject({ status: 401, message: "Session expired" });
+                                }
                             });
                         });
                     }
@@ -106,11 +110,12 @@
                     ApiService.isRefreshing = false;
 
                     if (success) {
-                        ApiService.onRefreshed();
+                        ApiService.onRefreshed(true); // ✅ True पास करें
                         return ApiService.request(endpoint, method, body, true);
                     } else {
+                        ApiService.onRefreshed(false); // ✅ False पास करें
                         ApiService.handleAuthFailure();
-                        return;
+                        throw { status: 401, message: "Session expired" };
                     }
                 }
 
@@ -143,6 +148,12 @@
             }
         },
 
+        onRefreshed: function (success) {
+            // ✅ FIX 2B: पेंडिंग कॉल्स को success स्टेटस भेजें
+            ApiService.refreshSubscribers.forEach((callback) => callback(success));
+            ApiService.refreshSubscribers = [];
+        },
+
         refreshToken: async function () {
             const refreshKey = window.APP_CONFIG?.STORAGE_KEYS?.REFRESH || 'refresh_token';
             const refresh = localStorage.getItem(refreshKey);
@@ -171,10 +182,7 @@
             return false;
         },
 
-        onRefreshed: function () {
-            ApiService.refreshSubscribers.forEach((callback) => callback());
-            ApiService.refreshSubscribers = [];
-        },
+        
 
         handleAuthFailure: function() {
             localStorage.removeItem(window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token');

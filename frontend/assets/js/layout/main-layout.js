@@ -7,7 +7,8 @@
     const EVENTS = window.APP_CONFIG?.EVENTS || {};
 
     function isLoggedIn() {
-        const tokenKey = (window.APP_CONFIG?.STORAGE_KEYS?.TOKEN) || 'auth_token';
+        // ✅ FIX 3A: 'auth_token' को हटाकर 'access_token' करें
+        const tokenKey = (window.APP_CONFIG?.STORAGE_KEYS?.TOKEN) || 'access_token';
         return !!localStorage.getItem(tokenKey);
     }
 
@@ -278,10 +279,9 @@
         renderNavbarLocation();
         bindNavbarLocationClick();
 
-        const tokenKey = (window.APP_CONFIG?.STORAGE_KEYS?.TOKEN) || 'auth_token';
-        if (localStorage.getItem(tokenKey) && window.CartService?.updateGlobalCount) {
-            window.CartService.updateGlobalCount();
-        } else {
+        // ✅ FIX 3B: डुप्लीकेट Cart API कॉल को हटा दिया गया है
+        const tokenKey = (window.APP_CONFIG?.STORAGE_KEYS?.TOKEN) || 'access_token';
+        if (!localStorage.getItem(tokenKey)) {
             document.querySelectorAll('.cart-count').forEach(el => el.style.display = 'none');
         }
     }

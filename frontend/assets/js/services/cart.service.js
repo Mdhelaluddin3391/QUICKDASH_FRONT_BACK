@@ -42,36 +42,32 @@
                     quantity: quantity
                 });
 
-                // अगर सब ठीक है, तो कार्ट अपडेट करें (आपका मौजूदा कोड)
-                // notifyListeners(response.cart); ... 
+                // ✅ FIX 1: रिस्पॉन्स आने के बाद लोकल स्टेट और UI को अपडेट करें
+                this._total = response.total_amount || 0;
+                this._count = (response.items || []).length;
+                this._notifyChange(response);
+                
                 return response;
 
             } catch (error) {
                 console.error("Cart Update Error:", error);
 
                 // --- यहाँ हमने Toast का लॉजिक जोड़ा है ---
-
-                // चेक करें कि क्या एरर में मैसेज है
                 const errorMessage = error.message || "Something went wrong";
 
-                // अगर आइटम स्टोर में नहीं है (400 Bad Request)
                 if (error.status === 400 || errorMessage.includes('not available')) {
-
-                    // Toast दिखाएं (लाल रंग या Error स्टाइल में)
                     if (window.Toast) {
                         window.Toast.show(errorMessage, 'error');
                     } else {
-                        alert(errorMessage); // बैकअप अगर Toast लोड नहीं हुआ
+                        alert(errorMessage);
                     }
-
                 } else {
-                    // कोई और एरर हो तो भी दिखाएं
                     if (window.Toast) {
                         window.Toast.show("Error updating cart: " + errorMessage, 'error');
                     }
                 }
 
-                throw error; // एरर को आगे भेजें ताकि UI (button loader) को पता चले कि फेल हुआ
+                throw error;
             }
         },
 
