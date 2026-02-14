@@ -33,9 +33,10 @@ async function loadCart() {
             // यहाँ quantity को Number में बदलें ताकि जोड़-घटाव सही हो
             const currentQty = parseInt(item.quantity);
 
+            // FIX: Use item.sku_code and item.image to match the backend API response
             return `
-    <div class="card cart-item" id="item-card-${item.sku}">
-        <img src="${item.sku_image || 'https://via.placeholder.com/80'}" class="item-img">
+    <div class="card cart-item" id="item-card-${item.sku_code}">
+        <img src="${item.image || 'https://via.placeholder.com/80'}" class="item-img">
         <div class="item-details">
             <div class="item-name">${item.sku_name}</div>
             <div class="item-unit text-muted small">${item.sku_unit || ''}</div>
@@ -43,15 +44,15 @@ async function loadCart() {
         </div>
         <div class="qty-and-delete">
             <div class="qty-control">
-                <button class="qty-btn-sm" onclick="changeQty('${item.sku}', ${currentQty - 1})">
+                <button class="qty-btn-sm" onclick="changeQty('${item.sku_code}', ${currentQty - 1})">
                     <i class="fas fa-minus"></i>
                 </button>
-                <span id="qty-${item.sku}" class="mx-2">${currentQty}</span>
-                <button class="qty-btn-sm" onclick="changeQty('${item.sku}', ${currentQty + 1})">
+                <span id="qty-${item.sku_code}" class="mx-2">${currentQty}</span>
+                <button class="qty-btn-sm" onclick="changeQty('${item.sku_code}', ${currentQty + 1})">
                     <i class="fas fa-plus"></i>
                 </button>
             </div>
-            <button class="btn btn-outline btn-sm delete-btn ms-3" onclick="deleteItem('${item.sku}')">
+            <button class="btn btn-outline btn-sm delete-btn ms-3" onclick="deleteItem('${item.sku_code}')">
                 <i class="fas fa-trash"></i>
             </button>
         </div>
@@ -117,7 +118,7 @@ window.deleteItem = async function (skuCode) {
         await loadCart(); // Refresh UI
 
     } catch (e) {
-        Toast.error("Failed to remove item");
+        if (window.Toast) Toast.error("Failed to remove item");
         // Re-enable on error
         const card = document.getElementById(`item-card-${skuCode}`);
         if (card) {
