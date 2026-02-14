@@ -157,8 +157,17 @@ class OrderService:
 
         # 6. Pricing & Save
         surge_multiplier = SurgePricingService.calculate(order)
-        order.total_amount = total * surge_multiplier
-        if hasattr(order, "surge_multiplier"): order.surge_multiplier = surge_multiplier
+        
+        # ✅ यहाँ डिलीवरी फीस ₹5 फिक्स की गई है
+        base_delivery_fee = Decimal("5.00") 
+        actual_delivery_fee = base_delivery_fee # अभी के लिए Surge बंद रखा है, ताकि फीस डबल न हो।
+        
+        # ✅ Final Amount = Items का Total + डिलीवरी फीस
+        order.total_amount = total + actual_delivery_fee
+        
+        if hasattr(order, "surge_multiplier"): 
+            order.surge_multiplier = surge_multiplier
+            
         order.save()
 
         transaction.on_commit(lambda: AuditService.order_created(order))

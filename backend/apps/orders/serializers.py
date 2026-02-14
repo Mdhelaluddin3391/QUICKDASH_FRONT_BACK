@@ -14,7 +14,8 @@ from apps.catalog.models import Product
 from rest_framework import serializers
 from .models import Order, OrderItem, Cart, CartItem
 from apps.catalog.models import Product
-
+from apps.pricing.services import SurgePricingService
+from decimal import Decimal
 
 
 class CartItemSerializer(serializers.ModelSerializer):

@@ -3,6 +3,8 @@
 let selectedAddressId = null;
 let paymentMethod = 'COD';
 let resolvedWarehouseId = null; // Used only for UI state, not submitted
+const DELIVERY_FEE = 5.00;
+
 
 document.addEventListener('DOMContentLoaded', async () => {
     // 1. Auth Check
@@ -184,8 +186,25 @@ async function loadSummary() {
             </div>
         `).join('');
 
-        document.getElementById('summ-subtotal').innerText = Formatters.currency(cart.total_amount);
-        document.getElementById('summ-total').innerText = Formatters.currency(cart.total_amount);
+        // ✅ Subtotal और Total में Delivery Fee जोड़ें
+        const subtotal = parseFloat(cart.total_amount || 0);
+        const total = subtotal + DELIVERY_FEE;
+
+        // UI अपडेट करें
+        document.getElementById('summ-subtotal').innerText = Formatters.currency(subtotal);
+        
+        const delEl = document.getElementById('summ-delivery');
+        if (delEl) {
+            if (DELIVERY_FEE > 0) {
+                delEl.innerText = Formatters.currency(DELIVERY_FEE);
+                delEl.classList.remove('text-success'); // हरा रंग हटाएं
+            } else {
+                delEl.innerText = 'FREE';
+                delEl.classList.add('text-success'); // हरा रंग लगाएं
+            }
+        }
+
+        document.getElementById('summ-total').innerText = Formatters.currency(total);
     } catch(e) { console.error("Cart load error", e); }
 }
 
@@ -325,7 +344,8 @@ async function placeOrder() {
             delivery_address_id: selectedAddressId, 
             payment_method: paymentMethod,
             delivery_type: 'express',
-            total_amount: cart.total_amount
+            // ✅ यहाँ डिलीवरी फीस जोड़कर बैकएंड को भेजें
+            total_amount: (parseFloat(cart.total_amount) + DELIVERY_FEE) 
         };
 
         const orderRes = await ApiService.post('/orders/create/', orderPayload);
