@@ -5,7 +5,6 @@ from .models import Category, Product, Brand, Banner, FlashSale
 from apps.inventory.models import InventoryItem
 
 
-
 class NavigationCategorySerializer(serializers.ModelSerializer):
     """
     Used for the Navbar. Returns ONLY essential data for parent categories.
@@ -18,12 +17,14 @@ class NavigationCategorySerializer(serializers.ModelSerializer):
         fields = ("id", "name", "slug", "icon_url")
 
     def get_icon_url(self, obj):
-        if obj.icon:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.icon.url)
-            return obj.icon.url
-        return None
+        if not obj.icon:
+            return None
+        if obj.icon.startswith('http'):
+            return obj.icon
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.icon)
+        return obj.icon
     
 
 class HomeCategorySerializer(serializers.ModelSerializer):
@@ -39,15 +40,14 @@ class HomeCategorySerializer(serializers.ModelSerializer):
         fields = ("id", "name", "slug", "icon_url", "parent", "parent_name")
 
     def get_icon_url(self, obj):
-        if obj.icon:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.icon.url)
-            return obj.icon.url
-        return None
-    
-
-
+        if not obj.icon:
+            return None
+        if obj.icon.startswith('http'):
+            return obj.icon
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.icon)
+        return obj.icon
 
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -73,10 +73,12 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_image_url(self, obj):
         if not obj.image:
             return None
+        if obj.image.startswith('http'):
+            return obj.image
         request = self.context.get('request')
         if request:
-            return request.build_absolute_uri(obj.image.url)
-        return obj.image.url
+            return request.build_absolute_uri(obj.image)
+        return obj.image
 
     def get_sale_price(self, obj):
         if hasattr(obj, 'effective_price') and obj.effective_price is not None:
@@ -95,12 +97,14 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ("id", "name", "slug", "icon_url", "parent")
 
     def get_icon_url(self, obj):
-        if obj.icon:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.icon.url)
-            return obj.icon.url
-        return None
+        if not obj.icon:
+            return None
+        if obj.icon.startswith('http'):
+            return obj.icon
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.icon)
+        return obj.icon
 
 class BrandSerializer(serializers.ModelSerializer):
     logo_url = serializers.SerializerMethodField()
@@ -110,12 +114,14 @@ class BrandSerializer(serializers.ModelSerializer):
         fields = ('id', 'name', 'slug', 'logo_url')
     
     def get_logo_url(self, obj):
-        if obj.logo:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.logo.url)
-            return obj.logo.url
-        return None
+        if not obj.logo:
+            return None
+        if obj.logo.startswith('http'):
+            return obj.logo
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.logo)
+        return obj.logo
 
 
 class BannerSerializer(serializers.ModelSerializer):
@@ -126,12 +132,14 @@ class BannerSerializer(serializers.ModelSerializer):
         fields = ('id', 'title', 'image_url', 'target_url', 'position', 'bg_gradient')
 
     def get_image_url(self, obj):
-        if obj.image:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.image.url)
-            return obj.image.url
-        return None
+        if not obj.image:
+            return None
+        if obj.image.startswith('http'):
+            return obj.image
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.image)
+        return obj.image
 
 class FlashSaleSerializer(serializers.ModelSerializer):
     sku = serializers.CharField(source='product.sku', read_only=True)
@@ -149,12 +157,14 @@ class FlashSaleSerializer(serializers.ModelSerializer):
         )
 
     def get_sku_image(self, obj):
-        if obj.product.image:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.product.image.url)
-            return obj.product.image.url
-        return None
+        if not obj.product.image:
+            return None
+        if obj.product.image.startswith('http'):
+            return obj.product.image
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.product.image)
+        return obj.product.image
 
     def get_discounted_price(self, obj):
         mrp = obj.product.mrp
@@ -193,4 +203,9 @@ class SimpleCategorySerializer(serializers.ModelSerializer):
         fields = ("id", "name", "slug", "icon_url")
 
     def get_icon_url(self, obj):
-        return obj.icon.url if hasattr(obj, 'icon') and obj.icon else None
+        if not hasattr(obj, 'icon') or not obj.icon:
+            return None
+        if obj.icon.startswith('http'):
+            return obj.icon
+        # Yahan SimpleCategorySerializer mein request use nahi hota uske old code ke according, isliye waisa hi simple rakha
+        return obj.icon

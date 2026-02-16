@@ -2,7 +2,7 @@ from rest_framework import generics, filters, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
-from django.db.models import Prefetch, OuterRef, Subquery, DecimalField, Q, Sum, F  # ✅ Added 'F' here
+from django.db.models import Prefetch, OuterRef, Subquery, DecimalField, Q, Sum, F  
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
@@ -17,6 +17,7 @@ from rest_framework.exceptions import NotFound
 from django.db.models import Q
 from apps.warehouse.services import WarehouseService
 from apps.inventory.models import InventoryItem
+
 # ==============================================================================
 # PUBLIC CATALOG APIS
 # Authentication classes empty to allow Guest Browsing
@@ -299,16 +300,19 @@ class StorefrontCatalogAPIView(APIView):
                         p['effective_price'] = p.get('mrp')
                         p['sale_price'] = p.get('mrp')
 
-                # ✅ FIX: Yahan 'request.build_absolute_uri' add kiya hai icon ke liye
+                # ✅ FIXED ICON URL LOGIC
                 icon_url = None
                 if cat.icon:
-                    icon_url = request.build_absolute_uri(cat.icon.url)
+                    if cat.icon.startswith('http'):
+                        icon_url = cat.icon
+                    else:
+                        icon_url = request.build_absolute_uri(cat.icon)
 
                 feed.append({
                     "id": cat.id,
                     "name": cat.name,
                     "slug": cat.slug,
-                    "icon": icon_url, # Ab ye poora URL bhejega
+                    "icon": icon_url, # Ab ye safe hai
                     "products": p_data
                 })
 

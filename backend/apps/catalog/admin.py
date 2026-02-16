@@ -23,6 +23,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_display = (
         'name',
         'sku',
+        'image_preview',  # ✅ Naya Image Preview
         'category_name',
         'mrp',
         'stock_status',
@@ -59,7 +60,7 @@ class ProductAdmin(admin.ModelAdmin):
             'fields': ('mrp', 'is_active')
         }),
         ('Media', {
-            'fields': ('image',),
+            'fields': ('image', 'image_preview'), # ✅ Preview dikhane ke liye
             'classes': ('collapse',)
         }),
         ('Timestamps', {
@@ -68,7 +69,14 @@ class ProductAdmin(admin.ModelAdmin):
         }),
     )
 
-    readonly_fields = ('created_at',)
+    readonly_fields = ('created_at', 'image_preview') # ✅ Readonly banaya
+
+    # ✅ NAYA FUNCTION: URL se direct image dikhane ke liye
+    def image_preview(self, obj):
+        if obj.image:
+            return format_html('<img src="{}" style="max-height: 50px; max-width: 50px; border-radius: 5px; object-fit: cover;" />', obj.image)
+        return format_html('<span style="color: gray;">No Image</span>')
+    image_preview.short_description = "Preview"
 
     def category_name(self, obj):
         return obj.category.name
@@ -119,7 +127,6 @@ class ProductAdmin(admin.ModelAdmin):
 
     @admin.action(description='Mark selected products as featured')
     def mark_featured(self, request, queryset):
-        # Assuming is_featured field exists
         if hasattr(Product, 'is_featured'):
             updated = queryset.update(is_featured=True)
             self.message_user(request, f"{updated} products marked as featured.")
@@ -134,9 +141,10 @@ class ProductAdmin(admin.ModelAdmin):
         else:
             self.message_user(request, "is_featured field not available.")
 
+
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'parent_name', 'is_active', 'product_count')
+    list_display = ('name', 'icon_preview', 'parent_name', 'is_active', 'product_count') # ✅ Naya Icon Preview
     list_filter = ('is_active', 'parent')
     search_fields = ('name', 'parent__name')
     list_select_related = ('parent',)
@@ -145,13 +153,12 @@ class CategoryAdmin(admin.ModelAdmin):
     list_per_page = 25
     actions = ['activate_categories', 'deactivate_categories']
 
-    # FIX: Added 'slug' to fields below
     fieldsets = (
         ('Basic Information', {
             'fields': ('name', 'slug', 'parent') 
         }),
         ('Media', {
-            'fields': ('icon',),
+            'fields': ('icon', 'icon_preview'), # ✅ Naya Icon Preview
             'classes': ('collapse',)
         }),
         ('Status', {
@@ -160,6 +167,14 @@ class CategoryAdmin(admin.ModelAdmin):
     )
 
     prepopulated_fields = {'slug': ('name',)}
+    readonly_fields = ('icon_preview',) # ✅ Naya
+
+    # ✅ NAYA FUNCTION
+    def icon_preview(self, obj):
+        if obj.icon:
+            return format_html('<img src="{}" style="max-height: 40px; max-width: 40px; border-radius: 5px; object-fit: cover;" />', obj.icon)
+        return "-"
+    icon_preview.short_description = "Icon"
 
     def parent_name(self, obj):
         return obj.parent.name if obj.parent else "Root"
@@ -191,22 +206,22 @@ class CategoryAdmin(admin.ModelAdmin):
         updated = queryset.update(is_active=False)
         self.message_user(request, f"{updated} categories deactivated.")
 
+
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):
-    list_display = ('name', 'is_active', 'product_count')
+    list_display = ('name', 'logo_preview', 'is_active', 'product_count') # ✅ Naya Logo Preview
     list_filter = ('is_active',)
     search_fields = ('name',)
     list_editable = ('is_active',)
     list_per_page = 25
     actions = ['activate_brands', 'deactivate_brands']
 
-    # FIX: Added 'slug' to fields below
     fieldsets = (
         ('Basic Information', {
             'fields': ('name', 'slug')
         }),
         ('Media', {
-            'fields': ('logo',),
+            'fields': ('logo', 'logo_preview'), # ✅ Naya Logo Preview
             'classes': ('collapse',)
         }),
         ('Status', {
@@ -215,6 +230,14 @@ class BrandAdmin(admin.ModelAdmin):
     )
 
     prepopulated_fields = {'slug': ('name',)}
+    readonly_fields = ('logo_preview',) # ✅ Naya
+
+    # ✅ NAYA FUNCTION
+    def logo_preview(self, obj):
+        if obj.logo:
+            return format_html('<img src="{}" style="max-height: 40px; max-width: 40px; border-radius: 5px; object-fit: cover;" />', obj.logo)
+        return "-"
+    logo_preview.short_description = "Logo"
 
     def is_active_badge(self, obj):
         if obj.is_active:
@@ -241,9 +264,10 @@ class BrandAdmin(admin.ModelAdmin):
         updated = queryset.update(is_active=False)
         self.message_user(request, f"{updated} brands deactivated.")
 
+
 @admin.register(Banner)
 class BannerAdmin(admin.ModelAdmin):
-    list_display = ('title', 'position', 'is_active')
+    list_display = ('title', 'image_preview', 'position', 'is_active') # ✅ Naya Banner Preview
     list_filter = ('position', 'is_active')
     search_fields = ('title', 'target_url')
     list_editable = ('is_active',)
@@ -251,12 +275,21 @@ class BannerAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Content', {
-            'fields': ('title', 'image', 'target_url')
+            'fields': ('title', 'image', 'image_preview', 'target_url') # ✅ Naya Preview
         }),
         ('Display Settings', {
             'fields': ('position', 'bg_gradient', 'is_active')
         }),
     )
+
+    readonly_fields = ('image_preview',) # ✅ Naya
+
+    # ✅ NAYA FUNCTION
+    def image_preview(self, obj):
+        if obj.image:
+            return format_html('<img src="{}" style="max-height: 60px; max-width: 120px; border-radius: 5px; object-fit: cover;" />', obj.image)
+        return "-"
+    image_preview.short_description = "Banner Preview"
 
     def is_active_badge(self, obj):
         if obj.is_active:
