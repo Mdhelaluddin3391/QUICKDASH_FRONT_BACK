@@ -2,12 +2,10 @@
 from django.db import models
 
 
-    
-
 class Brand(models.Model):
     name = models.CharField(max_length=100)
     slug = models.SlugField(unique=True)
-    logo = models.ImageField(upload_to="brands/", null=True, blank=True)
+    logo = models.URLField(max_length=500, null=True, blank=True)
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
@@ -25,7 +23,7 @@ class Category(models.Model):
     
     name = models.CharField(max_length=100)
     slug = models.SlugField(unique=True)
-    icon = models.ImageField(upload_to="categories/", null=True, blank=True)
+    icon = models.URLField(max_length=500, null=True, blank=True)
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -45,7 +43,7 @@ class Product(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     sku = models.CharField(max_length=100, unique=True, db_index=True)
-    image = models.ImageField(upload_to="products/", null=True, blank=True)
+    image = models.URLField(max_length=500, null=True, blank=True)
     
     # UI Display Unit
     unit = models.CharField(max_length=50, default="1 Unit")
@@ -65,7 +63,7 @@ class Banner(models.Model):
     POSITION_CHOICES = (('HERO', 'Hero Slider'), ('MID', 'Mid Section'))
     
     title = models.CharField(max_length=100)
-    image = models.ImageField(upload_to="banners/")
+    image = models.URLField(max_length=500)
     target_url = models.CharField(max_length=200, blank=True)
     position = models.CharField(max_length=10, choices=POSITION_CHOICES, default='HERO')
     bg_gradient = models.CharField(max_length=50, default="linear-gradient(to right, #333, #000)")
@@ -73,6 +71,7 @@ class Banner(models.Model):
 
     def __str__(self):
         return self.title
+
 
 class FlashSale(models.Model):
     product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name="flash_sale")
