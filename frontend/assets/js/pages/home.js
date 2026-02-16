@@ -258,46 +258,16 @@ async function loadCategories() {
 
 async function loadBrands() {
     const container = document.getElementById('brand-scroller');
-    // Section ko find kar rahe hain taaki agar brands na hon toh poori section hide ho jaye
-    const section = container ? container.closest('section') : null; 
-    
     if (!container) return;
-    
     try {
-        const res = await ApiService.get('/catalog/brands/');
-        
-        // YAHAN FIX KIYA HAI: API data ko sahi se extract karna (results array)
-        const brands = res.results || res;
-        
-        // Agar brands list empty hai ya array nahi hai
-        if(!brands || !Array.isArray(brands) || brands.length === 0) { 
-            if(section) section.style.display = 'none'; 
-            return; 
-        }
-
-        // Sirf top 8 brands home page par show karne ke liye slice() ka use
-        const popularBrands = brands.slice(0, 8);
-        
-        container.innerHTML = popularBrands.map(b => `
-            <div class="brand-circle" style="text-align: center; cursor: pointer; flex-shrink: 0; width: 75px;" onclick="window.location.href='./search_results.html?brand=${b.id}'">
-                <div class="brand-img-box" style="width: 60px; height: 60px; border-radius: 50%; overflow: hidden; border: 1px solid #ddd; margin: 0 auto; background: #fff; display: flex; align-items: center; justify-content: center;">
-                    <img src="${b.logo_url || b.logo || 'https://via.placeholder.com/60?text=Brand'}" 
-                         alt="${b.name}" 
-                         style="width: 100%; height: 100%; object-fit: contain;"
-                         onerror="this.src='https://via.placeholder.com/60?text=Brand'">
-                </div>
-                <div style="font-size: 0.75rem; margin-top: 6px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                    ${b.name || 'Brand'}
-                </div>
+        const brands = await ApiService.get('/catalog/brands/');
+        if(!brands.length) { container.style.display = 'none'; return; }
+        container.innerHTML = brands.map(b => `
+            <div class="brand-circle" onclick="window.location.href='./search_results.html?brand=${b.id}'">
+                <img src="${b.logo_url}" alt="${b.name}">
             </div>
         `).join('');
-        
-        if(section) section.style.display = 'block';
-
-    } catch (e) {
-        console.error("Brands load hone mein error aayi:", e);
-        if(section) section.style.display = 'none';
-    }
+    } catch (e) {}
 }
 
 async function loadFlashSales() {
