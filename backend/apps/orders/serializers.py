@@ -1,22 +1,9 @@
 # apps/orders/serializers.py
 from rest_framework import serializers
-from .models import Order, OrderItem, Cart, CartItem
-from apps.catalog.models import Product
-from rest_framework import serializers
-from .models import Order, OrderItem, Cart, CartItem
-from apps.catalog.models import Product
-from rest_framework import serializers
-from .models import Order
-# apps/orders/serializers.py
-from rest_framework import serializers
-from .models import Order, OrderItem, Cart, CartItem
-from apps.catalog.models import Product
-from rest_framework import serializers
+from decimal import Decimal
 from .models import Order, OrderItem, Cart, CartItem
 from apps.catalog.models import Product
 from apps.pricing.services import SurgePricingService
-from decimal import Decimal
-
 
 class CartItemSerializer(serializers.ModelSerializer):
     sku_code = serializers.CharField(source='sku.sku', read_only=True)
@@ -29,12 +16,20 @@ class CartItemSerializer(serializers.ModelSerializer):
         model = CartItem
         fields = ('id', 'sku_code', 'sku_name','product_name', 'quantity', 'price', 'total_price', 'image')
 
+    # ✅ FIXED: Removed .url and added check for External vs Local links
     def get_image(self, obj):
-        # Resolve via SKU string from Catalog
         p = Product.objects.filter(sku=obj.sku.sku).first()
-        if p and p.image:
-            return p.image.url
-        return None
+        if not p or not p.image:
+            return None
+            
+        if p.image.startswith('http'):
+            return p.image
+            
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(p.image)
+            
+        return p.image
 
 class CartSerializer(serializers.ModelSerializer):
     items = CartItemSerializer(many=True, read_only=True)
@@ -52,9 +47,20 @@ class OrderItemSerializer(serializers.ModelSerializer):
         model = OrderItem
         fields = ("sku", "product_name", "sku_name", "quantity", "price", "total_price", "sku_image")
 
+    # ✅ FIXED: Removed .url and added check for External vs Local links
     def get_sku_image(self, obj):
         product = Product.objects.filter(sku=obj.sku).first()
-        return product.image.url if (product and product.image) else None
+        if not product or not product.image:
+            return None
+            
+        if product.image.startswith('http'):
+            return product.image
+            
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(product.image)
+            
+        return product.image
 
     def get_total_price(self, obj):
         return obj.price * obj.quantity
@@ -68,7 +74,6 @@ class OrderSerializer(serializers.ModelSerializer):
     refund_details = serializers.SerializerMethodField()
 
     delivery_otp = serializers.SerializerMethodField()
-
 
     class Meta:
         model = Order
