@@ -84,6 +84,39 @@
 }
 .product-scroll-wrapper .product-card { flex: 0 0 200px; }
 
+
+
+/* --- Brand Scroller Styling --- */
+.brand-circle {
+    width: 80px;           /* Circle ki fixed width */
+    height: 80px;          /* Circle ki fixed height */
+    min-width: 80px;       /* Scroller mein shrink hone se rokne ke liye */
+    border-radius: 50%;    /* Pura gol (circle) banane ke liye */
+    border: 1px solid #eaeaea;
+    background-color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    cursor: pointer;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    transition: transform 0.2s ease;
+}
+
+.brand-circle:hover {
+    transform: scale(1.05); /* Hover karne par thoda sa bada hoga (animation) */
+}
+
+.brand-circle img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain; /* Image ko crop hone se bachayega aur pura dikhayega */
+    padding: 12px;       /* Logo circle ki boundary se na chipke isliye padding */
+}
+
+
+
+
 @media(max-width: 768px) {
     .hero-slide { height: 160px; }
     .category-scroll { grid-template-columns: repeat(4, 1fr); gap: 10px; }

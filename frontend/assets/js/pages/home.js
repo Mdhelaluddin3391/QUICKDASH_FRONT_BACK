@@ -262,25 +262,25 @@ async function loadBrands() {
     
     try {
         const response = await ApiService.get('/catalog/brands/');
-        
-        // Fix: Handle both paginated response (response.results) and direct array (response)
         const brands = response.results ? response.results : response;
 
-        // Agar brands array khali hai ya nahi mila
         if(!brands || brands.length === 0) { 
             container.style.display = 'none'; 
             return; 
         }
 
-        container.style.display = 'flex'; // Ensure container is visible
+        container.style.display = 'flex';
         
-        container.innerHTML = brands.map(b => `
+        // Fix: Sirf shuru ke 8 brands hi dikhayein (.slice(0, 8) use karke)
+        const brandsToShow = brands.slice(0, 8);
+
+        container.innerHTML = brandsToShow.map(b => `
             <div class="brand-circle" onclick="window.location.href='./search_results.html?brand=${b.id}'">
                 <img src="${b.logo_url || b.logo || 'https://via.placeholder.com/100?text=Brand'}" alt="${b.name}">
             </div>
         `).join('');
     } catch (e) {
-        console.error("Brands load karne mein error aayi:", e);
+        console.error("Brands load error:", e);
         container.style.display = 'none';
     }
 }
