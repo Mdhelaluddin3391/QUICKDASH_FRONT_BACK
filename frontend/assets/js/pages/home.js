@@ -274,9 +274,13 @@ async function loadBrands() {
         // Fix: Sirf shuru ke 8 brands hi dikhayein (.slice(0, 8) use karke)
         const brandsToShow = brands.slice(0, 8);
 
+        // Updated Structure: Image ke niche Name show karne ke liye
         container.innerHTML = brandsToShow.map(b => `
-            <div class="brand-circle" onclick="window.location.href='./search_results.html?brand=${b.id}'">
-                <img src="${b.logo_url || b.logo || 'https://via.placeholder.com/100?text=Brand'}" alt="${b.name}">
+            <div class="brand-item" onclick="window.location.href='./search_results.html?brand=${b.id}'">
+                <div class="brand-circle">
+                    <img src="${b.logo_url || b.logo || 'https://via.placeholder.com/100?text=Brand'}" alt="${b.name}">
+                </div>
+                <div class="brand-name">${b.name}</div>
             </div>
         `).join('');
     } catch (e) {

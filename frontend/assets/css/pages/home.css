@@ -85,12 +85,19 @@
 .product-scroll-wrapper .product-card { flex: 0 0 200px; }
 
 
+/* --- Brand Scroller Styling (UPDATED) --- */
+.brand-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    min-width: 80px; /* Scroller mein shrink na ho isliye */
+    width: 80px;
+}
 
-/* --- Brand Scroller Styling --- */
 .brand-circle {
     width: 80px;           /* Circle ki fixed width */
     height: 80px;          /* Circle ki fixed height */
-    min-width: 80px;       /* Scroller mein shrink hone se rokne ke liye */
     border-radius: 50%;    /* Pura gol (circle) banane ke liye */
     border: 1px solid #eaeaea;
     background-color: #fff;
@@ -98,13 +105,15 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    cursor: pointer;
     box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    transition: transform 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    margin-bottom: 8px;    /* Image aur naam ke beech ki space */
 }
 
-.brand-circle:hover {
-    transform: scale(1.05); /* Hover karne par thoda sa bada hoga (animation) */
+/* Hover karne par pura item interactive lagega */
+.brand-item:hover .brand-circle {
+    transform: scale(1.05);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
 
 .brand-circle img {
@@ -114,9 +123,20 @@
     padding: 12px;       /* Logo circle ki boundary se na chipke isliye padding */
 }
 
+.brand-name {
+    font-size: 0.8rem;
+    color: var(--text-main, #444); /* Theme ke hisaab se color adjust karega */
+    text-align: center;
+    font-weight: 600;
+    width: 100%;
+    /* Agar naam bohot bada hua toh 1 line me truncate hoke '...' dikhega */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 
-
+/* Media Queries */
 @media(max-width: 768px) {
     .hero-slide { height: 160px; }
     .category-scroll { grid-template-columns: repeat(4, 1fr); gap: 10px; }
