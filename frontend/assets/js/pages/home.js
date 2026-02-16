@@ -264,7 +264,10 @@ async function loadBrands() {
     if (!container) return;
     
     try {
-        const brands = await ApiService.get('/catalog/brands/');
+        const res = await ApiService.get('/catalog/brands/');
+        
+        // YAHAN FIX KIYA HAI: API data ko sahi se extract karna (results array)
+        const brands = res.results || res;
         
         // Agar brands list empty hai ya array nahi hai
         if(!brands || !Array.isArray(brands) || brands.length === 0) { 
