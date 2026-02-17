@@ -62,23 +62,11 @@ async function loadCart() {
     </div>
 `}).join('');
 
-        // ✅ Update Summary (Delivery Fee logic added)
+        // ✅ Sirf 'Total (To Pay)' Update karein
         const subtotal = parseFloat(cart.total_amount || 0);
         const total = subtotal + DELIVERY_FEE;
 
-        document.getElementById('subtotal').innerText = Formatters.currency(subtotal);
-        
-        const delEl = document.getElementById('summ-delivery');
-        if (delEl) {
-            if (DELIVERY_FEE > 0) {
-                delEl.innerText = Formatters.currency(DELIVERY_FEE);
-                delEl.classList.remove('text-success'); // हरा रंग हटाएं
-            } else {
-                delEl.innerText = 'FREE';
-                delEl.classList.add('text-success'); // हरा रंग लगाएं
-            }
-        }
-
+        // Subtotal aur Delivery ki extra lines hata di hain, taaki error na aaye
         document.getElementById('total').innerText = Formatters.currency(total);
 
     } catch (e) {
@@ -89,7 +77,7 @@ async function loadCart() {
 
 window.changeQty = async function (skuCode, newQty) {
     try {
-        // अगर यूजर 0 कर रहा है, तो delete logic कॉल करें या कन्फर्म करें
+        // अगर यूजर 0 कर रहा है, तो delete logic कॉल करें
         if (newQty <= 0) {
             await deleteItem(skuCode);
             return;
@@ -107,7 +95,6 @@ window.changeQty = async function (skuCode, newQty) {
         await loadCart();
 
     } catch (e) {
-        // Toast पहले से आपके कोड में है, वह ठीक है
         if (window.Toast) Toast.error("Failed to update cart");
 
         // एरर आने पर वापस इनेबल करें

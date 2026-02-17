@@ -6,9 +6,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Cart - QuickDash</title>
     <script src="/assets/js/env.js"></script>
-<script src="/assets/js/config.js"></script>
-<link rel="preload" href="./components/navbar.html" as="fetch" crossorigin>
-<link rel="preload" href="./components/footer.html" as="fetch" crossorigin>
+    <script src="/assets/js/config.js"></script>
+    <link rel="preload" href="./components/navbar.html" as="fetch" crossorigin>
+    <link rel="preload" href="./components/footer.html" as="fetch" crossorigin>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="./assets/css/base.css?v=1.0.0">
     <link rel="stylesheet" href="./assets/css/components.css?v=1.0.0">
@@ -42,32 +42,17 @@
 
             <div class="cart-summary-wrapper">
                 <div class="summary-card">
-                    <h3>Bill Details</h3>
-                    
-                    <div class="summary-row">
-                        <span>Item Total</span>
-                        <span id="subtotal">₹0</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Delivery Fee</span>
-                        <span id="summ-delivery">...</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Govt Taxes & Charges</span>
-                        <span>₹0.00</span>
-                    </div>
-                    
-                    <div class="summary-row total-row">
-                        <span>To Pay</span>
-                        <span id="total" class="text-primary">₹0</span>
+                    <div class="summary-row total-row" style="border-top: none; padding-top: 0; margin-top: 0;">
+                        <span style="font-size: 1.1rem; font-weight: bold; color: #374151;">To Pay</span>
+                        <span id="total" class="text-primary" style="font-size: 1.3rem; font-weight: 800;">₹0</span>
                     </div>
 
-                    <a href="checkout.html" class="btn btn-primary w-100 mt-4 py-3" style="font-size: 1rem;">
+                    <a href="checkout.html" class="btn btn-primary w-100 mt-3 py-3" style="font-size: 1.1rem; box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4); text-align: center; display: block;">
                         Proceed to Checkout <i class="fas fa-arrow-right ms-2"></i>
                     </a>
 
-                    <div class="secure-badge">
-                        <i class="fas fa-shield-alt"></i> Safe & Secure Payment
+                    <div class="text-center mt-3">
+                        <small class="text-muted">By placing order, you agree to our Terms.</small>
                     </div>
                 </div>
             </div>
