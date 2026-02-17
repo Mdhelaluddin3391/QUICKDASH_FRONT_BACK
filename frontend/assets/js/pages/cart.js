@@ -109,7 +109,7 @@ window.changeQty = async function (skuCode, newQty) {
 
 window.deleteItem = async function (skuCode) {
     try {
-        if (!confirm("Remove item from cart?")) return;
+        // YAHAN SE 'confirm()' WALI LINE HATA DI GAYI HAI
 
         // UI Feedback: Disable buttons temporarily
         const card = document.getElementById(`item-card-${skuCode}`);
@@ -119,11 +119,23 @@ window.deleteItem = async function (skuCode) {
             card.style.opacity = '0.7';
         }
 
-        await CartService.updateItem(skuCode, 0); // Setting quantity to 0 removes the item
+        // Setting quantity to 0 removes the item in backend
+        await CartService.updateItem(skuCode, 0); 
+        
+        // Agar aapke paas Toast system hai, toh item hatne ka notification de sakte hain
+        if (window.Toast) {
+            window.Toast.show("Item removed from cart", "info");
+        }
+
         await loadCart(); // Refresh UI
 
     } catch (e) {
-        if (window.Toast) Toast.error("Failed to remove item");
+        if (window.Toast) {
+            window.Toast.show("Failed to remove item", "error");
+        } else {
+            console.error("Failed to remove item", e);
+        }
+        
         // Re-enable on error
         const card = document.getElementById(`item-card-${skuCode}`);
         if (card) {
