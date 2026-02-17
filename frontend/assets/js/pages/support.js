@@ -1,72 +1,109 @@
-document.addEventListener('DOMContentLoaded', async () => {
-    const orderSelect = document.getElementById('ticket-order');
-    loadTicketHistory();
+document.getElementById('chat-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('msg-input');
+    const text = input.value.trim();
+    if (!text) return;
 
-    if (!localStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN)) {
-        orderSelect.innerHTML = '<option value="">Login to see orders</option>';
-        return;
-    }
+    addMsg(text, 'sent');
+    input.value = '';
+
+    const typingId = 'typing-' + Date.now();
+    addMsg('...', 'received', typingId);
 
     try {
-        const res = await ApiService.get('/orders/my/');
-        const orders = res.results || res;
-        if (orders.length === 0) {
-            orderSelect.innerHTML = '<option value="">No orders found</option>';
+        const res = await window.ApiService.post('/assistant/chat/', { message: text });
+
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+
+        if (res.reply) {
+            addMsg(res.reply, 'received');
         } else {
-            const options = orders.map(o => `<option value="${o.id}">Order #${o.id} - ${Formatters.date(o.created_at)}</option>`).join('');
-            orderSelect.innerHTML = '<option value="">Select an order...</option>' + options;
+            addMsg("Mujhe iska jawab nahi pata.", 'received');
         }
-    } catch (e) {
-        orderSelect.innerHTML = '<option value="">Failed to load orders</option>';
+
+        // WhatsApp Action Handling
+        if (res.action === 'whatsapp_support' && res.params && res.params.url) {
+            addWhatsAppButton(res.params.url);
+        }
+
+        // Action Handling for tracking
+        if (res.action === 'track_order' && res.params && res.params.order_id) {
+            addActionButton('Track Order Now', `/track_order.html?id=${res.params.order_id}`);
+        }
+
+        if (res.action === 'view_orders') {
+            addActionButton('View All Orders', '/orders.html');
+        }
+
+    } catch (err) {
+        console.error(err);
+        const typingEl = document.getElementById(typingId);
+        if (typingEl) typingEl.remove();
+        addMsg("Network error. Kripya dobara koshish karein.", 'received');
     }
 });
 
-function loadTicketHistory() {
-    const historyDiv = document.getElementById('ticket-history');
-    try {
-        const tickets = JSON.parse(localStorage.getItem('support_tickets') || '[]');
-        if (tickets.length === 0) {
-            historyDiv.innerHTML = '<p class="text-muted small">No previous tickets</p>';
-            return;
-        }
-        historyDiv.innerHTML = tickets.map(t => `
-            <div class="ticket-item p-2 border-bottom small">
-                <strong>#${t.id}</strong> - ${t.subject}
-                <br><span class="text-muted text-xs">${t.date}</span>
-            </div>
-        `).join('');
-    } catch (e) {
-        historyDiv.innerHTML = '';
-    }
+function addMsg(text, type, id = null) {
+    const div = document.createElement('div');
+    div.className = `msg ${type}`;
+    div.innerText = text; // innerText avoids XSS attacks
+    if (id) div.id = id;
+
+    const box = document.getElementById('chat-box');
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
 }
 
-document.getElementById('support-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
+// Custom Function to Add WhatsApp Button
+function addWhatsAppButton(url) {
+    const div = document.createElement('div');
+    div.className = "msg received";
+    div.style.backgroundColor = "transparent"; 
+    div.style.padding = "0";
 
-    const subject = document.getElementById('ticket-subject').value;
-    const message = document.getElementById('ticket-message').value;
-    const orderId = document.getElementById('ticket-order').value;
+    const btn = document.createElement('a');
+    btn.href = url;
+    btn.target = "_blank";
+    btn.innerHTML = '<i class="fab fa-whatsapp"></i> Chat on WhatsApp';
+    
+    // Inline styling for the button (Aap isko apne CSS me bhi daal sakte hain)
+    btn.style.display = "inline-block";
+    btn.style.backgroundColor = "#25d366";
+    btn.style.color = "white";
+    btn.style.padding = "10px 20px";
+    btn.style.borderRadius = "8px";
+    btn.style.textDecoration = "none";
+    btn.style.fontWeight = "bold";
+    btn.style.marginTop = "5px";
 
-    try {
-        const payload = { subject, message };
-        if (orderId) payload.order_id = orderId;
+    div.appendChild(btn);
+    const box = document.getElementById('chat-box');
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+}
 
-        const res = await ApiService.post('/support/tickets/', payload);
+// Custom Function to Add General Action Buttons (Track Order, etc)
+function addActionButton(text, url) {
+    const div = document.createElement('div');
+    div.className = "msg received";
+    div.style.backgroundColor = "transparent"; 
+    div.style.padding = "0";
 
-        Toast.show('Ticket created successfully!', 'success');
+    const btn = document.createElement('a');
+    btn.href = url;
+    btn.innerHTML = text;
+    
+    btn.style.display = "inline-block";
+    btn.style.backgroundColor = "var(--primary, #007bff)";
+    btn.style.color = "white";
+    btn.style.padding = "8px 15px";
+    btn.style.borderRadius = "5px";
+    btn.style.textDecoration = "none";
+    btn.style.marginTop = "5px";
 
-        const newTicket = {
-            id: res.id,
-            subject: subject,
-            date: new Date().toLocaleDateString()
-        };
-        const tickets = JSON.parse(localStorage.getItem('support_tickets') || '[]');
-        tickets.unshift(newTicket);
-        localStorage.setItem('support_tickets', JSON.stringify(tickets.slice(0, 5)));
-
-        e.target.reset();
-        loadTicketHistory();
-    } catch (e) {
-        Toast.show('Failed to create ticket', 'error');
-    }
-});
+    div.appendChild(btn);
+    const box = document.getElementById('chat-box');
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+}
