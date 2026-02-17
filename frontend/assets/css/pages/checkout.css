@@ -280,29 +280,65 @@
     gap: 6px;
 }
 
-/* Mobile Responsive Adjustments */
+/* ======================================================= */
+/* Mobile Responsive Adjustments (Premium UI for Cart)    */
+/* ======================================================= */
 @media (max-width: 576px) {
     .cart-item {
-        flex-direction: column; /* पूरा कार्ड ऊपर नीचे हो सकता है, लेकिन qty साइड में चाहिए */
-        align-items: flex-start;
+        display: grid;
+        grid-template-columns: 75px 1fr; /* Image left mein, baki text right mein */
+        gap: 5px 15px; /* Spacing */
+        padding: 12px;
+        align-items: center;
     }
 
     .item-img {
+        width: 75px;
+        height: 75px;
+        object-fit: cover;
+        margin: 0;
+        grid-column: 1;
+        grid-row: 1 / span 2; /* Image dono rows cover karegi */
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.08); /* Halki si shadow premium look ke liye */
+    }
+
+    .item-details {
+        grid-column: 2;
+        grid-row: 1; /* Name aur Price upar */
         width: 100%;
-        height: 120px; /* मोबाइल में इमेज थोड़ी बड़ी */
-        margin-right: 0;
-        margin-bottom: 10px;
+    }
+
+    .item-name {
+        font-size: 0.95rem;
+        margin-bottom: 3px;
+        line-height: 1.3;
+        color: #1f2937;
+    }
+
+    .item-price {
+        font-size: 0.95rem;
     }
 
     .qty-and-delete {
+        grid-column: 2;
+        grid-row: 2; /* Buttons niche */
         width: 100%;
-        justify-content: space-between; /* Qty बाएं, Delete दाएं */
-        margin-top: 10px;
-        flex-direction: row !important; /* यह लाइन बहुत जरूरी है */
+        justify-content: space-between; /* Plus/Minus ek side, Delete ek side */
+        flex-direction: row !important;
+        margin-top: 8px;
     }
     
-    .item-details {
-        width: 100%;
+    /* Touch friendly buttons for mobile */
+    .qty-btn-sm {
+        width: 30px;
+        height: 30px;
+        font-size: 0.9rem;
+    }
+    
+    .delete-btn {
+        padding: 5px 12px;
+        font-size: 0.85rem;
     }
 }
 
@@ -323,9 +359,6 @@
         padding-bottom: 140px; 
     }
 }
-
-
-
 
 /* --- Disabled Payment Option --- */
 .payment-option.disabled-option {
