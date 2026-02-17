@@ -323,3 +323,19 @@
         padding-bottom: 140px; 
     }
 }
+
+
+
+
+/* --- Disabled Payment Option --- */
+.payment-option.disabled-option {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background-color: #f9fafb; /* Light grey background */
+    border-color: #e5e7eb;
+    pointer-events: none; /* CSS se click block karne ke liye */
+}
+
+.payment-option.disabled-option:hover {
+    border-color: #e5e7eb; /* Hover pe bhi border change nahi hoga */
+}

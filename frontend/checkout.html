@@ -66,15 +66,18 @@
                             <i class="fas fa-check-circle ml-auto text-primary" style="font-size:1.2rem;"></i>
                         </label>
 
-                        <label class="payment-option" onclick="selectPayment('RAZORPAY', this)">
-                            <input type="radio" name="payment" value="RAZORPAY">
-                            <div class="pay-icon"><i class="fas fa-credit-card text-primary"></i></div>
+                        <label class="payment-option disabled-option" title="Currently Unavailable">
+                            <input type="radio" name="payment" value="RAZORPAY" disabled>
+                            <div class="pay-icon"><i class="fas fa-credit-card" style="color: #9ca3af;"></i></div>
                             <div>
-                                <strong style="font-size:1.05rem;">Pay Online</strong>
-                                <p class="text-muted small m-0">UPI, Cards, Netbanking (Razorpay)</p>
+                                <strong style="font-size:1.05rem; color: #6b7280;">Pay Online
+                                    <span
+                                        style="font-size: 0.7rem; background: #e5e7eb; color: #4b5563; padding: 2px 6px; border-radius: 4px; margin-left: 5px;">Coming
+                                        Soon</span>
+                                </strong>
+                                <p class="text-muted small m-0">UPI, Cards, Netbanking (Currently unavailable)</p>
                             </div>
-                            <i class="fas fa-check-circle ml-auto text-primary"
-                                style="font-size:1.2rem; opacity:0;"></i>
+                            <i class="fas fa-lock ml-auto" style="font-size:1.2rem; color: #d1d5db;"></i>
                         </label>
                     </div>
                 </div>
