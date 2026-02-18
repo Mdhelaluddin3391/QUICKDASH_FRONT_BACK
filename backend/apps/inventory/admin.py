@@ -2,11 +2,18 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.db import models
+from django.urls import path            # ✅ Added: URL routing ke liye
+from django.http import JsonResponse    # ✅ Added: Data wapas bhejne ke liye
 from .models import InventoryItem, InventoryTransaction
+from apps.catalog.models import Product # ✅ Added: Product search karne ke liye
 
 
 @admin.register(InventoryItem)
 class InventoryItemAdmin(admin.ModelAdmin):
+    # ✅ JS File Link ki gayi hai taaki browser me SKU change detect ho sake
+    class Media:
+        js = ('inventory/js/sku_lookup.js',)
+
     list_display = (
         'sku',
         'product_name',
@@ -28,7 +35,7 @@ class InventoryItemAdmin(admin.ModelAdmin):
         'sku',
         'product_name',
         'bin__bin_code',
-        'bin__rack__number'  # Fixed: changed from rack_number to number
+        'bin__rack__number'
     )
     # Optimized to prevent N+1 queries
     list_select_related = (
@@ -57,6 +64,31 @@ class InventoryItemAdmin(admin.ModelAdmin):
     )
 
     readonly_fields = ('updated_at',)
+
+    # ✅ NAYA CODE: Custom URL add kiya taaki JS ispe request bhej sake
+    def get_urls(self):
+        urls = super().get_urls()
+        my_urls = [
+            path('lookup-product-data/', self.admin_site.admin_view(self.lookup_product_data), name='inventory-product-lookup'),
+        ]
+        return my_urls + urls
+
+    # ✅ NAYA CODE: Backend logic jo Catalog me SKU dhundega
+    def lookup_product_data(self, request):
+        sku = request.GET.get('sku')
+        data = {'found': False}
+        if sku:
+            # Case-insensitive search
+            product = Product.objects.filter(sku__iexact=sku).first()
+            if product:
+                data = {
+                    'found': True,
+                    'name': product.name,
+                    'price': str(product.mrp) # Decimal ko string banaya JSON ke liye
+                }
+        return JsonResponse(data)
+
+    # --- Niche ka sara code wahi purana hai ---
 
     def warehouse_name(self, obj):
         return obj.warehouse.name
