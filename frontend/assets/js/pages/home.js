@@ -38,9 +38,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function initHome() {
     // Parallel load for independent components
+    // 'loadCategories' ko yahan move kiya taaki 8 categories hamesha dikhein
     loadBanners();
     loadBrands();
     loadFlashSales();
+    loadCategories(); 
 
     // Clear feed container before loading
     const feedContainer = document.getElementById('feed-container');
@@ -56,7 +58,6 @@ async function initHome() {
             setupStorefrontScroll(ctx.lat, ctx.lng, ctx.city);
         } else {
             // Location exists but no coords? Fallback.
-            await loadCategories(); 
             setupGenericScroll();
         }
     } else {
@@ -73,7 +74,6 @@ async function initHome() {
             </div>
         `;
         
-        await loadCategories();
         setupGenericScroll();
     }
 }
@@ -126,8 +126,6 @@ async function loadStorefront(lat, lng, city, isInitial = false) {
                     </button>
                 </div>
             `;
-            // If not serviceable, load categories so top bar isn't empty
-            if (catContainer) await loadCategories(); 
             sfHasNext = false; // Stop further loading
             return;
         }
@@ -140,17 +138,10 @@ async function loadStorefront(lat, lng, city, isInitial = false) {
 
         // Render Categories
         if (res.categories && res.categories.length > 0) {
-            // Only update top circles on first page load
-            if (isInitial && catContainer) {
-                catContainer.innerHTML = res.categories.map(c => `
-                    <div class="cat-card" onclick="window.location.href='./search_results.html?slug=${c.slug}'">
-                        <div class="cat-img-box">
-                            <img src="${c.icon || 'https://cdn-icons-png.flaticon.com/512/3703/3703377.png'}" alt="${c.name}" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3703/3703377.png'">
-                        </div>
-                        <div class="cat-name">${c.name}</div>
-                    </div>
-                `).join('');
-            }
+            
+            // NOTE: Yahan se wo code hata diya jo 'catContainer' ko update karta tha.
+            // Kyunki storefront API pagination ki wajah se sirf 4 categories bhej raha hai.
+            // Upar wala 'Shop by Category' section ab 'loadCategories()' sambhalega jo hamesha 8 dikhayega.
 
             // Render Feed Sections (Append mode)
             const html = res.categories.map(cat => {
@@ -170,10 +161,7 @@ async function loadStorefront(lat, lng, city, isInitial = false) {
             feedContainer.insertAdjacentHTML('beforeend', html);
 
         } else if (isInitial) {
-            // UPDATED: Agar Storefront se categories nahi aayi, toh Generic Categories load karein
             console.warn("Storefront returned no categories, loading generic fallback.");
-            if (catContainer) await loadCategories();
-            
             feedContainer.innerHTML = '<p class="text-center py-5">No products available in this store right now.</p>';
         }
 
@@ -185,7 +173,6 @@ async function loadStorefront(lat, lng, city, isInitial = false) {
         // Fallback to generic feed if Storefront crashes on initial load
         if (isInitial) {
             loadGenericFeed(true); // true = isInitial
-            if (catContainer) loadCategories(); 
         }
     } finally {
         sfLoading = false;
@@ -314,6 +301,7 @@ async function loadCategories() {
         // Fallback for categories if Storefront API fails or no location
         const cats = await ApiService.get('/catalog/categories/parents/');
         if (Array.isArray(cats) && cats.length > 0) {
+            // Updated: Slice(0, 8) ensures exactly 8 categories are shown
             container.innerHTML = cats.slice(0, 8).map(c => `
                 <div class="cat-card" onclick="window.location.href='./search_results.html?slug=${c.slug}'">
                     <div class="cat-img-box">
