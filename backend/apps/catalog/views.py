@@ -399,6 +399,7 @@ class CategoryListAPIView(generics.ListAPIView):
     permission_classes = [AllowAny]
     authentication_classes = [] 
     serializer_class = SimpleCategorySerializer 
+    pagination_class = None
     
     
     def get_queryset(self):
