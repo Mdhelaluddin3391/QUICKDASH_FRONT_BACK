@@ -383,6 +383,7 @@ class BrandListAPIView(generics.ListAPIView):
     authentication_classes = [] 
     serializer_class = BrandSerializer
     queryset = Brand.objects.filter(is_active=True)
+    pagination_class = None
 
 class FlashSaleListAPIView(APIView):
     permission_classes = [AllowAny]
@@ -398,6 +399,7 @@ class CategoryListAPIView(generics.ListAPIView):
     permission_classes = [AllowAny]
     authentication_classes = [] 
     serializer_class = SimpleCategorySerializer 
+    
     
     def get_queryset(self):
         return Category.objects.filter(is_active=True).order_by('name')
