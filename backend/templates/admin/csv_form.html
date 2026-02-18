@@ -1,0 +1,15 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<div>
+    <h2>Upload Products CSV</h2>
+    <p>Please upload a CSV file with the following headers: <br>
+    <code>name, sku, description, unit, mrp, category, brand, is_active, image</code></p>
+    
+    <form method="POST" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="file" name="csv_file" required>
+        <br><br>
+        <input type="submit" value="Upload" class="default" style="padding: 10px 20px; background: #417690; color: white; border: none; cursor: pointer;">
+    </form>
+</div>
+{% endblock %}

@@ -1,4 +1,10 @@
+# apps/catalog/admin.py
+import csv
+import io
+from django.shortcuts import render, redirect
+from django.urls import path
 from django.contrib import admin
+from django.contrib import messages
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Sum
@@ -20,10 +26,12 @@ class ProductImageInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
+    change_list_template = "admin/catalog/product/change_list.html"  # ✅ CSV Button ke liye template
+
     list_display = (
         'name',
         'sku',
-        'image_preview',  # ✅ Naya Image Preview
+        'image_preview',
         'category_name',
         'mrp',
         'stock_status',
@@ -53,14 +61,14 @@ class ProductAdmin(admin.ModelAdmin):
         ('Basic Information', {
             'fields': ('name', 'sku', 'description', 'unit')
         }),
-        ('Categorization', {
+        ('Shop by Store', {  # ✅ Yahan naam change kiya gaya hai
             'fields': ('category', 'brand')
         }),
         ('Pricing & Inventory', {
             'fields': ('mrp', 'is_active')
         }),
         ('Media', {
-            'fields': ('image', 'image_preview'), # ✅ Preview dikhane ke liye
+            'fields': ('image', 'image_preview'),
             'classes': ('collapse',)
         }),
         ('Timestamps', {
@@ -69,9 +77,82 @@ class ProductAdmin(admin.ModelAdmin):
         }),
     )
 
-    readonly_fields = ('created_at', 'image_preview') # ✅ Readonly banaya
+    readonly_fields = ('created_at', 'image_preview')
 
-    # ✅ NAYA FUNCTION: URL se direct image dikhane ke liye
+    # ✅ CSV IMPORT URL ADDING
+    def get_urls(self):
+        urls = super().get_urls()
+        new_urls = [
+            path('import-csv/', self.import_csv),
+        ]
+        return new_urls + urls
+
+    # ✅ CSV IMPORT LOGIC
+    def import_csv(self, request):
+        if request.method == "POST":
+            csv_file = request.FILES["csv_file"]
+            
+            if not csv_file.name.endswith('.csv'):
+                messages.warning(request, 'The wrong file type was uploaded. Please upload a CSV file.')
+                return redirect("..")
+            
+            file_data = csv_file.read().decode("utf-8")
+            csv_data = io.StringIO(file_data)
+            
+            reader = csv.DictReader(csv_data)
+            
+            count = 0
+            for row in reader:
+                try:
+                    # Category dhoondo ya banao
+                    category_name = row.get('category', '').strip()
+                    category_obj = None
+                    if category_name:
+                        category_obj, _ = Category.objects.get_or_create(
+                            name=category_name, 
+                            defaults={'slug': category_name.lower().replace(" ", "-")}
+                        )
+
+                    # Brand dhoondo ya banao
+                    brand_name = row.get('brand', '').strip()
+                    brand_obj = None
+                    if brand_name:
+                        brand_obj, _ = Brand.objects.get_or_create(
+                            name=brand_name, 
+                            defaults={'slug': brand_name.lower().replace(" ", "-")}
+                        )
+
+                    is_active_val = str(row.get('is_active', 'TRUE')).strip().upper() == 'TRUE'
+
+                    # Product Update ya Create karo
+                    obj, created = Product.objects.update_or_create(
+                        sku=row.get('sku'),
+                        defaults={
+                            'name': row.get('name'),
+                            'description': row.get('description', ''),
+                            'unit': row.get('unit', '1 Unit'),
+                            'image': row.get('image', ''),
+                            'mrp': row.get('mrp', 0.00),
+                            'is_active': is_active_val,
+                            'category': category_obj,
+                            'brand': brand_obj,
+                        }
+                    )
+                    count += 1
+                except Exception as e:
+                    messages.error(request, f"Error in row {row.get('sku', 'Unknown')}: {e}")
+                    continue
+
+            self.message_user(request, f"{count} products imported successfully.")
+            return redirect("..")
+            
+        # Form dikhane ke liye (Note: Aapko templates create karne honge jo maine pichle msg me diye the)
+        form = {}
+        payload = {"form": form}
+        return render(request, "admin/csv_form.html", payload)
+
+    # --- Purane Functions ---
+
     def image_preview(self, obj):
         if obj.image:
             return format_html('<img src="{}" style="max-height: 50px; max-width: 50px; border-radius: 5px; object-fit: cover;" />', obj.image)
@@ -89,7 +170,6 @@ class ProductAdmin(admin.ModelAdmin):
     mrp_display.admin_order_field = 'mrp'
 
     def stock_status(self, obj):
-        # Calculate total stock from inventory
         from apps.inventory.models import InventoryItem
         total_stock = InventoryItem.objects.filter(sku=obj.sku).aggregate(
             total=Sum('total_stock')
@@ -114,7 +194,6 @@ class ProductAdmin(admin.ModelAdmin):
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
-    # Admin Actions
     @admin.action(description='Activate selected products')
     def activate_products(self, request, queryset):
         updated = queryset.update(is_active=True)
@@ -144,7 +223,7 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'icon_preview', 'parent_name', 'is_active', 'product_count') # ✅ Naya Icon Preview
+    list_display = ('name', 'icon_preview', 'parent_name', 'is_active', 'product_count')
     list_filter = ('is_active', 'parent')
     search_fields = ('name', 'parent__name')
     list_select_related = ('parent',)
@@ -158,7 +237,7 @@ class CategoryAdmin(admin.ModelAdmin):
             'fields': ('name', 'slug', 'parent') 
         }),
         ('Media', {
-            'fields': ('icon', 'icon_preview'), # ✅ Naya Icon Preview
+            'fields': ('icon', 'icon_preview'),
             'classes': ('collapse',)
         }),
         ('Status', {
@@ -167,9 +246,8 @@ class CategoryAdmin(admin.ModelAdmin):
     )
 
     prepopulated_fields = {'slug': ('name',)}
-    readonly_fields = ('icon_preview',) # ✅ Naya
+    readonly_fields = ('icon_preview',)
 
-    # ✅ NAYA FUNCTION
     def icon_preview(self, obj):
         if obj.icon:
             return format_html('<img src="{}" style="max-height: 40px; max-width: 40px; border-radius: 5px; object-fit: cover;" />', obj.icon)
@@ -209,7 +287,7 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):
-    list_display = ('name', 'logo_preview', 'is_active', 'product_count') # ✅ Naya Logo Preview
+    list_display = ('name', 'logo_preview', 'is_active', 'product_count')
     list_filter = ('is_active',)
     search_fields = ('name',)
     list_editable = ('is_active',)
@@ -221,7 +299,7 @@ class BrandAdmin(admin.ModelAdmin):
             'fields': ('name', 'slug')
         }),
         ('Media', {
-            'fields': ('logo', 'logo_preview'), # ✅ Naya Logo Preview
+            'fields': ('logo', 'logo_preview'),
             'classes': ('collapse',)
         }),
         ('Status', {
@@ -230,9 +308,8 @@ class BrandAdmin(admin.ModelAdmin):
     )
 
     prepopulated_fields = {'slug': ('name',)}
-    readonly_fields = ('logo_preview',) # ✅ Naya
+    readonly_fields = ('logo_preview',)
 
-    # ✅ NAYA FUNCTION
     def logo_preview(self, obj):
         if obj.logo:
             return format_html('<img src="{}" style="max-height: 40px; max-width: 40px; border-radius: 5px; object-fit: cover;" />', obj.logo)
@@ -267,7 +344,7 @@ class BrandAdmin(admin.ModelAdmin):
 
 @admin.register(Banner)
 class BannerAdmin(admin.ModelAdmin):
-    list_display = ('title', 'image_preview', 'position', 'is_active') # ✅ Naya Banner Preview
+    list_display = ('title', 'image_preview', 'position', 'is_active')
     list_filter = ('position', 'is_active')
     search_fields = ('title', 'target_url')
     list_editable = ('is_active',)
@@ -275,16 +352,15 @@ class BannerAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('Content', {
-            'fields': ('title', 'image', 'image_preview', 'target_url') # ✅ Naya Preview
+            'fields': ('title', 'image', 'image_preview', 'target_url')
         }),
         ('Display Settings', {
             'fields': ('position', 'bg_gradient', 'is_active')
         }),
     )
 
-    readonly_fields = ('image_preview',) # ✅ Naya
+    readonly_fields = ('image_preview',)
 
-    # ✅ NAYA FUNCTION
     def image_preview(self, obj):
         if obj.image:
             return format_html('<img src="{}" style="max-height: 60px; max-width: 120px; border-radius: 5px; object-fit: cover;" />', obj.image)
