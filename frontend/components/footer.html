@@ -1,10 +1,51 @@
+<div
+    style="background: linear-gradient(to bottom, #ffffff, #f8f9fa); padding: 50px 20px; text-align: center; border-top: 1px solid #f1f1f1; margin-top: auto;">
+    <div style="max-width: 500px; margin: 0 auto;">
+        <div style="margin-bottom: 15px; animation: float 3s ease-in-out infinite;">
+            <i class="fas fa-search-location" style="font-size: 2.5rem; color: #e9ecef;"></i>
+        </div>
+
+        <h4 style="margin: 0 0 8px; color: #343a40; font-weight: 700; font-size: 1.1rem;">
+            Didn't find what you're looking for?
+        </h4>
+
+        <p style="color: #868e96; margin-bottom: 25px; font-size: 0.9rem; line-height: 1.5;">
+            Thousands of products are just a click away. Try searching for specific items or brands above.
+        </p>
+
+        <button
+            onclick="window.scrollTo({top: 0, behavior: 'smooth'}); setTimeout(() => document.querySelector('input[type=search]')?.focus(), 500);"
+            style="background: #ffffff; border: 1px solid #ced4da; padding: 12px 30px; border-radius: 50px; color: #495057; font-weight: 600; font-size: 0.9rem; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.03); transition: transform 0.2s;"
+            onmouseover="this.style.transform='translateY(-2px)'; this.style.borderColor='#adb5bd'"
+            onmouseout="this.style.transform='translateY(0)'; this.style.borderColor='#ced4da'">
+            Go to Search <i class="fas fa-arrow-up" style="margin-left: 8px; font-size: 0.8rem;"></i>
+        </button>
+    </div>
+</div>
+
+<style>
+    @keyframes float {
+        0% {
+            transform: translateY(0px);
+        }
+
+        50% {
+            transform: translateY(-8px);
+        }
+
+        100% {
+            transform: translateY(0px);
+        }
+    }
+</style>
+
 <div class="container">
     <div class="footer-grid">
         <div class="footer-col">
             <h4>QuickDash</h4>
             <p class="text-muted small">Groceries delivered in minutes. Fresh, fast, and reliable.</p>
         </div>
-        
+
         <div class="footer-col">
             <h4>Quick Links</h4>
             <a href="index.html">Home</a>
