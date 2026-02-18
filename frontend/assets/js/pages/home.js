@@ -1,8 +1,15 @@
 // frontend/assets/js/pages/home.js
 
+// State Variables for Generic Feed
 let feedPage = 1;
 let feedLoading = false;
 let feedHasNext = true;
+
+// State Variables for Storefront (Location Aware) Feed
+let sfPage = 1;
+let sfLoading = false;
+let sfHasNext = true;
+
 let currentAbortController = null; // To cancel pending requests on location change
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -14,10 +21,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const evtName = 'app:location-changed';
     window.addEventListener(evtName, async () => {
         console.log("[Home] Location changed, refreshing storefront...");
-        // Reset Feed State
+        // Reset Feed States
         feedPage = 1;
         feedHasNext = true;
         feedLoading = false;
+        
+        sfPage = 1;
+        sfHasNext = true;
+        sfLoading = false;
         
         await initHome();
     });
@@ -31,24 +42,29 @@ async function initHome() {
     loadBrands();
     loadFlashSales();
 
+    // Clear feed container before loading
+    const feedContainer = document.getElementById('feed-container');
+    feedContainer.innerHTML = '';
+
     // 3. Location-Aware Storefront Loading
     if (window.LocationManager && window.LocationManager.hasLocation()) {
         const ctx = window.LocationManager.getLocationContext();
         
         // Use Headers Context (L1 or L2)
         if (ctx.lat && ctx.lng) {
-            await loadStorefront(ctx.lat, ctx.lng, ctx.city);
+            await loadStorefront(ctx.lat, ctx.lng, ctx.city, true); // true = Initial load
+            setupStorefrontScroll(ctx.lat, ctx.lng, ctx.city);
         } else {
             // Location exists but no coords? Fallback.
             await loadCategories(); 
-            setupInfiniteScroll();
+            setupGenericScroll();
         }
     } else {
         // No Location Set -> Show Generic Feed or Prompt
         console.warn("[Home] No location set. Loading generic categories.");
         
         // Prompt User
-        document.getElementById('feed-container').innerHTML = `
+        feedContainer.innerHTML = `
             <div class="alert alert-info text-center m-3">
                 <i class="fas fa-map-marker-alt"></i> 
                 Please select your location to see products available in your area.
@@ -58,20 +74,31 @@ async function initHome() {
         `;
         
         await loadCategories();
+        setupGenericScroll();
     }
 }
 
-// 1. Optimized Storefront (Location Aware)
-// 1. Optimized Storefront (Location Aware) - Updated Logic
-async function loadStorefront(lat, lng, city) {
+// =========================================================
+// 1. STOREFRONT INFINITE SCROLL (Location ON)
+// =========================================================
+
+async function loadStorefront(lat, lng, city, isInitial = false) {
+    if (sfLoading || !sfHasNext) return;
+    
     const feedContainer = document.getElementById('feed-container');
     const catContainer = document.getElementById('category-grid');
     
+    sfLoading = true;
+    
     // UI Loading State
-    feedContainer.innerHTML = `
-        <div class="loader-spinner"></div>
-        <p class="text-center text-muted small">Finding nearby store...</p>
-    `;
+    if (isInitial) {
+        feedContainer.innerHTML = `
+            <div class="loader-spinner"></div>
+            <p class="text-center text-muted small">Finding nearby store...</p>
+        `;
+    } else {
+        insertSentinelLoader(feedContainer);
+    }
 
     try {
         // Cancel previous request if any (debounce effect)
@@ -79,11 +106,13 @@ async function loadStorefront(lat, lng, city) {
         currentAbortController = new AbortController();
 
         // ApiService automatically injects X-Location headers. 
+        // Pass page parameter for pagination
         const res = await ApiService.get(
-            `/catalog/storefront/?lat=${lat}&lon=${lng}&city=${city || ''}`
+            `/catalog/storefront/?lat=${lat}&lon=${lng}&city=${city || ''}&page=${sfPage}`
         );
         
         currentAbortController = null;
+        removeSentinelLoader();
 
         // --- [CRITICAL CHECK: Serviceability] ---
         if (res.serviceable === false) {
@@ -97,15 +126,23 @@ async function loadStorefront(lat, lng, city) {
                     </button>
                 </div>
             `;
-            // UPDATED: Clear karne ki bajaye generic categories load karein taaki section dikhe
+            // If not serviceable, load categories so top bar isn't empty
             if (catContainer) await loadCategories(); 
+            sfHasNext = false; // Stop further loading
             return;
         }
 
+        // Update Infinite Scroll State
+        sfHasNext = res.has_next;
+        if(sfHasNext) sfPage++;
+
+        if (isInitial) feedContainer.innerHTML = '';
+
         // Render Categories
         if (res.categories && res.categories.length > 0) {
-            if (catContainer) {
-                catContainer.innerHTML = res.categories.slice(0, 8).map(c => `
+            // Only update top circles on first page load
+            if (isInitial && catContainer) {
+                catContainer.innerHTML = res.categories.map(c => `
                     <div class="cat-card" onclick="window.location.href='./search_results.html?slug=${c.slug}'">
                         <div class="cat-img-box">
                             <img src="${c.icon || 'https://cdn-icons-png.flaticon.com/512/3703/3703377.png'}" alt="${c.name}" onerror="this.src='https://cdn-icons-png.flaticon.com/512/3703/3703377.png'">
@@ -115,11 +152,11 @@ async function loadStorefront(lat, lng, city) {
                 `).join('');
             }
 
-            // Render Feed Sections
-            feedContainer.innerHTML = res.categories.map(cat => {
+            // Render Feed Sections (Append mode)
+            const html = res.categories.map(cat => {
                 if (!cat.products || cat.products.length === 0) return '';
                 return `
-                <section class="feed-section">
+                <section class="feed-section fade-in">
                     <div class="section-head" style="padding: 0 20px;">
                         <h3>${cat.name}</h3>
                         <a href="./search_results.html?slug=${cat.slug}">See All</a>
@@ -129,7 +166,10 @@ async function loadStorefront(lat, lng, city) {
                     </div>
                 </section>
             `}).join('');
-        } else {
+            
+            feedContainer.insertAdjacentHTML('beforeend', html);
+
+        } else if (isInitial) {
             // UPDATED: Agar Storefront se categories nahi aayi, toh Generic Categories load karein
             console.warn("Storefront returned no categories, loading generic fallback.");
             if (catContainer) await loadCategories();
@@ -140,62 +180,55 @@ async function loadStorefront(lat, lng, city) {
     } catch (e) {
         if (e.name === 'AbortError') return; // Ignore cancelled requests
         console.error("Storefront failed", e);
+        removeSentinelLoader();
         
-        // Fallback to generic feed if Storefront crashes
-        loadGenericFeed();
-        // UPDATED: Error aane par bhi Categories load honi chahiye
-        if (catContainer) loadCategories(); 
+        // Fallback to generic feed if Storefront crashes on initial load
+        if (isInitial) {
+            loadGenericFeed(true); // true = isInitial
+            if (catContainer) loadCategories(); 
+        }
+    } finally {
+        sfLoading = false;
     }
 }
 
-function setupInfiniteScroll() {
-    // Only use infinite scroll for Generic Feed (No location set)
-    loadGenericFeed();
-    
-    // Check if sentinel already exists
-    let sentinel = document.getElementById('feed-sentinel');
-    if (!sentinel) {
-        sentinel = document.createElement('div');
-        sentinel.id = 'feed-sentinel';
-        sentinel.style.height = "50px";
-        sentinel.style.marginBottom = "50px";
-        sentinel.innerHTML = '<div class="loader-spinner d-none"></div>'; 
-        document.getElementById('feed-container').after(sentinel);
-
-        const observer = new IntersectionObserver((entries) => {
-            if(entries[0].isIntersecting && !feedLoading && feedHasNext) {
-                feedPage++;
-                loadGenericFeed(); 
-            }
-        }, { rootMargin: '200px' });
-
-        observer.observe(sentinel);
-    }
+function setupStorefrontScroll(lat, lng, city) {
+    createObserver(() => loadStorefront(lat, lng, city, false), () => sfHasNext && !sfLoading);
 }
 
-// 2. Generic Fallback (No Location)
-async function loadGenericFeed() {
+// =========================================================
+// 2. GENERIC FEED INFINITE SCROLL (Location OFF)
+// =========================================================
+
+function setupGenericScroll() {
+    createObserver(() => loadGenericFeed(false), () => feedHasNext && !feedLoading);
+}
+
+async function loadGenericFeed(isInitial = false) {
     if (feedLoading || !feedHasNext) return;
+    
     feedLoading = true;
     const container = document.getElementById('feed-container');
-    const sentinelLoader = document.querySelector('#feed-sentinel .loader-spinner');
     
-    if(feedPage > 1 && sentinelLoader) sentinelLoader.classList.remove('d-none');
-    if(feedPage === 1 && !container.innerHTML) container.innerHTML = '<div class="loader-spinner"></div>';
+    if(isInitial) container.innerHTML = '<div class="loader-spinner"></div>';
+    else insertSentinelLoader(container);
 
     try {
         const res = await ApiService.get(`/catalog/home/feed/?page=${feedPage}`);
         const sections = res.sections || [];
+        removeSentinelLoader();
+        
         feedHasNext = res.has_next;
+        if(feedHasNext) feedPage++;
 
-        if(feedPage === 1) container.innerHTML = '';
-        if (sections.length === 0 && feedPage === 1) {
+        if(isInitial) container.innerHTML = '';
+        if (sections.length === 0 && isInitial) {
             container.innerHTML = `<p class="text-center text-muted py-5">No products found!</p>`;
             return;
         }
 
         const html = sections.map(sec => `
-            <section class="feed-section">
+            <section class="feed-section fade-in">
                 <div class="section-head" style="padding: 0 20px;">
                     <h3>${sec.category_name}</h3>
                     <a href="./search_results.html?slug=${sec.slug}">View All</a>
@@ -209,15 +242,52 @@ async function loadGenericFeed() {
 
     } catch (e) {
         console.error("Feed Error", e);
-        if(feedPage === 1) container.innerHTML = `<p class="text-center text-muted py-5">Unable to load products.</p>`;
+        removeSentinelLoader();
+        if(isInitial) container.innerHTML = `<p class="text-center text-muted py-5">Unable to load products.</p>`;
     } finally {
         feedLoading = false;
-        if(sentinelLoader) sentinelLoader.classList.add('d-none');
-        if(!feedHasNext) {
-            const s = document.getElementById('feed-sentinel');
-            if(s) s.remove();
-        }
     }
+}
+
+// =========================================================
+// UTILITIES & COMPONENTS
+// =========================================================
+
+// Shared Intersection Observer for Infinite Scroll
+function createObserver(callback, conditionFn) {
+    // Remove old sentinel if exists
+    const old = document.getElementById('feed-sentinel');
+    if(old) old.remove();
+
+    const sentinel = document.createElement('div');
+    sentinel.id = 'feed-sentinel';
+    sentinel.style.height = "20px";
+    sentinel.style.marginBottom = "50px"; 
+    document.getElementById('feed-container').after(sentinel);
+
+    const observer = new IntersectionObserver((entries) => {
+        if(entries[0].isIntersecting && conditionFn()) {
+            callback();
+        }
+    }, { rootMargin: '300px' }); // Pre-load 300px before reaching bottom
+
+    observer.observe(sentinel);
+}
+
+function insertSentinelLoader(container) {
+    let loader = document.getElementById('scroll-loader');
+    if(!loader) {
+        loader = document.createElement('div');
+        loader.id = 'scroll-loader';
+        loader.className = 'text-center py-3';
+        loader.innerHTML = '<div class="loader-spinner" style="width:30px;height:30px;"></div>';
+        container.appendChild(loader);
+    }
+}
+
+function removeSentinelLoader() {
+    const loader = document.getElementById('scroll-loader');
+    if(loader) loader.remove();
 }
 
 // 3. Components

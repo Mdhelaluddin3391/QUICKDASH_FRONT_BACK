@@ -6,6 +6,7 @@ from django.db.models import Prefetch, OuterRef, Subquery, DecimalField, Q, Sum,
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
+from django.core.paginator import Paginator  # Added for Infinite Scroll
 
 from .models import Category, Product, Banner, Brand, FlashSale
 from .serializers import (
@@ -231,7 +232,7 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
 
 class StorefrontCatalogAPIView(APIView):
     """
-    Home Page Feed.
+    Home Page Feed with Infinite Scroll Support.
     Returns products available in the detected Warehouse.
     Prioritizes Middleware resolved warehouse (via Headers) over Query Params.
     """
@@ -245,6 +246,7 @@ class StorefrontCatalogAPIView(APIView):
             OpenApiParameter("lat", OpenApiTypes.DOUBLE, required=False, description="Fallback Latitude"),
             OpenApiParameter("lon", OpenApiTypes.DOUBLE, required=False, description="Fallback Longitude"),
             OpenApiParameter("city", OpenApiTypes.STR, required=False),
+            OpenApiParameter("page", OpenApiTypes.INT, required=False, description="Page number for infinite scroll"),
         ],
     )
     def get(self, request):
@@ -267,18 +269,36 @@ class StorefrontCatalogAPIView(APIView):
             total_stock__gt=F('reserved_stock')
         ).values_list('sku', flat=True).distinct()
 
-        # 3. Build Categories Feed
-        categories = Category.objects.filter(is_active=True, parent__isnull=True)[:6]
+        # 3. Build Categories Feed (Infinite Scroll Logic)
+        # Fetch all parent categories ordered by ID to ensure consistent pagination
+        all_categories = Category.objects.filter(is_active=True, parent__isnull=True).order_by('id')
         
+        page_number = request.query_params.get('page', 1)
+        page_size = 4  # Load 4 categories per scroll
+        
+        paginator = Paginator(all_categories, page_size)
+        
+        try:
+            page_obj = paginator.page(page_number)
+        except Exception:
+            # If page is out of range, return empty result
+            return Response({
+                "serviceable": True,
+                "warehouse_id": warehouse.id,
+                "warehouse_name": warehouse.name,
+                "categories": [],
+                "has_next": False
+            })
+
         feed = []
-        for cat in categories:
+        for cat in page_obj:
             # --- Price Subquery Setup ---
             price_subquery = InventoryItem.objects.filter(
                 sku=OuterRef('sku'),
                 bin__rack__aisle__zone__warehouse=warehouse
             ).values('price')[:1]
 
-            # Fetch products
+            # Fetch products (Keep limit 6 per category as requested)
             products = Product.objects.filter(
                 Q(category=cat) | Q(category__parent=cat),
                 sku__in=skus_in_stock,
@@ -320,7 +340,8 @@ class StorefrontCatalogAPIView(APIView):
             "serviceable": True,
             "warehouse_id": warehouse.id,
             "warehouse_name": warehouse.name,
-            "categories": feed
+            "categories": feed,
+            "has_next": page_obj.has_next()
         })
 
 class GlobalSearchAPIView(APIView):
