@@ -282,17 +282,28 @@ async function loadBanners() {
     const container = document.getElementById('hero-slider');
     if (!container) return;
     try {
-        const banners = await ApiService.get('/catalog/banners/');
+        const response = await ApiService.get('/catalog/banners/');
         
-        if (banners.length > 0) {
+        // Fix: Pagination results array ko nikalna
+        const banners = response.results ? response.results : response;
+        
+        if (banners && banners.length > 0) {
             container.classList.remove('skeleton');
             container.innerHTML = banners.map(b => `
                 <img src="${b.image_url}" class="hero-slide" 
                      onclick="window.location.href='${b.target_url || '#'}'"
                      alt="${b.title || 'Banner'}">
             `).join('');
-        } else { container.style.display = 'none'; }
-    } catch (e) { container.style.display = 'none'; }
+            
+            // Container ko wapas show karna agar wo hide ho gaya tha
+            container.style.display = 'block'; 
+        } else { 
+            container.style.display = 'none'; 
+        }
+    } catch (e) { 
+        console.error("Banner load hone mein error:", e);
+        container.style.display = 'none'; 
+    }
 }
 
 async function loadCategories() {
