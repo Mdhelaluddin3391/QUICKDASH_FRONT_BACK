@@ -33,7 +33,7 @@ async function handleSendOtp(e) {
     btn.innerHTML = 'Sending...';
 
     try {
-        phoneNumber = input; 
+        phoneNumber = `+91${input}`;
         
         // 1. API Call ka result 'res' variable mein save karein
         const res = await ApiService.post('/notifications/send-otp/', { phone: phoneNumber });
