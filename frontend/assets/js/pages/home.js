@@ -312,10 +312,9 @@ async function loadBanners() {
             // 3. MID Banners set karein (Beech wale section ke liye)
             if (midContainer && midBanners.length > 0) {
                 midContainer.innerHTML = midBanners.map(b => `
-                    <img src="${b.image_url}" 
-                         style="width: 100%; height: auto; object-fit: cover; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); cursor: pointer;"
-                         onclick="window.location.href='${b.target_url || '#'}'"
-                         alt="${b.title || 'Mid Banner'}">
+                    <div class="mid-banner" onclick="window.location.href='${b.target_url || '#'}'">
+                        <img src="${b.image_url}" alt="${b.title || 'Mid Banner'}">
+                    </div>
                 `).join('');
                 midContainer.style.display = 'block';
             }

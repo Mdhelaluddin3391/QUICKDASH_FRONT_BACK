@@ -1,42 +1,85 @@
-/* Hero Banner */
-.hero-wrapper { padding: 20px 0; margin-bottom: 10px; }
+/* =========================================
+   HERO BANNER
+========================================= */
+.hero-wrapper { 
+    padding: 20px 10px; 
+}
 .hero-slider {
-    display: flex; gap: 20px; overflow-x: auto;
-    scroll-snap-type: x mandatory; scrollbar-width: none;
+    display: flex; 
+    gap: 20px; 
+    overflow-x: auto; /* Taki multiple banner swipe ho sakein */
+    scroll-snap-type: x mandatory; 
+    scrollbar-width: none;
     padding-bottom: 10px;
 }
 .hero-slide {
-    flex: 0 0 100%; height: 250px; border-radius: 20px;
-    scroll-snap-align: center; object-fit: cover;
+    flex: 0 0 100%; 
+    height: 250px; 
+    border-radius: 20px;
+    scroll-snap-align: center; 
+    object-fit: cover;
     box-shadow: var(--shadow-md);
-    cursor: pointer; transition: transform 0.3s;
+    cursor: pointer; 
+    transition: transform 0.3s ease;
 }
-.hero-slide:hover { transform: scale(1.01); }
+.hero-slide:hover { 
+    transform: scale(1.02); 
+}
 
-/* Features */
+/* =========================================
+   FEATURES BAR
+========================================= */
 .features-bar {
     display: flex;
-    justify-content: space-between; /* Edges par chipkane ke liye */
-    align-items: center;
-    width: 100%;
-    padding: 10px 5px; /* Side se sirf 5px ki thodi si doori */
-    box-sizing: border-box;
+    justify-content: space-between;
+    padding: 15px 10px;
+    background: #fff;
+    margin: 20px 10px;
+    border-radius: 15px;
+    box-shadow: var(--shadow-sm);
 }
-
 .feature-item {
-    font-size: 11px; /* Mobile par padhne mein aasan aur fit aane wala size */
     text-align: center;
-    white-space: nowrap; /* Text ko doosri line me tutne se rokega */
+    font-size: 13px;
+    font-weight: 500;
+    white-space: nowrap; 
+}
+.feature-item i {
+    display: block;
+    font-size: 18px;
+    margin-bottom: 5px;
+    color: var(--primary);
 }
 
-/* Icon thoda bada aur alag dikhne ke liye */
-.feature-item i {
-    display: block; /* Icon ko text ke upar dikhane ke liye (Optional) */
-    font-size: 16px;
-    margin-bottom: 3px;
-    color: #007bff; /* Aapke app ki theme ka color */
+/* =========================================
+   MID BANNER
+========================================= */
+.mid-banner-wrapper {
+    padding: 10px;
+    margin: 10px 0 30px 0;
 }
-/* Categories Grid */
+.mid-banner {
+    width: 100%;
+    height: 180px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.mid-banner:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+}
+.mid-banner img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* =========================================
+   CATEGORIES GRID
+========================================= */
 .category-scroll-section { margin-bottom: 40px; }
 .section-head {
     display: flex; justify-content: space-between; align-items: flex-end;
@@ -66,7 +109,9 @@
 .cat-img-box img { width: 50px; height: 50px; object-fit: contain; }
 .cat-name { font-weight: 600; font-size: 0.9rem; color: var(--text-main); }
 
-/* Flash Sale (Modernized) */
+/* =========================================
+   FLASH SALE
+========================================= */
 .flash-sale-container {
     background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%);
     padding: 25px; border-radius: 20px; margin-bottom: 40px;
@@ -88,71 +133,52 @@
 }
 .flash-card:hover { transform: translateY(-5px); box-shadow: 0 10px 20px rgba(190, 18, 60, 0.1); }
 
-/* Horizontal Product Scroll (Feed) */
+/* =========================================
+   PRODUCT FEED
+========================================= */
 .product-scroll-wrapper {
     display: flex; gap: 20px; overflow-x: auto;
     padding: 10px 5px 20px; scrollbar-width: none;
 }
 .product-scroll-wrapper .product-card { flex: 0 0 200px; }
 
-
-/* --- Brand Scroller Styling (UPDATED) --- */
+/* =========================================
+   BRAND SCROLLER
+========================================= */
 .brand-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    cursor: pointer;
-    min-width: 80px; /* Scroller mein shrink na ho isliye */
-    width: 80px;
+    display: flex; flex-direction: column; align-items: center;
+    cursor: pointer; min-width: 80px; width: 80px;
 }
-
 .brand-circle {
-    width: 80px;           /* Circle ki fixed width */
-    height: 80px;          /* Circle ki fixed height */
-    border-radius: 50%;    /* Pura gol (circle) banane ke liye */
-    border: 1px solid #eaeaea;
-    background-color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    width: 80px; height: 80px; border-radius: 50%;
+    border: 1px solid #eaeaea; background-color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
-    margin-bottom: 8px;    /* Image aur naam ke beech ki space */
+    margin-bottom: 8px;
 }
-
-/* Hover karne par pura item interactive lagega */
 .brand-item:hover .brand-circle {
-    transform: scale(1.05);
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    transform: scale(1.05); box-shadow: 0 4px 10px rgba(0,0,0,0.1);
 }
-
 .brand-circle img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain; /* Image ko crop hone se bachayega aur pura dikhayega */
-    padding: 12px;       /* Logo circle ki boundary se na chipke isliye padding */
+    width: 100%; height: 100%; object-fit: contain; padding: 12px;
 }
-
 .brand-name {
-    font-size: 0.8rem;
-    color: var(--text-main, #444); /* Theme ke hisaab se color adjust karega */
-    text-align: center;
-    font-weight: 600;
-    width: 100%;
-    /* Agar naam bohot bada hua toh 1 line me truncate hoke '...' dikhega */
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 0.8rem; color: var(--text-main, #444);
+    text-align: center; font-weight: 600; width: 100%;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
-
-/* Media Queries */
+/* =========================================
+   RESPONSIVE (MOBILE)
+========================================= */
 @media(max-width: 768px) {
     .hero-slide { height: 160px; }
+    .mid-banner { height: 120px; }
+    .feature-item { font-size: 11px; }
+
     .category-scroll { grid-template-columns: repeat(4, 1fr); gap: 10px; }
     .cat-img-box { width: 65px; height: 65px; border-radius: 18px; }
     .cat-img-box img { width: 35px; }
     .cat-name { font-size: 0.75rem; }
-    .feature-item { font-size: 0.7rem; }
 }
