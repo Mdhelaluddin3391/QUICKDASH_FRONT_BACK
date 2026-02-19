@@ -10,6 +10,8 @@ from django.utils.translation import gettext_lazy as _
 from django.db.models import Sum
 from .models import Product, Category, Brand, Banner, FlashSale
 
+import requests  # ✅ Yeh line add karni hai (API call ke liye)
+from django.shortcuts import render, redirect
 
 class ProductImageInline(admin.TabularInline):
     model = None  # Placeholder - ProductImage model may not exist yet
@@ -88,6 +90,7 @@ class ProductAdmin(admin.ModelAdmin):
         return new_urls + urls
 
     # ✅ CSV IMPORT LOGIC
+    # ✅ SMART CSV IMPORT LOGIC
     def import_csv(self, request):
         if request.method == "POST":
             csv_file = request.FILES["csv_file"]
@@ -103,9 +106,47 @@ class ProductAdmin(admin.ModelAdmin):
             
             count = 0
             for row in reader:
+                sku_val = row.get('sku', '').strip()
+                if not sku_val:
+                    continue  # Agar sku nahi hai toh wo line skip kardo
+                
+                # CSV se data nikalna (agar hai toh)
+                name_val = row.get('name', '').strip()
+                brand_name = row.get('brand', '').strip()
+                category_name = row.get('category', '').strip()
+                image_val = row.get('image', '').strip()
+                desc_val = row.get('description', '').strip()
+                mrp_val = row.get('mrp', 0.00)
+
+                # 🔥 API MAGIC: Agar name khali hai, toh OpenFoodFacts API se fetch karo
+                if not name_val:
+                    api_url = f"https://world.openfoodfacts.org/api/v0/product/{sku_val}.json"
+                    try:
+                        response = requests.get(api_url, timeout=5)
+                        data = response.json()
+                        
+                        if data.get('status') == 1:
+                            product_data = data.get('product', {})
+                            
+                            name_val = product_data.get('product_name', '')
+                            image_val = product_data.get('image_front_url', '')
+                            desc_val = product_data.get('ingredients_text', '') 
+                            
+                            # API se Brand aur Category laao (agar CSV me nahi thi)
+                            if not brand_name and product_data.get('brands'):
+                                brand_name = product_data.get('brands').split(',')[0].strip()
+                                
+                            if not category_name and product_data.get('categories'):
+                                category_name = product_data.get('categories').split(',')[0].strip()
+                    except Exception as e:
+                        pass # API down ho toh error throw na kare
+
+                # Agar API se bhi naam nahi mila aur CSV me bhi nahi tha
+                if not name_val:
+                    name_val = f"Unknown Product (SKU: {sku_val})"
+
                 try:
                     # Category dhoondo ya banao
-                    category_name = row.get('category', '').strip()
                     category_obj = None
                     if category_name:
                         category_obj, _ = Category.objects.get_or_create(
@@ -114,7 +155,6 @@ class ProductAdmin(admin.ModelAdmin):
                         )
 
                     # Brand dhoondo ya banao
-                    brand_name = row.get('brand', '').strip()
                     brand_obj = None
                     if brand_name:
                         brand_obj, _ = Brand.objects.get_or_create(
@@ -126,13 +166,13 @@ class ProductAdmin(admin.ModelAdmin):
 
                     # Product Update ya Create karo
                     obj, created = Product.objects.update_or_create(
-                        sku=row.get('sku'),
+                        sku=sku_val,
                         defaults={
-                            'name': row.get('name'),
-                            'description': row.get('description', ''),
+                            'name': name_val,
+                            'description': desc_val,
                             'unit': row.get('unit', '1 Unit'),
-                            'image': row.get('image', ''),
-                            'mrp': row.get('mrp', 0.00),
+                            'image': image_val,
+                            'mrp': mrp_val,
                             'is_active': is_active_val,
                             'category': category_obj,
                             'brand': brand_obj,
@@ -140,13 +180,12 @@ class ProductAdmin(admin.ModelAdmin):
                     )
                     count += 1
                 except Exception as e:
-                    messages.error(request, f"Error in row {row.get('sku', 'Unknown')}: {e}")
+                    messages.error(request, f"Error in SKU {sku_val}: {e}")
                     continue
 
-            self.message_user(request, f"{count} products imported successfully.")
+            self.message_user(request, f"{count} products imported (Missing data auto-fetched).")
             return redirect("..")
             
-        # Form dikhane ke liye (Note: Aapko templates create karne honge jo maine pichle msg me diye the)
         form = {}
         payload = {"form": form}
         return render(request, "admin/csv_form.html", payload)
