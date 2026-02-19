@@ -301,7 +301,7 @@ async function loadBanners() {
                 heroContainer.innerHTML = heroBanners.map(b => `
                     <img src="${b.image_url}" class="hero-slide" 
                          style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px; max-height: 200px;"
-                         onclick="window.location.href='${b.target_url || '#'}'"
+                         onclick="handleBannerClick('${b.target_url}')"
                          alt="${b.title || 'Hero Banner'}">
                 `).join('');
                 heroContainer.style.display = 'block';
@@ -312,7 +312,7 @@ async function loadBanners() {
             // 3. MID Banners set karein (Beech wale section ke liye)
             if (midContainer && midBanners.length > 0) {
                 midContainer.innerHTML = midBanners.map(b => `
-                    <div class="mid-banner" onclick="window.location.href='${b.target_url || '#'}'">
+                    <div class="mid-banner" onclick="handleBannerClick('${b.target_url}')">
                         <img src="${b.image_url}" alt="${b.title || 'Mid Banner'}">
                     </div>
                 `).join('');
@@ -486,5 +486,24 @@ window.addToCart = async function(skuCode, btn) {
         Toast.error(e.message || "Failed to add");
         btn.innerText = originalText;
         btn.disabled = false;
+    }
+};
+
+// --- APK Navigation Fix for Banners ---
+window.handleBannerClick = function(url) {
+    if (!url || url === '#' || url === 'null') return;
+    
+    // Agar URL main http ya https hai, toh usko relative path main convert karein
+    if (url.startsWith('http')) {
+        try {
+            const urlObj = new URL(url);
+            // Sirf path aur query params nikalega (e.g., /search_results.html?slug=veg)
+            window.location.href = urlObj.pathname + urlObj.search;
+        } catch (e) {
+            window.location.href = url;
+        }
+    } else {
+        // Agar already relative URL hai (e.g., ./product.html)
+        window.location.href = url;
     }
 };
