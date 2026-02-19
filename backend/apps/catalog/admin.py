@@ -145,14 +145,15 @@ class ProductAdmin(admin.ModelAdmin):
                 if not name_val:
                     name_val = f"Unknown Product (SKU: {sku_val})"
 
+                if not category_name:
+                    category_name = "Uncategorized"
+
                 try:
                     # Category dhoondo ya banao
-                    category_obj = None
-                    if category_name:
-                        category_obj, _ = Category.objects.get_or_create(
-                            name=category_name, 
-                            defaults={'slug': category_name.lower().replace(" ", "-")}
-                        )
+                    category_obj, _ = Category.objects.get_or_create(
+                        name=category_name, 
+                        defaults={'slug': category_name.lower().replace(" ", "-")}
+                    )
 
                     # Brand dhoondo ya banao
                     brand_obj = None
