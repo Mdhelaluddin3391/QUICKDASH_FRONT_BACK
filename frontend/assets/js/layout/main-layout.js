@@ -394,3 +394,57 @@
         }
     };
 })();
+
+
+
+
+
+
+
+
+
+// frontend/assets/js/layout/main-layout.js ya phir global script main add karein
+
+document.addEventListener('DOMContentLoaded', async () => {
+    await checkStoreStatus();
+});
+
+async function checkStoreStatus() {
+    try {
+        // API.service.js se API_BASE_URL ka use karein, for example:
+        const response = await fetch(`${window.API_BASE_URL || 'http://localhost:8000/api'}/core/store-status/`);
+        
+        if (response.ok) {
+            const data = await response.json();
+            
+            // Agar store band hai
+            if (data.is_store_open === false) {
+                showStoreOfflineUI(data.store_closed_message);
+            }
+        }
+    } catch (error) {
+        console.error("Error fetching store status:", error);
+    }
+}
+
+function showStoreOfflineUI(message) {
+    // Body me class add karein taki scrolling band ho jaye
+    document.body.classList.add('store-closed-mode');
+    
+    // UI elements create karein
+    const overlay = document.createElement('div');
+    overlay.className = 'store-offline-overlay';
+    
+    const modal = document.createElement('div');
+    modal.className = 'store-offline-modal';
+    
+    modal.innerHTML = `
+        <h2> Store is Offline</h2>
+        <p>${message}</p>
+    `;
+    
+    overlay.appendChild(modal);
+    
+    // Isko body main sabse aage add kar de
+    document.body.appendChild(overlay);
+}

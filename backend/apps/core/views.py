@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django.conf import settings
+from .models import StoreSettings
 
 logger = logging.getLogger(__name__)
 
@@ -94,4 +95,17 @@ class AppConfigAPIView(APIView):
                 "phone": "+919999999999",
                 "email": "support@quickdash.com"
             }
+        })
+    
+
+
+
+class StoreStatusAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        settings, created = StoreSettings.objects.get_or_create(pk=1)
+        return Response({
+            'is_store_open': settings.is_store_open,
+            'store_closed_message': settings.store_closed_message
         })

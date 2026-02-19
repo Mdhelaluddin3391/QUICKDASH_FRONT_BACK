@@ -79,3 +79,55 @@ input, select, textarea { font-family: inherit; }
 /* Transitions */
 .hover-scale { transition: transform 0.2s; }
 .hover-scale:hover { transform: scale(1.02); }
+
+
+
+
+
+
+
+/* frontend/assets/css/base.css (ya main layout css) */
+
+body.store-closed-mode {
+    overflow: hidden; /* Scroll disable karne ke liye */
+}
+
+/* Ye puri website ko grey kar dega */
+body.store-closed-mode .main-content-wrapper{
+    filter: grayscale(100%);
+    pointer-events: none; /* Clicks disable kar dega */
+}
+
+.store-offline-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.6); /* Translucent dark background */
+    z-index: 999999; /* Sabse upar dikhane ke liye */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.store-offline-modal {
+    background: #fff;
+    padding: 40px;
+    border-radius: 12px;
+    text-align: center;
+    max-width: 400px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.store-offline-modal h2 {
+    color: #ff4757;
+    margin-bottom: 15px;
+    font-size: 24px;
+}
+
+.store-offline-modal p {
+    color: #333;
+    font-size: 16px;
+    line-height: 1.5;
+}
