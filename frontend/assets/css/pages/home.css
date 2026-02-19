@@ -2,7 +2,7 @@
    HERO BANNER
 ========================================= */
 .hero-wrapper { 
-    padding: 20px 10px; 
+    padding: 15px 10px 5px 10px;
 }
 .hero-slider {
     display: flex; 
@@ -11,6 +11,7 @@
     scroll-snap-type: x mandatory; 
     scrollbar-width: none;
     padding-bottom: 10px;
+    min-height: 250px;
 }
 .hero-slide {
     flex: 0 0 100%; 
@@ -202,6 +203,7 @@
    RESPONSIVE (MOBILE)
 ========================================= */
 @media(max-width: 768px) {
+    .hero-slider { min-height: 160px; }
     .hero-slide { height: 160px; }
     .mid-banner { height: 120px; }
     .feature-item { font-size: 11px; }
