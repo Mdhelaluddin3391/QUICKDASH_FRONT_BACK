@@ -401,9 +401,7 @@
 
 
 
-
-
-// frontend/assets/js/layout/main-layout.js ya phir global script main add karein
+// frontend/assets/js/layout/main-layout.js ke end me update karein
 
 document.addEventListener('DOMContentLoaded', async () => {
     await checkStoreStatus();
@@ -411,8 +409,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function checkStoreStatus() {
     try {
-        // API.service.js se API_BASE_URL ka use karein, for example:
-        const response = await fetch(`${window.API_BASE_URL || 'http://localhost:8000/api'}/core/store-status/`);
+        // FIX: APP_CONFIG.API_BASE_URL ka use karein
+        const baseUrl = window.APP_CONFIG?.API_BASE_URL || 'http://localhost:8000/api/v1';
+        
+        // baseUrl ke sath /core/store-status/ lagayein
+        const response = await fetch(`${baseUrl}/core/store-status/`);
         
         if (response.ok) {
             const data = await response.json();
@@ -421,6 +422,8 @@ async function checkStoreStatus() {
             if (data.is_store_open === false) {
                 showStoreOfflineUI(data.store_closed_message);
             }
+        } else {
+            console.error("Store status API returned:", response.status);
         }
     } catch (error) {
         console.error("Error fetching store status:", error);
@@ -439,7 +442,7 @@ function showStoreOfflineUI(message) {
     modal.className = 'store-offline-modal';
     
     modal.innerHTML = `
-        <h2> Store is Offline</h2>
+        <h2>⚠️ Store is Offline</h2>
         <p>${message}</p>
     `;
     
