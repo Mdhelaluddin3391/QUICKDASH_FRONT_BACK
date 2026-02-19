@@ -1,4 +1,3 @@
-# apps/accounts/models.py
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 from django.utils import timezone
@@ -22,7 +21,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     objects = UserManager()
 
     USERNAME_FIELD = "phone"
-    REQUIRED_FIELDS = []  # Phone is USERNAME_FIELD, so it's prompted by default
+    REQUIRED_FIELDS = []  
 
     def __str__(self):
         return self.phone

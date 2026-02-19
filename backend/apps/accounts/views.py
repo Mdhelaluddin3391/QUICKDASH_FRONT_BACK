@@ -1,4 +1,3 @@
-# apps/accounts/views.py
 import uuid
 import time
 from rest_framework.views import APIView
@@ -22,7 +21,7 @@ from .serializers import (
     PasswordResetConfirmSerializer
 )
 from .services import AccountService
-from apps.notifications.services import OTPService # Import OTP Service
+from apps.notifications.services import OTPService 
 
 User = get_user_model()
 
@@ -51,17 +50,14 @@ class CustomerRegisterAPIView(APIView):
         if not phone or not otp:
             return Response({"error": "Phone and OTP required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 1. Verify OTP (Security Check)
-        # This raises BusinessLogicException if invalid/expired
+       
         try:
             OTPService.verify(phone, otp)
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 2. Idempotent creation/login via Service
         user = AccountService.create_customer(phone)
         
-        # 3. Generate Tokens
         refresh = RefreshToken.for_user(user)
         
         return Response({
@@ -146,6 +142,6 @@ class DeleteAccountAPIView(APIView):
 
     def delete(self, request):
         user = request.user
-        user.is_active = False # Soft Delete
+        user.is_active = False 
         user.save()
         return Response({"status": "account_deleted"})

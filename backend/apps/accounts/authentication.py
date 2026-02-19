@@ -15,7 +15,6 @@ class SecureJWTAuthentication(JWTAuthentication):
         except InvalidToken:
             raise InvalidToken("Token is invalid or expired")
 
-        # Check for Revocation (Blocklist)
         jti = validated_token.get('jti')
         if jti and cache.get(f"blocklist:{jti}"):
             raise AuthenticationFailed("This session has been logged out.")

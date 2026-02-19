@@ -87,7 +87,6 @@ class CustomUserAdmin(UserAdmin):
         role_names = [role.get_role_display() for role in roles]
         role_text = ", ".join(role_names)
 
-        # Color coding for primary role
         if 'employee' in [r.role for r in roles]:
             return format_html('<span style="color: blue; font-weight: bold;">{}</span>', role_text)
         elif 'rider' in [r.role for r in roles]:
@@ -108,7 +107,6 @@ class CustomUserAdmin(UserAdmin):
     created_at_date.short_description = "Joined"
     created_at_date.admin_order_field = 'created_at'
 
-    # Admin Actions
     @admin.action(description='Activate selected users')
     def activate_users(self, request, queryset):
         updated = queryset.update(is_active=True)
@@ -200,7 +198,6 @@ class AddressAdmin(admin.ModelAdmin):
 
     @admin.action(description='Mark selected addresses as default')
     def mark_as_default(self, request, queryset):
-        # Note: This should ideally clear other defaults for the same user
         updated = queryset.update(is_default=True)
         self.message_user(request, f"{updated} addresses marked as default.")
 

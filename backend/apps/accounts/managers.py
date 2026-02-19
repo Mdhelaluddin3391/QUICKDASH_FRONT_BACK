@@ -6,7 +6,6 @@ class UserManager(BaseUserManager):
         if not phone:
             raise ValueError("Phone number is required")
 
-        # Normalize logic can be added here (e.g. strip spaces)
         phone = phone.strip()
         
         user = self.model(phone=phone, **extra_fields)
