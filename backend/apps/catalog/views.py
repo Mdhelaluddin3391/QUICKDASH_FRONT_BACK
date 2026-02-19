@@ -398,6 +398,7 @@ class BannerListAPIView(generics.ListAPIView):
     authentication_classes = [] 
     serializer_class = BannerSerializer
     queryset = Banner.objects.filter(is_active=True)
+    pagination_class = None
 
 class BrandListAPIView(generics.ListAPIView):
     permission_classes = [AllowAny]

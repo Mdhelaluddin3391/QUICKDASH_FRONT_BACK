@@ -283,6 +283,7 @@ async function loadBanners() {
     if (!container) return;
     try {
         const banners = await ApiService.get('/catalog/banners/');
+        
         if (banners.length > 0) {
             container.classList.remove('skeleton');
             container.innerHTML = banners.map(b => `
