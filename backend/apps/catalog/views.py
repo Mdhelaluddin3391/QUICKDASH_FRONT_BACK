@@ -7,7 +7,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
 from django.core.paginator import Paginator  # Added for Infinite Scroll
-
+import re
+from django.db.models import Case, When, Value, IntegerField
 from .models import Category, Product, Banner, Brand, FlashSale
 from .serializers import (
     CategorySerializer, ProductSerializer, BannerSerializer, 
@@ -361,15 +362,29 @@ class GlobalSearchAPIView(APIView):
             products = products.filter(brand_id=brand_id)
         
         if query:
-            products = products.filter(
-                Q(name__icontains=query) | 
-                Q(sku__icontains=query) |
-                Q(description__icontains=query) |
-                Q(category__name__icontains=query)
-            )
+            # ADVANCED: Multi-word search (Tokenization)
+            words = re.findall(r'\w+', query)
+            for word in words:
+                products = products.filter(
+                    Q(name__icontains=word) | 
+                    Q(sku__icontains=word) |
+                    Q(description__icontains=word) |
+                    Q(category__name__icontains=word)
+                )
+            
+            # ADVANCED: Relevance Ranking (Exact match ko top par rakhega)
+            products = products.annotate(
+                relevance=Case(
+                    When(name__iexact=query, then=Value(1)),
+                    When(sku__iexact=query, then=Value(2)),
+                    When(name__istartswith=query, then=Value(3)),
+                    When(name__icontains=query, then=Value(4)),
+                    default=Value(5),
+                    output_field=IntegerField()
+                )
+            ).order_by('relevance', '-created_at')
 
         products = products[:40]
-        # Warehouse Price Injection logic can be added here similar to SkuListAPIView
         return Response(ProductSerializer(products, many=True, context={'request': request}).data)
 
 class SearchSuggestAPIView(APIView):
@@ -377,21 +392,58 @@ class SearchSuggestAPIView(APIView):
     authentication_classes = [] 
     
     def get(self, request):
-        query = request.query_params.get('q', '')
+        query = request.query_params.get('q', '').strip()
         if len(query) < 2: return Response([])
         
-        product_results = Product.objects.filter(name__icontains=query, is_active=True)[:5]
-        brand_results = Brand.objects.filter(name__icontains=query, is_active=True)[:3]
+        # ADVANCED: Multi-word search
+        words = re.findall(r'\w+', query)
+        
+        product_results = Product.objects.filter(is_active=True).select_related('category')
+        brand_results = Brand.objects.filter(is_active=True)
+        
+        for word in words:
+            product_results = product_results.filter(
+                Q(name__icontains=word) | Q(category__name__icontains=word) | Q(sku__icontains=word)
+            )
+            brand_results = brand_results.filter(name__icontains=word)
+            
+        # Relevance Ranking for top results
+        product_results = product_results.annotate(
+            relevance=Case(When(name__istartswith=query, then=Value(1)), default=Value(2), output_field=IntegerField())
+        ).order_by('relevance')[:5]
+        
+        brand_results = brand_results[:3]
         
         data = []
-        for p in product_results:
-            data.append({"text": p.name, "type": "Product", "url": f"/product.html?code={p.sku}"})
-            
+        
+        # ADVANCED: Brands Rich Data
         for b in brand_results:
-            data.append({"text": f"Brand: {b.name}", "type": "Brand", "url": f"/search_results.html?brand={b.id}"})
+            logo_url = request.build_absolute_uri(b.logo.url) if b.logo else None
+            data.append({
+                "text": b.name, 
+                "type": "Brand", 
+                "image": logo_url,
+                "url": f"/search_results.html?brand={b.id}"
+            })
+            
+        # ADVANCED: Products Rich Data (Prices & Images included)
+        for p in product_results:
+            # Safe Image Fetching (Adapts to your model structure)
+            image_url = None
+            if hasattr(p, 'image') and p.image:
+                image_url = request.build_absolute_uri(p.image.url)
+            elif hasattr(p, 'images') and p.images.exists() and p.images.first().image:
+                image_url = request.build_absolute_uri(p.images.first().image.url)
+                
+            data.append({
+                "text": p.name, 
+                "type": p.category.name if p.category else "Product", 
+                "price": getattr(p, 'mrp', None), # Adds Price for frontend
+                "image": image_url,
+                "url": f"/product.html?code={p.sku}"
+            })
             
         return Response(data)
-
 
 class BannerListAPIView(generics.ListAPIView):
     permission_classes = [AllowAny]
