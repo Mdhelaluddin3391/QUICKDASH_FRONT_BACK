@@ -28,7 +28,7 @@
 
 /* =========================================
    FEATURES BAR
-========================================= */
+=========================================
 .features-bar {
     display: flex;
     justify-content: space-between;
@@ -50,6 +50,33 @@
     margin-bottom: 5px;
     color: var(--primary);
 }
+ */
+
+
+/* Features */
+.features-bar {
+    display:flex;
+    justify-content:space-between;
+    padding:15px 10px;
+    background:#fff;
+    margin:20px 10px;
+    border-radius:15px;
+    box-shadow:var(--shadow-sm);
+}
+
+.feature-item{
+    text-align:center;
+    font-size:13px;
+}
+
+.feature-item i{
+    display:block;
+    font-size:18px;
+    margin-bottom:5px;
+    color:var(--primary);
+}
+
+
 
 /* =========================================
    MID BANNER
