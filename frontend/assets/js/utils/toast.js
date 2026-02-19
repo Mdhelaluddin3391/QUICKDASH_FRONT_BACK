@@ -47,20 +47,37 @@ window.Toast = {
         }, duration);
     },
 
-
-
-
     devOTP: function(otp) {
         let container = document.getElementById('dev-toast-container');
         if (!container) {
             container = document.createElement('div');
             container.id = 'dev-toast-container';
+            
+            // --- NAYA FIX: OTP Container ko screen ke center mein laane ke liye ---
+            container.style.position = 'fixed';
+            container.style.top = '40%'; // Screen par upar se 40% niche
+            container.style.left = '50%';
+            container.style.transform = 'translate(-50%, -50%)';
+            container.style.zIndex = '99999'; // Sabse upar dikhne ke liye
+            container.style.width = '90%'; // Mobile screen ke hisaab se
+            container.style.maxWidth = '400px';
+            container.style.display = 'flex';
+            container.style.flexDirection = 'column';
+            container.style.alignItems = 'center';
+            // ---------------------------------------------------------------------
+            
             document.body.appendChild(container);
         }
 
         const toast = document.createElement('div');
         toast.className = 'toast toast-dev show'; // 'show' class तुरंत जोड़ें
+        
+        // --- NAYA FIX: Toast ki thodi designing taaki center me achha lage ---
         toast.style.pointerEvents = "auto";
+        toast.style.width = "100%";
+        toast.style.boxShadow = "0 10px 25px rgba(0,0,0,0.2)"; // Thoda shadow jisse pop-up jaisa lage
+        toast.style.border = "2px solid #7209b7";
+        // ---------------------------------------------------------------------
 
         const content = document.createElement('div');
         content.className = 'toast-content';
@@ -79,7 +96,7 @@ window.Toast = {
             <span style="font-weight:bold; color:#555; font-size:0.9rem;">SMS Service Unavailable</span>
             <span style="margin-top:4px;">
                 Use Temporary OTP: 
-                <b style="background:#7209b7; color:#fff; padding:2px 6px; border-radius:4px; letter-spacing:1px;">${otp}</b>
+                <b style="background:#7209b7; color:#fff; padding:2px 6px; border-radius:4px; letter-spacing:1px; font-size: 1.1rem;">${otp}</b>
             </span>
         `;
 
@@ -102,8 +119,6 @@ window.Toast = {
         }, 20000);
     },
 
-
-    
     success: function(msg) { this.show(msg, 'success'); },
     error: function(msg) { this.show(msg, 'error'); },
     warning: function(msg) { this.show(msg, 'warning'); },

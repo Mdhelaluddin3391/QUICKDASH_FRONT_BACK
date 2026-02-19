@@ -12,6 +12,13 @@ from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.celery import CeleryIntegration
 from corsheaders.defaults import default_headers
 
+from datetime import timedelta # Upar import add karna na bhoolein agar nahi hai
+
+
+
+AUTH_USER_MODEL = "accounts.User"
+
+
 # Configure logging early for startup diagnostics
 logging.basicConfig(
     level=logging.INFO,
@@ -346,12 +353,6 @@ if not DEBUG:
 # ==============================================================================
 # PHASE 12: AUTHENTICATION & DRF
 # ==============================================================================
-AUTH_USER_MODEL = "accounts.User"
-
-SIMPLE_JWT = {
-    "SIGNING_KEY": os.getenv("JWT_SIGNING_KEY", SECRET_KEY),
-    "ALGORITHM": "HS256",
-}
 
 # backend/config/settings.py
 
@@ -442,3 +443,16 @@ logger.info(f"   DEBUG: {DEBUG}")
 logger.info(f"   Allowed Hosts: {ALLOWED_HOSTS}")
 logger.info(f"   CSRF Trusted Origins: {CSRF_TRUSTED_ORIGINS}")
 logger.info(f"   Database: {DATABASES.get('default', {}).get('HOST', 'unknown')}")
+
+
+
+
+
+SIMPLE_JWT = {
+    "SIGNING_KEY": os.getenv("JWT_SIGNING_KEY", SECRET_KEY),
+    "ALGORITHM": "HS256",
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=365),     # Access token 7 din chalega
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=365),   # Refresh token 30 din chalega
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+}

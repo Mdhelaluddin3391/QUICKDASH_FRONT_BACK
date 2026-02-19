@@ -6,7 +6,11 @@ class AccountService:
     @staticmethod
     @transaction.atomic
     def create_customer(phone):
-        user, created = User.objects.get_or_create(phone=phone)
+        # Naya line: Agar phone number mein +91 hai, toh usko hata do
+        clean_phone = phone.replace("+91", "") if phone.startswith("+91") else phone
+        
+        # Ab hamesha 10-digit number se hi account banega ya find hoga
+        user, created = User.objects.get_or_create(phone=clean_phone)
         UserRole.objects.get_or_create(user=user, role="customer")
         return user
 
