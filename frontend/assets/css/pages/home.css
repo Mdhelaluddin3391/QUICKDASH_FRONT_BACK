@@ -14,7 +14,7 @@
 }
 .hero-slide {
     flex: 0 0 100%; 
-    height: 250px; 
+    height: 350px; 
     border-radius: 20px;
     scroll-snap-align: center; 
     object-fit: cover;
@@ -67,6 +67,8 @@
 .feature-item{
     text-align:center;
     font-size:13px;
+    font-weight: 500;
+    white-space: nowrap; 
 }
 
 .feature-item i{
