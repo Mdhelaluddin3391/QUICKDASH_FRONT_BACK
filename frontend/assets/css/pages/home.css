@@ -1,5 +1,5 @@
 /* Hero Banner */
-.hero-wrapper { padding: 20px 0; margin-bottom: 20px; }
+.hero-wrapper { padding: 20px 0; margin-bottom: 10px; }
 .hero-slider {
     display: flex; gap: 20px; overflow-x: auto;
     scroll-snap-type: x mandatory; scrollbar-width: none;
