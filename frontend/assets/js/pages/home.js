@@ -279,30 +279,54 @@ function removeSentinelLoader() {
 
 // 3. Components
 async function loadBanners() {
-    const container = document.getElementById('hero-slider');
-    if (!container) return;
+    const heroContainer = document.getElementById('hero-slider');
+    const midContainer = document.getElementById('mid-banner-container'); // Naya container HTML se
+    
+    if (!heroContainer) return;
+    
     try {
         const response = await ApiService.get('/catalog/banners/');
-        
-        // Fix: Pagination results array ko nikalna
         const banners = response.results ? response.results : response;
-        
+
         if (banners && banners.length > 0) {
-            container.classList.remove('skeleton');
-            container.innerHTML = banners.map(b => `
-                <img src="${b.image_url}" class="hero-slide" 
-                     onclick="window.location.href='${b.target_url || '#'}'"
-                     alt="${b.title || 'Banner'}">
-            `).join('');
             
-            // Container ko wapas show karna agar wo hide ho gaya tha
-            container.style.display = 'block'; 
+            // 1. HERO aur MID banners ko unki position ke hisaab se alag karein
+            const heroBanners = banners.filter(b => b.position === 'HERO');
+            const midBanners = banners.filter(b => b.position === 'MID');
+
+            // 2. HERO Banners set karein (Upar wale section ke liye)
+            if (heroBanners.length > 0) {
+                heroContainer.classList.remove('skeleton');
+                // style mein 100% width aur cover object-fit lagaya hai taaki size perfect aaye
+                heroContainer.innerHTML = heroBanners.map(b => `
+                    <img src="${b.image_url}" class="hero-slide" 
+                         style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px; max-height: 200px;"
+                         onclick="window.location.href='${b.target_url || '#'}'"
+                         alt="${b.title || 'Hero Banner'}">
+                `).join('');
+                heroContainer.style.display = 'block';
+            } else {
+                heroContainer.style.display = 'none';
+            }
+
+            // 3. MID Banners set karein (Beech wale section ke liye)
+            if (midContainer && midBanners.length > 0) {
+                midContainer.innerHTML = midBanners.map(b => `
+                    <img src="${b.image_url}" 
+                         style="width: 100%; height: auto; object-fit: cover; border-radius: 12px; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); cursor: pointer;"
+                         onclick="window.location.href='${b.target_url || '#'}'"
+                         alt="${b.title || 'Mid Banner'}">
+                `).join('');
+                midContainer.style.display = 'block';
+            }
+
         } else { 
-            container.style.display = 'none'; 
+            heroContainer.style.display = 'none'; 
+            if(midContainer) midContainer.style.display = 'none';
         }
     } catch (e) { 
         console.error("Banner load hone mein error:", e);
-        container.style.display = 'none'; 
+        heroContainer.style.display = 'none'; 
     }
 }
 
