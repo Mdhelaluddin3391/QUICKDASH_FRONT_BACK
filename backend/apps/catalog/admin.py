@@ -9,9 +9,8 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Sum
 from .models import Product, Category, Brand, Banner, FlashSale
+import requests
 
-import requests  # ✅ Yeh line add karni hai (API call ke liye)
-from django.shortcuts import render, redirect
 
 class ProductImageInline(admin.TabularInline):
     model = None  # Placeholder - ProductImage model may not exist yet
