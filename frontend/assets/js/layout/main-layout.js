@@ -442,7 +442,7 @@ function showStoreOfflineUI(message) {
     modal.className = 'store-offline-modal';
     
     modal.innerHTML = `
-        <h2>⚠️ Store is Offline</h2>
+        <h2>Store is Offline</h2>
         <p>${message}</p>
     `;
     
