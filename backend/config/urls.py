@@ -22,7 +22,6 @@ from django.conf.urls.static import static
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 from apps.core.views import health_check, AppConfigAPIView
-from django.contrib import admin
 
 admin.site.site_header = "QuickDash Master Admin"
 admin.site.site_title = "QuickDash Portal"
@@ -44,11 +43,13 @@ urlpatterns = [
 
     # API V1 Routes
     path('api/v1/customers/', include('apps.customers.urls')),
-
     path('api/v1/auth/', include('apps.accounts.urls')),
-    path('api/v1/auth/customer/', include('apps.customers.urls')), # Customer Profile/Addresses
-    
-    
+    path('api/v1/auth/customer/', include('apps.customers.urls')), 
+    path('api/v1/core/', include('apps.core.urls')),
+    path('api/v1/pricing/', include('apps.pricing.urls')),
+    path('api/v1/accounts/', include('apps.accounts.urls')),
+    path('api/v1/core/', include('apps.core.urls')),
+    path('api/v1/pricing/', include('apps.pricing.urls')),
     path('api/v1/catalog/', include('apps.catalog.urls')),
     path('api/v1/orders/', include('apps.orders.urls')),
     path('api/v1/inventory/', include('apps.inventory.urls')),
