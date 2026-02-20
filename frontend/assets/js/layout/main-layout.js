@@ -410,7 +410,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function checkStoreStatus() {
     try {
         // FIX: APP_CONFIG.API_BASE_URL ka use karein
-        const baseUrl = window.APP_CONFIG?.API_BASE_URL || 'http://localhost:8000/api/v1';
+        const baseUrl = window.APP_CONFIG?.API_BASE_URL || 'https://quickdash-front-back.onrender.com/api/v1';
         
         // baseUrl ke sath /core/store-status/ lagayein
         const response = await fetch(`${baseUrl}/core/store-status/`);
