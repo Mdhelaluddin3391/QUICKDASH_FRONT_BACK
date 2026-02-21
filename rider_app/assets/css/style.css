@@ -84,3 +84,30 @@ input:checked + .slider:before { transform: translateX(22px); }
     from { opacity: 0; transform: translateY(20px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+/* 🔥 NAYA CSS: Center OTP Toast ke liye */
+#dev-toast-container {
+    position: fixed;
+    top: 40%;              /* Screen mein upar se 40% (Center) */
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 99999;        /* Sabse upar dikhega */
+    width: 90%;
+    max-width: 320px;
+    pointer-events: none;  /* Taaki uske pichhe click ho sake */
+}
+
+.center-otp-toast {
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    border: 3px solid var(--primary);
+    animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes popIn {
+    0% { opacity: 0; transform: scale(0.8); }
+    100% { opacity: 1; transform: scale(1); }
+}

@@ -38,15 +38,31 @@ form.addEventListener('submit', async (e) => {
             document.getElementById('phone').disabled = true;
             btn.innerText = "Verify & Login";
             
-            const demoOtp = res.otp || '123456'; 
+            // 🔥 FIX: Backend ki `debug_otp` field se real OTP nikalna 
+            const realOtp = res.debug_otp; 
             
-            if (typeof window.showToast === 'function') {
-                window.showToast(`Test Mode: Your OTP is ${demoOtp}`, 'success');
-            } else {
-                alert(`Test Mode: Your OTP is ${demoOtp}`);
+            // Ek custom bada Alert/Toast banate hain jo center mein dikhe aur lamba ruke (15 seconds)
+            let toastContainer = document.getElementById('dev-toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'dev-toast-container';
+                document.body.appendChild(toastContainer);
             }
+
+            toastContainer.innerHTML = `
+                <div class="center-otp-toast">
+                    <span style="font-size: 0.9rem; color: #555;">Dev Mode / SMS Blocked</span><br/>
+                    <b style="font-size: 1.5rem; color: var(--primary); letter-spacing: 2px;">OTP: ${realOtp}</b>
+                </div>
+            `;
+
+            // 15 Second (15000ms) baad toast ko hata dena
+            setTimeout(() => {
+                toastContainer.innerHTML = '';
+            }, 15000);
             
-            document.getElementById('otp').value = demoOtp; 
+            // Rider ko type nahi karna padega, auto-fill kar dete hain
+            document.getElementById('otp').value = realOtp; 
 
         } else {
             // Verify
