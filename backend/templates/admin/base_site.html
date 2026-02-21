@@ -1,0 +1,48 @@
+{% extends "admin/base.html" %}
+
+{% block extrahead %}
+{{ block.super }}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 1. Ek notification sound set karein (Apne static folder me ek sound file rakh lena)
+        // Ensure kijiye ki aapne static folder me sounds/ring.mp3 rakhi ho
+        const orderSound = new Audio('/static/sounds/ring.mp3');
+
+        // 2. WebSocket se connect karein
+        // Yeh URL hum aage configure karenge routing me
+        const protocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
+        const socketUrl = protocol + window.location.host + '/ws/admin-notifications/';
+        const adminSocket = new WebSocket(socketUrl);
+
+        adminSocket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            
+            // Check karein ki message naye order ka hai
+            if (data.type === 'new_order') {
+                // Sound bajao
+                orderSound.play().catch(function(error) {
+                    console.log("Browser policy ki wajah se sound play nahi hua. Admin ko page par ek baar click karna hoga.", error);
+                });
+                
+                // Aap chaho toh alert bhi dikha sakte ho ya koi toast message
+                // alert("Naya Order Aaya Hai! ID: " + data.order_id);
+            }
+        };
+
+        adminSocket.onclose = function(event) {
+            console.error('Admin notification socket band ho gaya hai.');
+        };
+
+        // Browser Autoplay Policy Hack: 
+        // Browser apne aap sound nahi bajane deta jab tak admin click na kare.
+        // Yeh code admin ke pehle click par sound ki permission le lega.
+        document.body.addEventListener('click', function unlockAudio() {
+            orderSound.play().then(() => {
+                orderSound.pause();
+                orderSound.currentTime = 0;
+            }).catch(err => {});
+            document.body.removeEventListener('click', unlockAudio);
+        }, { once: true });
+    });
+</script>
+{% endblock %}
