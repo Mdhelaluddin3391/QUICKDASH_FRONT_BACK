@@ -3,8 +3,8 @@ const form = document.getElementById('rider-login-form');
 const btn = document.getElementById('action-btn');
 const msg = document.getElementById('error-msg');
 
-if(localStorage.getItem(RIDER_CONFIG.STORAGE_KEYS.TOKEN)) {
-    window.location.href = RIDER_CONFIG.ROUTES.DASHBOARD;
+if(localStorage.getItem(window.RIDER_CONFIG.STORAGE_KEYS.TOKEN)) {
+    window.location.href = window.RIDER_CONFIG.ROUTES.DASHBOARD;
 }
 
 form.addEventListener('submit', async (e) => {
@@ -32,8 +32,7 @@ form.addEventListener('submit', async (e) => {
         if (!isOtpSent) {
             // Send OTP
             const res = await ApiService.post('/notifications/send-otp/', { 
-                phone: formattedPhone,          
-                phone_number: formattedPhone    
+                phone: formattedPhone
             });
             isOtpSent = true;
             
@@ -74,19 +73,19 @@ form.addEventListener('submit', async (e) => {
                 throw { message: "Please enter OTP" };
             }
             
-            const res = await ApiService.post('/auth/register/customer/', { phone: formattedPhone, phone_number: formattedPhone, otp });
-            localStorage.setItem(RIDER_CONFIG.STORAGE_KEYS.TOKEN, res.access);
+            const res = await ApiService.post('/accounts/register/customer/', { phone: formattedPhone, otp });
+            localStorage.setItem(window.RIDER_CONFIG.STORAGE_KEYS.TOKEN, res.access);
             
             try {
                 await ApiService.get('/riders/me/');
                 if (typeof window.showToast === 'function') window.showToast("Login Successful!", 'success');
                 
                 setTimeout(() => {
-                    window.location.href = RIDER_CONFIG.ROUTES.DASHBOARD;
+                    window.location.href = window.RIDER_CONFIG.ROUTES.DASHBOARD;
                 }, 1000);
             } catch(err) {
                 msg.innerText = "Access Denied: Not a Rider Account";
-                localStorage.removeItem(RIDER_CONFIG.STORAGE_KEYS.TOKEN);
+                localStorage.removeItem(window.RIDER_CONFIG.STORAGE_KEYS.TOKEN);
                 isOtpSent = false; 
                 document.getElementById('otp-group').style.display = 'none';
                 document.getElementById('phone').disabled = false;
@@ -114,5 +113,12 @@ form.addEventListener('submit', async (e) => {
         btn.disabled = false;
         if(isOtpSent) btn.innerText = "Verify & Login";
         else btn.innerText = "Get OTP";
+    }
+});
+
+// Redirect to dashboard if already logged in on page load
+document.addEventListener('DOMContentLoaded', () => {
+    if(localStorage.getItem(window.RIDER_CONFIG.STORAGE_KEYS.TOKEN)) {
+        window.location.href = window.RIDER_CONFIG.ROUTES.DASHBOARD;
     }
 });
