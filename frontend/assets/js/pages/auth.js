@@ -5,7 +5,6 @@ const stepOtp = document.getElementById('step-otp');
 let phoneNumber = '';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // अगर पहले से लॉगिन है तो होमपेज पर भेजें
     if (localStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN)) {
         window.location.href = APP_CONFIG.ROUTES.HOME;
         return;
@@ -16,14 +15,43 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const otpForm = document.getElementById('step-otp');
     if (otpForm) otpForm.addEventListener('submit', handleVerifyAndLogin);
+
+    // 🔥 NEW: Advanced & Smooth OTP Input Logic
+    const otpInputs = document.querySelectorAll('.otp-input');
+    otpInputs.forEach((input, index) => {
+        // Typing handler
+        input.addEventListener('input', (e) => {
+            input.value = input.value.replace(/[^0-9]/g, ''); // Sirf numbers allow
+            if (input.value && index < otpInputs.length - 1) {
+                otpInputs[index + 1].focus(); // Next box me jao
+            }
+        });
+
+        // Backspace (Delete) handler
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' && !input.value && index > 0) {
+                otpInputs[index - 1].focus(); // Pichle box me jao
+            }
+        });
+
+        // Copy-Paste handler
+        input.addEventListener('paste', (e) => {
+            e.preventDefault();
+            const pasteData = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6);
+            pasteData.split('').forEach((char, i) => {
+                if (otpInputs[i]) {
+                    otpInputs[i].value = char;
+                    if (i < 5) otpInputs[i + 1].focus();
+                }
+            });
+        });
+    });
 });
 
 async function handleSendOtp(e) {
     e.preventDefault();
-    // UPDATED: Spaces and non-digit characters ko remove kar dena
     const rawInput = document.getElementById('phone-input').value.replace(/\D/g, '');
     
-    // Indian Mobile Validation strictly for 10 digits
     if (!/^[6-9]\d{9}$/.test(rawInput) || rawInput.length !== 10) {
         return Toast.error("Please enter a valid 10-digit mobile number");
     }
@@ -34,20 +62,24 @@ async function handleSendOtp(e) {
     btn.innerHTML = 'Sending...';
 
     try {
-        // UPDATED: Strictly add +91
         phoneNumber = `+91${rawInput}`;
         
-        // 1. API Call ka result 'res' variable mein save karein
         const res = await ApiService.post('/notifications/send-otp/', { phone: phoneNumber });
         
         stepPhone.style.display = 'none';
         stepOtp.style.display = 'block';
         document.getElementById('display-phone').innerText = phoneNumber;
         
-        // 2. Yahan check karein: Agar backend ne 'debug_otp' bheja hai
-        // toh wahi Random OTP dikhayein
         if (res.debug_otp) {
-            Toast.devOTP(res.debug_otp); // <--- Ye Backend wala Real Random OTP hai
+            Toast.devOTP(res.debug_otp); 
+            
+            // 🔥 NEW: Dev mode mein automatically 6 boxes fill ho jayenge!
+            const debugOtpStr = String(res.debug_otp);
+            const otpInputs = document.querySelectorAll('.otp-input');
+            otpInputs.forEach((inp, i) => {
+                if (debugOtpStr[i]) inp.value = debugOtpStr[i];
+            });
+
         } else {
             Toast.success("OTP Sent successfully");
         }
@@ -81,7 +113,6 @@ async function handleVerifyAndLogin(e) {
     btn.innerText = "Verifying...";
     
     try {
-        // Direct Register/Login call handles both verification and token generation.
         const res = await ApiService.post('/auth/register/customer/', { 
             phone: phoneNumber, 
             otp: otp 
@@ -91,7 +122,6 @@ async function handleVerifyAndLogin(e) {
             localStorage.setItem(APP_CONFIG.STORAGE_KEYS.TOKEN, res.access);
             if(res.refresh) localStorage.setItem(APP_CONFIG.STORAGE_KEYS.REFRESH, res.refresh);
             
-            // Fetch Profile immediately to update UI
             try {
                 const user = await ApiService.get('/auth/me/');
                 localStorage.setItem(APP_CONFIG.STORAGE_KEYS.USER, JSON.stringify(user));
@@ -121,13 +151,10 @@ function startTimerLocal() {
     }, 1000);
 }
 
-// UI Helpers
-window.focusNext = function(el) {
-    if (el.value.length === 1 && el.nextElementSibling) el.nextElementSibling.focus();
-}
-
 window.resetForm = function() {
     stepOtp.style.display = 'none';
     stepPhone.style.display = 'block';
     document.getElementById('get-otp-btn').disabled = false;
+    // OTP boxes clear kar do jab form reset ho
+    document.querySelectorAll('.otp-input').forEach(i => i.value = '');
 }
