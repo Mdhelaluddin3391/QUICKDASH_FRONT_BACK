@@ -1,8 +1,25 @@
+from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from .models import User, UserRole, Address
+
+# --- 1. Custom Form Add karein OTP based users ke liye ---
+class CustomUserCreationForm(forms.ModelForm):
+    class Meta:
+        model = User
+        # Yahan sirf zaroori fields rakhein, password nahi
+        fields = ('phone', 'first_name', 'last_name', 'email')
+
+    def save(self, commit=True):
+        # User object banayein bina save kiye
+        user = super().save(commit=False)
+        # Django ko batayein ki is user ka koi password nahi hai (OTP login hoga)
+        user.set_unusable_password()
+        if commit:
+            user.save()
+        return user
 
 
 class UserRoleInline(admin.TabularInline):
@@ -15,6 +32,9 @@ class UserRoleInline(admin.TabularInline):
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
+    # --- 2. Admin ko batayein ki naya Custom Form use karna hai ---
+    add_form = CustomUserCreationForm
+
     list_display = (
         'phone',
         'full_name',
@@ -40,9 +60,10 @@ class CustomUserAdmin(UserAdmin):
     actions = ['activate_users', 'deactivate_users', 'make_staff', 'remove_staff']
     inlines = [UserRoleInline]
 
+    # --- 3. Yahan se 'password' field ko hata dein ---
     fieldsets = (
         ('Authentication Info', {
-            'fields': ('phone', 'password')
+            'fields': ('phone',)  # Pehle yahan 'password' tha
         }),
         ('Personal Info', {
             'fields': ('first_name', 'last_name', 'email')
@@ -56,10 +77,11 @@ class CustomUserAdmin(UserAdmin):
         }),
     )
 
+    # --- 4. Yahan se 'password1', 'password2' fields ko hata dein ---
     add_fieldsets = (
         ('Authentication Info', {
             'classes': ('wide',),
-            'fields': ('phone', 'password1', 'password2')
+            'fields': ('phone',)  # Pehle yahan 'password1', 'password2' tha
         }),
         ('Personal Info', {
             'classes': ('wide',),
