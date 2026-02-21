@@ -129,26 +129,41 @@ class SkuListAPIView(generics.ListAPIView):
 
     def _inject_warehouse_prices(self, data, request):
         warehouse = getattr(request, 'warehouse', None)
-        if not warehouse: return
-
         results = data.get('results') if isinstance(data, dict) else data
         if not results: return
+
+        # Agar warehouse set nahi hai, toh default stock 0 dikhaye
+        if not warehouse: 
+            for item in results:
+                item['available_stock'] = 0
+            return
 
         skus = [item.get('sku') for item in results]
         if not skus: return
 
-        # Batch fetch prices
-        inventory_prices = InventoryItem.objects.filter(
+        # Database se un SKUs ka data ek saath get karein
+        inventory_items = InventoryItem.objects.filter(
             sku__in=skus,
             bin__rack__aisle__zone__warehouse=warehouse
-        ).values('sku', 'price')
+        )
         
-        price_map = {item['sku']: item['price'] for item in inventory_prices}
+        # Ek dictionary banayein inventory map karne ke liye
+        inv_map = {}
+        for inv in inventory_items:
+            if inv.sku not in inv_map:
+                inv_map[inv.sku] = {'price': inv.price, 'stock': 0}
+            
+            # Sahi available stock calculate karein
+            inv_map[inv.sku]['stock'] += (inv.total_stock - inv.reserved_stock)
 
+        # Ab results ke andar loop chala kar data inject kar dein
         for item in results:
             sku = item.get('sku')
-            if sku in price_map:
-                item['sale_price'] = price_map[sku] # Frontend expects 'sale_price'
+            if sku in inv_map:
+                item['sale_price'] = inv_map[sku]['price']
+                item['available_stock'] = inv_map[sku]['stock']
+            else:
+                item['available_stock'] = 0  # Agar inventory me nahi hai toh Out of stock
 
 class SkuDetailAPIView(generics.RetrieveAPIView):
     """
@@ -314,9 +329,24 @@ class StorefrontCatalogAPIView(APIView):
             if products.exists():
                 p_data = ProductSerializer(products, many=True, context={'request': request}).data
                 
+                # NAYA CODE: Products ka real stock nikalne ke liye
+                product_skus = [p['sku'] for p in p_data]
+                inventory_qs = InventoryItem.objects.filter(
+                    sku__in=product_skus,
+                    bin__rack__aisle__zone__warehouse=warehouse
+                )
+                
+                stock_map = {}
+                for inv in inventory_qs:
+                    if inv.sku not in stock_map:
+                        stock_map[inv.sku] = 0
+                    stock_map[inv.sku] += (inv.total_stock - inv.reserved_stock)
+                
                 # Consistency Injection
                 for p in p_data: 
-                    p['available_stock'] = 10 # Just a flag for Frontend
+                    # NAYA CODE: Hardcoded 10 ki jagah database se actual stock value pass karein
+                    p['available_stock'] = stock_map.get(p['sku'], 0) 
+                    
                     if p.get('effective_price') is None:
                         p['effective_price'] = p.get('mrp')
                         p['sale_price'] = p.get('mrp')

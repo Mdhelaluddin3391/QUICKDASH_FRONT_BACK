@@ -224,6 +224,7 @@ async function loadProducts(reset = false) {
 }
 
 // --- 4. Render Logic ---
+// --- 4. Render Logic ---
 function renderProductCards(products, container) {
     const html = products.map(p => {
         const imgUrl = p.image_url || 'https://via.placeholder.com/150?text=No+Image';
@@ -234,11 +235,14 @@ function renderProductCards(products, container) {
             discountBadge = `<div class="badge-off" style="position:absolute; top:10px; left:10px; background:#ef4444; color:white; padding:2px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold; z-index:2;">${off}% OFF</div>`;
         }
 
+        // NAYA CODE: Check karein ki product out of stock hai ya nahi
+        const isOOS = p.available_stock <= 0;
+
         return `
         <div class="card product-card" style="position:relative; padding:15px; border:1px solid #eee; transition:0.3s;">
             ${discountBadge}
             <a href="./product.html?code=${p.sku}" style="text-decoration:none; color:inherit;">
-                <img src="${imgUrl}" style="width:100%; height:140px; object-fit:contain; margin-bottom:15px;" loading="lazy">
+                <img src="${imgUrl}" style="width:100%; height:140px; object-fit:contain; margin-bottom:15px; opacity: ${isOOS ? 0.5 : 1};" loading="lazy">
                 <div class="item-name" style="font-weight:600; font-size:0.95rem; height:44px; overflow:hidden; line-height:1.4;">${p.name}</div>
             </a>
             <div class="item-unit text-muted small mb-2">${p.unit || '1 Unit'}</div>
@@ -248,11 +252,10 @@ function renderProductCards(products, container) {
                     <span class="font-bold" style="font-size:1.1rem;">${Formatters.currency(p.sale_price || p.price)}</span>
                     ${p.mrp > (p.sale_price || p.price) ? `<span class="text-muted small ml-1" style="text-decoration: line-through; font-size:0.85rem;">${Formatters.currency(p.mrp)}</span>` : ''}
                 </div>
-                <button class="btn btn-sm btn-outline-primary" 
-                        style="border-radius:6px; padding: 6px 20px;"
-                        onclick="addToCart('${p.sku}', this)">
-                    ADD
-                </button>
+                ${isOOS ? 
+                    `<button class="btn btn-sm btn-secondary" style="border-radius:6px; padding: 6px 20px;" disabled>OOS</button>` : 
+                    `<button class="btn btn-sm btn-outline-primary" style="border-radius:6px; padding: 6px 20px;" onclick="addToCart('${p.sku}', this)">ADD</button>`
+                }
             </div>
         </div>
         `;

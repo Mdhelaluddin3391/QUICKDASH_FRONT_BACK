@@ -210,13 +210,22 @@ class ProductAdmin(admin.ModelAdmin):
 
     def stock_status(self, obj):
         from apps.inventory.models import InventoryItem
-        total_stock = InventoryItem.objects.filter(sku=obj.sku).aggregate(
-            total=Sum('total_stock')
-        )['total'] or 0
-        if total_stock > 10:
-            return format_html('<span style="color: green;">{} in stock</span>', total_stock)
-        elif total_stock > 0:
-            return format_html('<span style="color: orange;">{} low stock</span>', total_stock)
+        # Sirf total stock nahi, reserved stock bhi get karein
+        stock_data = InventoryItem.objects.filter(sku=obj.sku).aggregate(
+            t_stock=Sum('total_stock'),
+            r_stock=Sum('reserved_stock')
+        )
+        
+        t_stock = stock_data['t_stock'] or 0
+        r_stock = stock_data['r_stock'] or 0
+        
+        # Real stock nikalne ke liye total me se reserved minus karein
+        available_stock = t_stock - r_stock
+
+        if available_stock > 10:
+            return format_html('<span style="color: green;">{} in stock</span>', available_stock)
+        elif available_stock > 0:
+            return format_html('<span style="color: orange;">{} low stock</span>', available_stock)
         else:
             return format_html('<span style="color: red;">Out of stock</span>')
     stock_status.short_description = "Stock Status"
