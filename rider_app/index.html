@@ -18,9 +18,10 @@
         </div>
         
         <form id="rider-login-form">
-            <div class="input-group">
+            <div class="input-group" style="display: flex; align-items: center;">
                 <i class="fas fa-phone"></i>
-                <input type="tel" id="phone" placeholder="+91 99999 99999" required>
+                <span style="color: inherit; font-weight: bold; margin-left: 5px; margin-right: 5px; padding-right: 10px; border-right: 1px solid rgba(0,0,0,0.2);">+91</span>
+                <input type="tel" id="phone" placeholder="9876543210" maxlength="10" required style="flex: 1; border: none; outline: none; background: transparent; color: inherit;">
             </div>
             
             <div class="input-group" id="otp-group" style="display:none;">

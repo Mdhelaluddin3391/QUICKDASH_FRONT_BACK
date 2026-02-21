@@ -9,18 +9,21 @@ if(localStorage.getItem(RIDER_CONFIG.STORAGE_KEYS.TOKEN)) {
 
 form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    let phone = document.getElementById('phone').value.trim();
+    
+    // UPDATED: Sirf number extract karna (spaces/symbols hatana)
+    let rawPhone = document.getElementById('phone').value.replace(/\D/g, ''); 
     const otp = document.getElementById('otp').value.trim();
     msg.innerText = "";
 
-    // 🔥 FIX 1: Auto Format Phone Number (Agar user +91 bhool jaye)
-    if (!phone.startsWith('+')) {
-        if (phone.length === 10) {
-            phone = '+91' + phone; // India ka code default add karo
-        } else {
-            phone = '+' + phone;
-        }
+    // Strictly 10 digit ka number hona chahiye
+    if (rawPhone.length !== 10) {
+        msg.innerText = "Please enter a valid 10-digit phone number.";
+        if (typeof window.showToast === 'function') window.showToast("Invalid number", 'error');
+        return;
     }
+
+    // Backend ko specifically format pass karna
+    let formattedPhone = `+91${rawPhone}`;
 
     try {
         btn.disabled = true;
@@ -29,8 +32,8 @@ form.addEventListener('submit', async (e) => {
         if (!isOtpSent) {
             // Send OTP
             const res = await ApiService.post('/notifications/send-otp/', { 
-                phone: phone,          // Backend ko check karein agar ye 'phone_number' chahiye toh isko phone_number: phone kardein
-                phone_number: phone    // Safe side dono bhej dete hain taaki ek toh catch ho hi jaye
+                phone: formattedPhone,          
+                phone_number: formattedPhone    
             });
             isOtpSent = true;
             
@@ -38,7 +41,7 @@ form.addEventListener('submit', async (e) => {
             document.getElementById('phone').disabled = true;
             btn.innerText = "Verify & Login";
             
-            // 🔥 FIX: Backend ki `debug_otp` field se real OTP nikalna 
+            // Backend ki `debug_otp` field se real OTP nikalna 
             const realOtp = res.debug_otp; 
             
             // Ek custom bada Alert/Toast banate hain jo center mein dikhe aur lamba ruke (15 seconds)
@@ -71,7 +74,7 @@ form.addEventListener('submit', async (e) => {
                 throw { message: "Please enter OTP" };
             }
             
-            const res = await ApiService.post('/auth/register/customer/', { phone: phone, phone_number: phone, otp });
+            const res = await ApiService.post('/auth/register/customer/', { phone: formattedPhone, phone_number: formattedPhone, otp });
             localStorage.setItem(RIDER_CONFIG.STORAGE_KEYS.TOKEN, res.access);
             
             try {
@@ -92,7 +95,7 @@ form.addEventListener('submit', async (e) => {
     } catch (err) {
         console.error("Full Error Details:", err);
         
-        // 🔥 FIX 2: Better Error Message Display
+        // Better Error Message Display
         let errorText = "Something went wrong";
         
         if (err.message) {

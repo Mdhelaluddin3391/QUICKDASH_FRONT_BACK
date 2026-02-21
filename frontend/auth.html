@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - QuickDash</title>
     <script src="/assets/js/env.js"></script>
-<script src="/assets/js/config.js"></script>
+    <script src="/assets/js/config.js"></script>
     <link rel="stylesheet" href="./assets/css/base.css?v=1.0.0">
     <link rel="stylesheet" href="./assets/css/components.css?v=1.0.0">
     <link rel="stylesheet" href="./assets/css/layout.css?v=1.0.0">
@@ -30,11 +30,9 @@
             <form id="step-phone">
                 <div class="form-group text-left">
                     <label class="form-label">Mobile Number</label>
-                    <div style="display:flex; gap:10px;">
-                        <input type="text" value="+91" disabled style="width:60px; text-align:center;"
-                            class="form-control">
-                        <input type="tel" id="phone-input" class="form-control" placeholder="9876543210" maxlength="10"
-                            autofocus>
+                    <div class="form-control" style="display: flex; align-items: center; padding: 0; overflow: hidden;">
+                        <span style="padding: 0 12px; color: #555; font-weight: bold; background-color: #f0f0f0; border-right: 1px solid #ccc; height: 100%; display: flex; align-items: center;">+91</span>
+                        <input type="tel" id="phone-input" placeholder="9876543210" maxlength="10" autofocus style="border: none; outline: none; width: 100%; padding: 0.375rem 0.75rem; background: transparent;">
                     </div>
                 </div>
                 <button type="submit" class="btn btn-primary w-100" id="get-otp-btn">
@@ -63,17 +61,13 @@
 
     <div id="footer-placeholder"></div>
 
-   <script src="./assets/js/config.js?v=1.0.0" defer></script>
-<script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
-<script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
-
-<script src="./assets/js/pages/auth.js?v=1.0.0" defer></script>
+    <script src="./assets/js/config.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+    <script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+    <script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+    <script src="./assets/js/pages/auth.js?v=1.0.0" defer></script>
 </body>
 
 </html>

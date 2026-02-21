@@ -20,10 +20,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function handleSendOtp(e) {
     e.preventDefault();
-    const input = document.getElementById('phone-input').value;
+    // UPDATED: Spaces and non-digit characters ko remove kar dena
+    const rawInput = document.getElementById('phone-input').value.replace(/\D/g, '');
     
-    // Indian Mobile Validation
-    if (!/^[6-9]\d{9}$/.test(input)) {
+    // Indian Mobile Validation strictly for 10 digits
+    if (!/^[6-9]\d{9}$/.test(rawInput) || rawInput.length !== 10) {
         return Toast.error("Please enter a valid 10-digit mobile number");
     }
 
@@ -33,7 +34,8 @@ async function handleSendOtp(e) {
     btn.innerHTML = 'Sending...';
 
     try {
-        phoneNumber = `+91${input}`;
+        // UPDATED: Strictly add +91
+        phoneNumber = `+91${rawInput}`;
         
         // 1. API Call ka result 'res' variable mein save karein
         const res = await ApiService.post('/notifications/send-otp/', { phone: phoneNumber });
@@ -79,7 +81,6 @@ async function handleVerifyAndLogin(e) {
     btn.innerText = "Verifying...";
     
     try {
-        // FIX: Removed separate verify-otp call. 
         // Direct Register/Login call handles both verification and token generation.
         const res = await ApiService.post('/auth/register/customer/', { 
             phone: phoneNumber, 
