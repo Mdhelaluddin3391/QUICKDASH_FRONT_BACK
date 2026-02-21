@@ -24,10 +24,16 @@ form.addEventListener('submit', async (e) => {
             document.getElementById('phone').disabled = true;
             btn.innerText = "Verify & Login";
             
-            // 🔥 Yahan OTP ko Toast me dikha rahe hain (SMS ka kharcha bachane ke liye)
-            const demoOtp = res.otp || '123456'; // Agar API OTP nahi deti toh default 123456 dikhayega
-            window.showToast(`Test Mode: Your OTP is ${demoOtp}`, 'success');
-            // Auto-fill form for convenience (Optional)
+            // 🔥 Yahan OTP Toast message mein show karega
+            const demoOtp = res.otp || '123456'; 
+            
+            if(window.showToast) {
+                window.showToast(`TEST MODE: Your OTP is ${demoOtp}`, 'success');
+            } else {
+                alert(`OTP Sent: ${demoOtp}`); // Fallback agar css/js miss ho
+            }
+            
+            // User ki suvidha ke liye field me direct fill kar dete hain
             document.getElementById('otp').value = demoOtp; 
 
         } else {
@@ -36,8 +42,10 @@ form.addEventListener('submit', async (e) => {
             localStorage.setItem(RIDER_CONFIG.STORAGE_KEYS.TOKEN, res.access);
             
             try {
+                // Verify Rider Role
                 await ApiService.get('/riders/me/');
-                window.showToast("Login Successful!", 'success');
+                if(window.showToast) window.showToast("Login Successful!", 'success');
+                
                 setTimeout(() => {
                     window.location.href = RIDER_CONFIG.ROUTES.DASHBOARD;
                 }, 1000);
@@ -48,7 +56,7 @@ form.addEventListener('submit', async (e) => {
         }
     } catch (err) {
         msg.innerText = err.message || "Something went wrong";
-        window.showToast(err.message || "An error occurred", 'error');
+        if(window.showToast) window.showToast(err.message || "An error occurred", 'error');
         if(isOtpSent) btn.innerText = "Verify & Login";
         else btn.innerText = "Get OTP";
     } finally {

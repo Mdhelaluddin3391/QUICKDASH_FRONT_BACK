@@ -39,7 +39,6 @@
 })();
 
 
-
 // Add this helper function globally for Toast Messages
 window.showToast = function(message, type = 'info') {
     let container = document.querySelector('.toast-container');
@@ -51,12 +50,12 @@ window.showToast = function(message, type = 'info') {
 
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
-    toast.innerHTML = `<i class="fas fa-info-circle"></i> <span>${message}</span>`;
+    toast.innerHTML = `<span>${message}</span>`;
     
     container.appendChild(toast);
 
     setTimeout(() => {
         toast.style.opacity = '0';
         setTimeout(() => toast.remove(), 300);
-    }, 4000); // Hide after 4 seconds
+    }, 4000); // 4 second baad toast gayab
 };
