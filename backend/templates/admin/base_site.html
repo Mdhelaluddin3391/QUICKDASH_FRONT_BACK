@@ -14,23 +14,23 @@
         const socketUrl = protocol + window.location.host + '/ws/admin-notifications/';
         const adminSocket = new WebSocket(socketUrl);
 
+        // 👇 YEH NAYA CODE ADD KAREIN 👇
+        adminSocket.onopen = function(event) {
+            console.log("🟢 WebSocket Server se Connect ho gaya hai!");
+        };
+
         adminSocket.onmessage = function(event) {
             const data = JSON.parse(event.data);
-            
-            // Check karein ki message naye order ka hai
             if (data.type === 'new_order') {
-                // Sound bajao
                 orderSound.play().catch(function(error) {
-                    console.log("Browser policy ki wajah se sound play nahi hua. Admin ko page par ek baar click karna hoga.", error);
+                    console.log("Sound play error:", error);
                 });
-                
-                // Aap chaho toh alert bhi dikha sakte ho ya koi toast message
-                // alert("Naya Order Aaya Hai! ID: " + data.order_id);
             }
         };
 
+        // 👇 ISKO UPDATE KAREIN 👇
         adminSocket.onclose = function(event) {
-            console.error('Admin notification socket band ho gaya hai.');
+            console.error('🔴 Admin notification socket band ho gaya. Code:', event.code, 'Reason:', event.reason);
         };
 
         // Browser Autoplay Policy Hack: 
