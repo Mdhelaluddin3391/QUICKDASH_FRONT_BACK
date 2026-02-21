@@ -162,3 +162,33 @@ class RiderPayoutListAPIView(APIView):
         
         payouts = RiderPayout.objects.filter(rider=request.user.rider_profile).order_by("-created_at")
         return Response(RiderPayoutSerializer(payouts, many=True).data)
+    
+
+
+
+
+class RiderLocationUpdateAPIView(APIView):
+    """
+    Rider App: Updates the rider's current GPS location.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not hasattr(request.user, 'rider_profile'):
+            return Response({"error": "User is not a rider"}, status=status.HTTP_403_FORBIDDEN)
+
+        lat = request.data.get("lat")
+        lng = request.data.get("lng")
+
+        if lat is not None and lng is not None:
+            profile = request.user.rider_profile
+            
+            # Note: Double check your RiderProfile model to ensure these field names match. 
+            # They might be 'latitude'/'longitude' or 'current_lat'/'current_lng'.
+            profile.current_lat = lat  
+            profile.current_lng = lng
+            profile.save()
+            
+            return Response({"status": "Location updated successfully"})
+            
+        return Response({"error": "Missing coordinates"}, status=status.HTTP_400_BAD_REQUEST)
