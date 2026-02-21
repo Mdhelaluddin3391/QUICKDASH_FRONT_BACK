@@ -1,3 +1,5 @@
+let locationWatchId = null;
+
 document.addEventListener('DOMContentLoaded', async () => {
     if (!localStorage.getItem(RIDER_CONFIG.STORAGE_KEYS.TOKEN)) {
         window.location.href = 'index.html';
@@ -32,10 +34,12 @@ function updateStatusUI(isOnline) {
         badge.innerText = "Online";
         badge.className = "badge-online";
         document.body.classList.remove('is-offline');
+        startLocationTracking(); // 🔥 Start Tracking
     } else {
         badge.innerText = "Offline";
         badge.className = "badge-offline";
         document.body.classList.add('is-offline');
+        stopLocationTracking();  // 🔥 Stop Tracking
     }
 }
 
@@ -44,19 +48,70 @@ window.toggleOnline = async function(el) {
     try {
         await ApiService.post('/riders/availability/', { is_available: isOnline });
         updateStatusUI(isOnline);
-        if(isOnline) checkActiveJobs();
+        if(isOnline) {
+            checkActiveJobs();
+            window.showToast("You are now Online", 'success');
+        } else {
+            window.showToast("You are Offline", 'info');
+        }
     } catch (e) {
         el.checked = !isOnline;
-        alert("Failed to update status. Check connection.");
+        window.showToast("Failed to update status. Check connection.", 'error');
     }
 };
+
+// ==========================================
+// 📍 SOLID LOCATION TRACKING SYSTEM
+// ==========================================
+function startLocationTracking() {
+    if (!navigator.geolocation) {
+        window.showToast("Geolocation is not supported by your browser", 'error');
+        return;
+    }
+
+    // Clear any existing watch
+    if (locationWatchId !== null) stopLocationTracking();
+
+    locationWatchId = navigator.geolocation.watchPosition(
+        async (position) => {
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+            
+            try {
+                // Send coordinates to backend periodically
+                await ApiService.post('/riders/location/', { lat, lng });
+                console.log(`📍 Location updated: ${lat}, ${lng}`);
+            } catch(e) {
+                console.warn("Could not sync location to server", e);
+            }
+        },
+        (error) => {
+            console.error("GPS Error:", error);
+            window.showToast("Please enable GPS/Location access", 'error');
+        },
+        {
+            enableHighAccuracy: true,  // Important for real-time tracking
+            maximumAge: 5000,          // Accept max 5-second old cached location
+            timeout: 10000             // Timeout after 10 seconds
+        }
+    );
+}
+
+function stopLocationTracking() {
+    if (locationWatchId !== null) {
+        navigator.geolocation.clearWatch(locationWatchId);
+        locationWatchId = null;
+        console.log("📍 Tracking stopped.");
+    }
+}
+// ==========================================
+
 
 async function checkActiveJobs() {
     if (!document.getElementById('online-toggle').checked) return;
 
     try {
         const deliveries = await ApiService.get('/delivery/me/');
-        
         const activeJob = deliveries.find(d => ['assigned', 'picked_up', 'out_for_delivery'].includes(d.status));
         const container = document.getElementById('active-job-area');
         
@@ -79,10 +134,17 @@ function renderJobCard(job, container) {
     const lat = address.lat || 0;
     const lng = address.lng || 0;
     
-    const mapLink = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    const mapLink = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
     const receiverName = address.receiver_name || "Customer";
     const fullAddr = address.full_address || "Address details unavailable";
     const phone = address.receiver_phone || "";
+    
+    // 🔥 Item List Build Karna
+    const itemsListHTML = order.items && order.items.length > 0 
+        ? `<ul class="order-items-list" style="margin: 10px 0; padding-left: 20px; font-size: 13px;">
+            ${order.items.map(i => `<li>${i.quantity}x ${i.product_name}</li>`).join('')}
+           </ul>`
+        : `<p style="font-size: 13px; color: #888;">Items details not available</p>`;
 
     let actionBtn = '';
     let statusBadge = '';
@@ -107,25 +169,34 @@ function renderJobCard(job, container) {
     }
 
     container.innerHTML = `
-        <div class="job-card">
+        <div class="job-card" style="text-align: left;">
             <div class="job-header">
                 <div>
                     <span class="order-id">Order #${order.id}</span>
                     ${statusBadge}
                 </div>
-                <span class="amount">₹${order.final_amount}</span>
+                <div style="text-align: right;">
+                    <span class="amount">₹${order.final_amount}</span><br>
+                    <small style="color:${order.payment_method === 'COD' ? '#eab308' : '#10b981'}">
+                        ${order.payment_method === 'COD' ? 'Collect Cash' : 'Paid Online'}
+                    </small>
+                </div>
             </div>
+            
             <div class="customer-info">
-                <h4>${receiverName}</h4>
+                <h4><i class="fas fa-user"></i> ${receiverName}</h4>
                 <p><i class="fas fa-map-marker-alt"></i> ${fullAddr}</p>
                 <div class="actions-row">
                     <a href="tel:${phone}" class="btn-small"><i class="fas fa-phone"></i> Call</a>
-                    <a href="${mapLink}" target="_blank" class="btn-small"><i class="fas fa-location-arrow"></i> Navigate</a>
+                    <a href="${mapLink}" target="_blank" class="btn-small btn-map"><i class="fas fa-location-arrow"></i> Navigate</a>
                 </div>
             </div>
-            <div class="job-items">
-                <small>${order.items ? order.items.length : 0} Items in package</small>
+
+            <div class="job-items" style="background: #f8fafc; padding: 10px; border-radius: 6px; margin-bottom: 15px;">
+                <strong><i class="fas fa-shopping-bag"></i> Package Contents:</strong>
+                ${itemsListHTML}
             </div>
+
             <div class="job-footer">
                 ${actionBtn}
             </div>
@@ -138,7 +209,7 @@ window.completeOrder = async function(id) {
     const otp = otpInput.value;
     
     if(!otp || otp.length !== 6) {
-        alert("Please enter the valid 6-digit OTP provided by the customer.");
+        window.showToast("Please enter the valid 6-digit OTP", 'error');
         return;
     }
     
@@ -149,16 +220,15 @@ window.completeOrder = async function(id) {
 
     try {
         await ApiService.post(`/delivery/${id}/complete/`, { otp });
-        alert("✅ Order Delivered Successfully!");
+        window.showToast("✅ Order Delivered Successfully!", 'success');
         await checkActiveJobs();
-        window.location.reload();
     } catch(e) {
         console.error(e);
         let msg = "Failed to complete delivery.";
         if(e.message) msg = e.message;
         if(e.error && e.error.detail) msg = e.error.detail;
         
-        alert("❌ Error: " + msg);
+        window.showToast("❌ Error: " + msg, 'error');
     } finally {
         btn.innerHTML = originalText;
         btn.disabled = false;
@@ -172,15 +242,16 @@ window.scanQR = async function(orderId) {
     try {
         await ApiService.post('/delivery/verify-handover/', { order_id: orderId });
         
-        alert("✅ Pickup Verified! Status Updated.");
+        window.showToast("✅ Pickup Verified! Status Updated.", 'success');
         checkActiveJobs(); 
     } catch (e) {
-        alert("❌ Handover Failed: " + (e.message || "Unknown error"));
+        window.showToast("❌ Handover Failed: " + (e.message || "Unknown error"), 'error');
     }
 };
 
 window.logout = function() {
     if(confirm("Are you sure you want to logout?")) {
+        stopLocationTracking();
         localStorage.clear();
         window.location.href = 'index.html';
     }
