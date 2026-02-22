@@ -151,6 +151,7 @@ async function handleSaveAddress(e) {
         await ApiService.post('/auth/customer/addresses/', payload);
         
         Toast.success("Address Saved!");
+            ApiService.clearCache();
         closeAddressModal();
         loadAddresses(); // Refresh list
     } catch (error) {

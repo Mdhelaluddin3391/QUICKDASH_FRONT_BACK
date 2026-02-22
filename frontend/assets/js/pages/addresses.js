@@ -167,6 +167,7 @@ async function saveAddress(e) {
         await ApiService.post('/auth/customer/addresses/', payload);
         
         // Success
+            ApiService.clearCache();
         closeModal();
         loadAddresses(); // Reload list
         if(window.Toast) Toast.success("Address saved successfully");
@@ -185,6 +186,7 @@ window.deleteAddress = async function(id) {
     try {
         await ApiService.delete(`/auth/customer/addresses/${id}/`);
         if(window.Toast) Toast.success("Address deleted");
+            ApiService.clearCache();
         loadAddresses();
     } catch (e) {
         alert("Failed to delete address");

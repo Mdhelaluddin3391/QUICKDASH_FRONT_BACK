@@ -14,10 +14,22 @@
 
     /**
      * Component Loader: HTML Partials (Nav/Footer)
+     * 🔥 ADDED: HTML Caching to prevent re-fetching and blinking
      */
     async function loadComponent(placeholderId, filePath) {
         const element = document.getElementById(placeholderId);
         if (!element) return;
+
+        // --- 🔥 HTML CACHE LOGIC START ---
+        const cacheKey = `html_cache_${filePath}`;
+        const cachedHtml = sessionStorage.getItem(cacheKey);
+
+        if (cachedHtml) {
+            element.innerHTML = cachedHtml;
+            highlightActiveLink(element);
+            return; // Cache mil gaya, aage fetch karne ki zaroorat nahi
+        }
+        // --- HTML CACHE LOGIC END ---
 
         try {
             let resolvedPath = filePath;
@@ -32,6 +44,10 @@
             const response = await fetch(resolvedPath);
             if (!response.ok) throw new Error(`Failed to load ${resolvedPath}`);
             const html = await response.text();
+            
+            // Save fetched HTML to SessionStorage
+            try { sessionStorage.setItem(cacheKey, html); } catch(e) {}
+
             element.innerHTML = html;
 
             // Load hone ke baad highlight karein
@@ -380,6 +396,10 @@
         } catch (e) { } finally {
             localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.TOKEN);
             localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.REFRESH);
+            
+            // --- 🔥 Cache clearing applied here already by you ---
+            if (window.ApiService) { window.ApiService.clearCache(); } else { sessionStorage.clear(); }
+
             localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.USER);
             localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.DELIVERY_CONTEXT);
             
@@ -395,14 +415,7 @@
     };
 })();
 
-
-
-
-
-
-
 // frontend/assets/js/layout/main-layout.js ke end me update karein
-
 document.addEventListener('DOMContentLoaded', async () => {
     await checkStoreStatus();
 });

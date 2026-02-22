@@ -23,6 +23,14 @@
 
         _set(key, data) {
             localStorage.setItem(key, JSON.stringify(data));
+            
+            // --- 🔥 SMART CACHE CLEAR ON LOCATION SET ---
+            if (window.ApiService) {
+                window.ApiService.clearCache();
+            } else {
+                sessionStorage.clear();
+            }
+
             this._notifyChange();
         },
 
@@ -140,6 +148,14 @@
         clear() {
             localStorage.removeItem(this.KEYS.SERVICE_CONTEXT);
             localStorage.removeItem(this.KEYS.DELIVERY_CONTEXT);
+            
+            // --- 🔥 SMART CACHE CLEAR ON LOCATION CLEAR ---
+            if (window.ApiService) {
+                window.ApiService.clearCache();
+            } else {
+                sessionStorage.clear();
+            }
+
             this._notifyChange();
         },
 
@@ -155,6 +171,8 @@
     window.addEventListener('storage', (e) => {
         if (e.key === LocationManager.KEYS.DELIVERY_CONTEXT || e.key === LocationManager.KEYS.SERVICE_CONTEXT) {
             console.warn("[LocationManager] Syncing across tabs...");
+            // --- 🔥 SMART CACHE CLEAR MULTI-TAB ---
+            if (window.ApiService) { window.ApiService.clearCache(); } else { sessionStorage.clear(); }
             window.location.reload();
         }
     });

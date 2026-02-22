@@ -128,6 +128,7 @@ async function handleVerifyAndLogin(e) {
             } catch(e) { console.warn("Profile fetch failed", e); }
             
             Toast.success("Login Successful");
+                ApiService.clearCache();
             window.location.href = APP_CONFIG.ROUTES.HOME;
         } else {
             throw new Error("No access token received");

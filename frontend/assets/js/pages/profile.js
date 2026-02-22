@@ -1,4 +1,3 @@
-// frontend/assets/js/pages/profile.js
 
 document.addEventListener('DOMContentLoaded', initDashboard);
 
@@ -51,6 +50,7 @@ function getStoredUser() {
     } catch (e) { return {}; }
 }
 
+                window.ApiService.clearCache();
 /* =========================
    EVENT BINDINGS
 ========================= */

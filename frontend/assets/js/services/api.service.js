@@ -5,6 +5,7 @@
  * - Injects Location Context (L1/L2) for Backend Middleware
  * - Injects Idempotency-Key for mutating requests
  * - Centralized Error Handling
+ * - 🔥 SMART GET CACHING ADDED
  */
 (function () {
     const ApiService = {
@@ -93,7 +94,6 @@
                 // [Existing Logic] Handle 401 Unauthorized (Token Refresh Flow)
                 if (response.status === 401 && !isRetry) {
                     if (ApiService.isRefreshing) {
-                        // ✅ FIX 2A: Resolve और Reject दोनों पास करें ताकि ऐप हैंग ना हो
                         return new Promise((resolve, reject) => {
                             ApiService.refreshSubscribers.push((wasRefreshed) => {
                                 if (wasRefreshed) {
@@ -110,10 +110,10 @@
                     ApiService.isRefreshing = false;
 
                     if (success) {
-                        ApiService.onRefreshed(true); // ✅ True पास करें
+                        ApiService.onRefreshed(true); 
                         return ApiService.request(endpoint, method, body, true);
                     } else {
-                        ApiService.onRefreshed(false); // ✅ False पास करें
+                        ApiService.onRefreshed(false); 
                         ApiService.handleAuthFailure();
                         throw { status: 401, message: "Session expired" };
                     }
@@ -149,7 +149,6 @@
         },
 
         onRefreshed: function (success) {
-            // ✅ FIX 2B: पेंडिंग कॉल्स को success स्टेटस भेजें
             ApiService.refreshSubscribers.forEach((callback) => callback(success));
             ApiService.refreshSubscribers = [];
         },
@@ -182,12 +181,13 @@
             return false;
         },
 
-        
-
         handleAuthFailure: function() {
             localStorage.removeItem(window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token');
             localStorage.removeItem(window.APP_CONFIG?.STORAGE_KEYS?.REFRESH || 'refresh_token');
             localStorage.removeItem(window.APP_CONFIG?.STORAGE_KEYS?.USER || 'user_info');
+            
+            // Auto clear cache on logout/failure
+            this.clearCache();
 
             const currentPath = window.location.pathname;
             const privatePages = [
@@ -209,11 +209,58 @@
             }
         },
 
-        get: function (endpoint, params = {}) { 
+        // --- 🔥 SMART GET CACHING 🔥 ---
+        get: async function (endpoint, params = {}, skipCache = false) { 
             const queryString = new URLSearchParams(params).toString();
             const url = queryString ? `${endpoint}?${queryString}` : endpoint;
-            return this.request(url, 'GET'); 
+
+            // 1. URLs that should NEVER be cached (Dynamic/Private data)
+            const noCacheEndpoints = ['/auth/', '/cart/', '/orders/', '/checkout/', '/profile/'];
+            const shouldSkipCache = skipCache || noCacheEndpoints.some(route => url.includes(route));
+
+            const cacheKey = `api_get_cache_${url}`;
+
+            // 2. Return Cache if valid
+            if (!shouldSkipCache) {
+                const cachedData = sessionStorage.getItem(cacheKey);
+                if (cachedData) {
+                    try {
+                        console.log(`[ApiService] Loaded from Cache: ${url}`);
+                        return JSON.parse(cachedData);
+                    } catch(e) { /* ignore parse error */ }
+                }
+            }
+
+            // 3. Normal API Call
+            const data = await this.request(url, 'GET'); 
+
+            // 4. Save to Cache
+            if (!shouldSkipCache && data) {
+                try {
+                    sessionStorage.setItem(cacheKey, JSON.stringify(data));
+                } catch(e) { 
+                    console.warn("SessionStorage full, skipping cache save"); 
+                }
+            }
+
+            return data;
         },
+
+        // --- CACHE INVALIDATION METHOD ---
+        // Call this when location changes, user logs in, or new address is added!
+        clearCache: function () {
+            const keysToRemove = [];
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                // Clean all API caches created by this service
+                if (key && (key.startsWith('api_get_cache_') || key.startsWith('cache_') || key.startsWith('storefront_'))) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => sessionStorage.removeItem(key));
+            console.log("[ApiService] System Cache Cleared Successfully.");
+        },
+
         post: function (endpoint, body) { return this.request(endpoint, 'POST', body); },
         put: function (endpoint, body) { return this.request(endpoint, 'PUT', body); },
         patch: function (endpoint, body) { return this.request(endpoint, 'PATCH', body); },

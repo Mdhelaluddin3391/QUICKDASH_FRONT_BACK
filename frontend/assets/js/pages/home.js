@@ -21,6 +21,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const evtName = 'app:location-changed';
     window.addEventListener(evtName, async () => {
         console.log("[Home] Location changed, refreshing storefront...");
+        
+        // --- 🔥 SMART CACHE CLEAR ADDED HERE ---
+        if (window.ApiService) {
+            window.ApiService.clearCache();
+        } else {
+            sessionStorage.clear();
+        }
+
         // Reset Feed States
         feedPage = 1;
         feedHasNext = true;
