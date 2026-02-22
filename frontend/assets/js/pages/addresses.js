@@ -73,107 +73,37 @@ window.openAddressModal = function() {
     }
 };
 
-
-
-
-// --- UPDATED: openAddressForm ---
+// --- FIX APPLIED HERE: Form open logic updated to clear old map address ---
 function openAddressForm(data) {
     const modal = document.getElementById('address-modal');
     if(modal) modal.classList.add('active');
 
-    // Auto-Fill Lat/Lng (Required for backend)
-    document.getElementById('a-lat').value = data.lat || '';
-    document.getElementById('a-lng').value = data.lng || '';
+    // Auto-Fill Form (Lat/Lng is required for backend)
+    document.getElementById('a-lat').value = data.lat;
+    document.getElementById('a-lng').value = data.lng;
     
-    // Display the fetched map address instead of generic text
+    // FIX 1: Display generic text instead of the specific map address "Malhanwara..."
     const displaySpan = document.getElementById('display-map-address');
     if(displaySpan) {
-        displaySpan.innerText = data.address ? data.address : "Pin Location Selected (Fill details below)";
-        displaySpan.style.color = "#2c3e50"; 
+        displaySpan.innerText = "Pin Location Selected (Fill details below)";
+        displaySpan.style.color = "#2c3e50"; // Darker color for better visibility
     }
     
     // Hidden field value (backup)
-    const googleText = document.getElementById('a-google-text');
-    if(googleText) googleText.value = data.address || '';
+    document.getElementById('a-google-text').value = data.address || '';
 
-    // 🔥 MAIN FIX: Map se fetch hua data input fields mein auto-fill karein
-    const cityEl = document.getElementById('a-city');
-    if(cityEl) cityEl.value = data.city || ''; // Agar data mila toh city daalein, warna empty
+    // FIX 2: Clear City and Pincode inputs so the user fills them manually
+    // This removes the confusion of seeing the old map data
+    document.getElementById('a-city').value = ''; 
     
     const pinEl = document.getElementById('a-pin');
-    if(pinEl) pinEl.value = data.pincode || ''; // Pincode auto-fill karein
+    if(pinEl) pinEl.value = ''; 
     
-    // Optional: Agar houseNo ya area map se mila hai toh usko bhi thoda auto-fill kar sakte hain
-    const houseEl = document.getElementById('a-house');
-    if(houseEl) houseEl.value = data.houseNo || '';
-
-    const buildingEl = document.getElementById('a-building');
-    // Sub-locality/area ko building/road wale input mein daal dete hain user ki help ke liye
-    if(buildingEl) buildingEl.value = data.area || data.building || ''; 
-
-    // Landmark hamesha empty rakhein taaki user khud type kare
-    const landmarkEl = document.getElementById('a-landmark');
-    if(landmarkEl) landmarkEl.value = '';
-
-    try {
-        // Aapke project mein jis bhi naam se user ka data save hota hai (jaise 'user', 'user_info', ya 'profile')
-        const userDataStr = localStorage.getItem('user') || localStorage.getItem('user_info'); 
-        
-        if (userDataStr) {
-            const user = JSON.parse(userDataStr);
-            
-            const nameEl = document.getElementById('a-name');
-            const phoneEl = document.getElementById('a-phone');
-
-            // Agar input fields hain aur khali hain, toh profile se data bhar do
-            if (nameEl && !nameEl.value) {
-                nameEl.value = user.name || user.first_name || ''; 
-            }
-            if (phoneEl && !phoneEl.value) {
-                phoneEl.value = user.phone || user.phone_number || user.mobile || ''; 
-            }
-        }
-    } catch(e) {
-        console.warn("Could not auto-fill user details", e);
-    }
-
-    
+    // Reset other fields
+    document.getElementById('a-house').value = '';
+    document.getElementById('a-building').value = '';
+    document.getElementById('a-landmark').value = '';
 }
-
-
-
-
-// // --- FIX APPLIED HERE: Form open logic updated to clear old map address ---
-// function openAddressForm(data) {
-//     const modal = document.getElementById('address-modal');
-//     if(modal) modal.classList.add('active');
-
-//     // Auto-Fill Form (Lat/Lng is required for backend)
-//     document.getElementById('a-lat').value = data.lat;
-//     document.getElementById('a-lng').value = data.lng;
-    
-//     // FIX 1: Display generic text instead of the specific map address "Malhanwara..."
-//     const displaySpan = document.getElementById('display-map-address');
-//     if(displaySpan) {
-//         displaySpan.innerText = "Pin Location Selected (Fill details below)";
-//         displaySpan.style.color = "#2c3e50"; // Darker color for better visibility
-//     }
-    
-//     // Hidden field value (backup)
-//     document.getElementById('a-google-text').value = data.address || '';
-
-//     // FIX 2: Clear City and Pincode inputs so the user fills them manually
-//     // This removes the confusion of seeing the old map data
-//     document.getElementById('a-city').value = ''; 
-    
-//     const pinEl = document.getElementById('a-pin');
-//     if(pinEl) pinEl.value = ''; 
-    
-//     // Reset other fields
-//     document.getElementById('a-house').value = '';
-//     document.getElementById('a-building').value = '';
-//     document.getElementById('a-landmark').value = '';
-// }
 
 // Close Modal Function
 window.closeModal = function() {
