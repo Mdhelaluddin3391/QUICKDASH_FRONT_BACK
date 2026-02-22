@@ -3,15 +3,31 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from .models import Order, OrderItem
 # 1. Task Import करें
+from apps.catalog.models import Product
 from apps.delivery.tasks import retry_auto_assign_rider
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
-    readonly_fields = ('sku', 'product_name', 'quantity', 'price', 'subtotal')
+    # 3. 'product_image' ko readonly_fields aur fields mein add karein
+    readonly_fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal')
     can_delete = False
-    fields = ('sku', 'product_name', 'quantity', 'price', 'subtotal')
+    fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal')
     show_change_link = False
+
+    # 4. Image dikhane ke liye custom function banayein
+    def product_image(self, obj):
+        if obj.sku:
+            # SKU ke basis par Product find karein
+            product = Product.objects.filter(sku=obj.sku).first()
+            if product and product.image:
+                # Agar product aur image mil jaye, toh HTML <img> tag return karein
+                return format_html(
+                    '<img src="{}" width="50" height="50" style="object-fit: cover; border-radius: 4px; box-shadow: 0 0 2px rgba(0,0,0,0.3);" />', 
+                    product.image
+                )
+        return "No Image"
+    product_image.short_description = "Image" # Column ka naam
 
     def subtotal(self, obj):
         if obj.price is None or obj.quantity is None:
