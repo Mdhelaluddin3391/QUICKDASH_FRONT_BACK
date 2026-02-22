@@ -234,3 +234,55 @@
 #brand-filter-container::-webkit-scrollbar-thumb:hover {
     background: var(--primary);
 }
+
+
+
+/* Sticky Horizontal Strip Container */
+.sub-cat-strip {
+    position: sticky;
+    top: 60px; /* Agar aapka navbar bada hai, toh isko 70px ya 80px kar lena */
+    z-index: 100;
+    background: #fff;
+    padding: 12px 15px;
+    display: flex;
+    overflow-x: auto;
+    gap: 10px;
+    border-bottom: 1px solid #eee;
+    -webkit-overflow-scrolling: touch; /* Mobile me smooth swipe ke liye */
+}
+
+/* Scrollbar Hide Karne ke liye */
+.sub-cat-strip::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+}
+.sub-cat-strip {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+/* Default Pill Design */
+.pill-btn {
+    white-space: nowrap;
+    padding: 6px 18px;
+    border-radius: 25px; /* Gol (rounded) shape */
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #555;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    text-decoration: none;
+    transition: all 0.2s ease-in-out;
+}
+
+.pill-btn:hover {
+    background: #e9ecef;
+    color: #333;
+}
+
+/* Active Selected Pill Design */
+.pill-btn.active {
+    background: var(--primary, #0d6efd); /* Aapke theme ka primary color */
+    color: #fff;
+    border-color: var(--primary, #0d6efd);
+    box-shadow: 0 4px 6px rgba(13, 110, 253, 0.2);
+}

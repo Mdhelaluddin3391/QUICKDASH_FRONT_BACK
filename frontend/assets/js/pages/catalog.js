@@ -55,38 +55,64 @@ async function loadSubCategories() {
     if (!currentSlug || !container) return;
 
     try {
-        // 1. Fetch ALL Categories (Assuming we have an endpoint, or utilize list api)
-        // Hum '/catalog/categories/' use kar rahe hain jo saari active categories laata hai
+        // 1. Fetch ALL Categories
         const res = await ApiService.get('/catalog/categories/');
         const allCats = res.results || res;
 
-        // 2. Find Current Category ID
+        // 2. Find Current Category
         const currentCat = allCats.find(c => c.slug === currentSlug);
         
         if (!currentCat) return;
 
-        // 3. Find Children (Categories jinka parent == currentCat.id)
-        // Note: Aapke backend model field 'parent' ya 'parent_id' ho sakta hai. 
-        // Agar response mein 'parent' object hai to 'c.parent.id' check karein, agar ID hai to direct.
+        let parentId = null;
+        let parentSlug = null;
+        
+        // 3. Check karein ki current category 'Parent' hai ya 'Sub-category'
+        const isSubcategory = currentCat.parent !== null && currentCat.parent !== undefined;
+
+        if (isSubcategory) {
+            // Agar Sub-category hai, toh uska Parent find karein
+            const pId = typeof currentCat.parent === 'object' ? currentCat.parent.id : currentCat.parent;
+            const parentObj = allCats.find(c => c.id === pId);
+            
+            parentId = parentObj ? parentObj.id : pId;
+            parentSlug = parentObj ? parentObj.slug : null;
+        } else {
+            // Agar Parent hai, toh woh khud hi parentId hai
+            parentId = currentCat.id;
+            parentSlug = currentCat.slug;
+        }
+
+        // 4. Parent ke saare children/siblings find karein
         const children = allCats.filter(c => {
-            if (typeof c.parent === 'object' && c.parent !== null) {
-                return c.parent.id === currentCat.id;
-            }
-            return c.parent === currentCat.id;
+            const cParentId = (typeof c.parent === 'object' && c.parent !== null) ? c.parent.id : c.parent;
+            return cParentId === parentId;
         });
 
-        // 4. Render Pills
-        if (children.length > 0) {
-            container.classList.remove('d-none'); // Show container
-            container.style.display = 'flex'; // Force flex
+        // 5. Render Pills HTML
+        if (children.length > 0 && parentSlug) {
+            container.classList.remove('d-none'); 
             
-            container.innerHTML = children.map(child => `
+            // "All" Button (Agar subcategory par nahi hai toh yahi active hoga)
+            let html = `
+                <a href="./search_results.html?slug=${parentSlug}" 
+                   class="pill-btn ${!isSubcategory ? 'active' : ''}">
+                   All
+                </a>
+            `;
+
+            // Sub-category Buttons (Jo slug URL mein hai, wo active hoga)
+            html += children.map(child => `
                 <a href="./search_results.html?slug=${child.slug}" 
-                   class="btn btn-sm btn-outline-secondary" 
-                   style="border-radius: 20px; font-size: 0.85rem; padding: 5px 15px;">
+                   class="pill-btn ${currentSlug === child.slug ? 'active' : ''}">
                    ${child.name}
                 </a>
             `).join('');
+
+            container.innerHTML = html;
+        } else {
+            // Agar koi subcategory nahi hai (e.g. Single independent category), toh strip hide kardo
+            container.classList.add('d-none');
         }
 
     } catch (e) {
