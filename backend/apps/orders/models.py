@@ -3,6 +3,7 @@ from django.db import models
 from django.utils import timezone
 from apps.warehouse.models import Warehouse
 from apps.catalog.models import Product
+from decimal import Decimal
 
 User = settings.AUTH_USER_MODEL
 
@@ -98,6 +99,7 @@ class Cart(models.Model):
     # --- NAYI PROPERTIES ---
     @property
     def delivery_fee(self):
+        from decimal import Decimal
         config = OrderConfiguration.objects.first()
         fee = config.delivery_fee if config else Decimal("5.00")
         threshold = config.free_delivery_threshold if config else Decimal("100.00")
