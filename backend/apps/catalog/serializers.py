@@ -200,7 +200,8 @@ class SimpleCategorySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Category
-        fields = ("id", "name", "slug", "icon_url")
+        fields = ("id", "name", "slug", "icon_url", "parent", "is_active")
+        # fields = ['id', 'name', 'slug', 'icon', 'parent', 'is_active']
 
     def get_icon_url(self, obj):
         if not hasattr(obj, 'icon') or not obj.icon:
