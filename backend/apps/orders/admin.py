@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from .models import Order, OrderItem
-from .models import OrderConfiguration
+# 1. Task Import करें
 from apps.delivery.tasks import retry_auto_assign_rider
 
 class OrderItemInline(admin.TabularInline):
@@ -164,14 +164,3 @@ class OrderAdmin(admin.ModelAdmin):
         updated = queryset.exclude(status__in=['delivered', 'cancelled']).update(status='cancelled')
         self.message_user(request, f"{updated} orders cancelled.")
     cancel_orders.short_description = "Cancel selected orders"
-
-
-@admin.register(OrderConfiguration)
-class OrderConfigurationAdmin(admin.ModelAdmin):
-    list_display = ('__str__', 'delivery_fee_amount', 'free_delivery_threshold', 'updated_at')
-
-    # Ensure karein ki Admin sirf settings update kar sake, naye records add karke kachra na bhare
-    def has_add_permission(self, request):
-        if self.model.objects.exists():
-            return False
-        return super().has_add_permission(request)

@@ -3,7 +3,6 @@ from django.db import models
 from django.utils import timezone
 from apps.warehouse.models import Warehouse
 from apps.catalog.models import Product
-from decimal import Decimal
 
 User = settings.AUTH_USER_MODEL
 
@@ -81,6 +80,7 @@ class OrderAbuseLog(models.Model):
     def is_blocked(self):
         return self.blocked_until and self.blocked_until > timezone.now()
 
+
 class Cart(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="cart")
     
@@ -94,33 +94,9 @@ class Cart(models.Model):
     def __str__(self):
         return f"Cart({self.user}) - {self.warehouse.code if self.warehouse else 'No WH'}"
 
-    # ✅ NAYA LOGIC: Sirf items ka total nikalne ke liye
-    @property
-    def delivery_fee(self):
-        subtotal = self.items_total
-        
-        # Agar cart khali hai toh 0 delivery fee
-        if subtotal == 0:
-            return Decimal('0.00')
-            
-        # ✅ Ab Admin Panel (Database) se values fetch karein
-        try:
-            config = OrderConfiguration.objects.get(pk=1)
-            fee_amount = config.delivery_fee_amount
-            free_threshold = config.free_delivery_threshold
-        except OrderConfiguration.DoesNotExist:
-            # Agar admin ne abhi tak save nahi kiya hai, toh default man lein
-            fee_amount = Decimal('15.00')
-            free_threshold = Decimal('200.00')
-            
-        # Agar subtotal threshold se kam hai, toh fee lagayein, warna Free
-        if subtotal < free_threshold:
-            return fee_amount
-            
-        return Decimal('0.00')
     @property
     def total_amount(self):
-        return self.items_total + self.delivery_fee
+        return sum(item.total_price for item in self.items.all())
 
 
 class CartItem(models.Model):
@@ -136,30 +112,3 @@ class CartItem(models.Model):
     @property
     def total_price(self):
         return self.sku.price * self.quantity
-    
-
-
-
-
-class OrderConfiguration(models.Model):
-    delivery_fee_amount = models.DecimalField(
-        max_digits=10, decimal_places=2, default=15.00, 
-        help_text="Standard Delivery Charge (e.g. 15.00)"
-    )
-    free_delivery_threshold = models.DecimalField(
-        max_digits=10, decimal_places=2, default=200.00, 
-        help_text="Kitne ki shopping par delivery free karni hai? (e.g. 200.00)"
-    )
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = "Order Configuration"
-        verbose_name_plural = "Order Configurations"
-
-    # Yeh function ensure karega ki DB mein sirf 1 hi row (record) bane
-    def save(self, *args, **kwargs):
-        self.pk = 1 
-        super(OrderConfiguration, self).save(*args, **kwargs)
-
-    def __str__(self):
-        return "Global Delivery Settings"
