@@ -112,6 +112,7 @@ async function checkActiveJobs() {
 
     try {
         const deliveries = await ApiService.get('/delivery/me/');
+        // Find first active job (prioritize: pending acceptance > picked up > out for delivery)
         const activeJob = deliveries.find(d => ['assigned', 'picked_up', 'out_for_delivery'].includes(d.status));
         const container = document.getElementById('active-job-area');
         
@@ -150,12 +151,21 @@ function renderJobCard(job, container) {
     let statusBadge = '';
 
     if (job.status === 'assigned') {
-        statusBadge = '<span class="status-tag tag-new">New Assignment</span>';
-        actionBtn = `<button class="btn-action btn-pickup" onclick="scanQR(${order.id})">
-                        <i class="fas fa-box"></i> Picked Up from Warehouse
-                     </button>`;
+        statusBadge = '<span class="status-tag tag-new">🆕 New Order - Action Required</span>';
+        actionBtn = `
+            <div class="acceptance-box" style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button class="btn-action btn-accept" onclick="acceptOrder(${job.id})" style="flex: 1; background: #10b981;">
+                    <i class="fas fa-check"></i> Accept Order
+                </button>
+                <button class="btn-action btn-reject" onclick="rejectOrder(${job.id})" style="flex: 1; background: #ef4444;">
+                    <i class="fas fa-times"></i> Reject
+                </button>
+            </div>
+            <div style="text-align: center; font-size: 12px; color: #666; margin-bottom: 15px;">
+                After accepting, you'll pick up from the warehouse
+            </div>`;
     } else if (['picked_up', 'out_for_delivery'].includes(job.status)) {
-        statusBadge = '<span class="status-tag tag-progress">Out for Delivery</span>';
+        statusBadge = '<span class="status-tag tag-progress">🚚 Out for Delivery</span>';
         actionBtn = `
             <div class="otp-box">
                 <label>Ask Customer for OTP:</label>
@@ -234,6 +244,54 @@ window.completeOrder = async function(id) {
         btn.disabled = false;
     }
 };
+
+// ==========================================
+// 🎯 Accept/Reject New Orders
+// ==========================================
+window.acceptOrder = async function(deliveryId) {
+    const btn = document.querySelector('.btn-accept');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Accepting...';
+    btn.disabled = true;
+
+    try {
+        await ApiService.post(`/delivery/${deliveryId}/respond/`, { action: 'accept' });
+        window.showToast("✅ Order Accepted! Go to warehouse to pick up.", 'success');
+        await checkActiveJobs();
+    } catch (e) {
+        console.error("Accept Error:", e);
+        let msg = e.message || "Failed to accept order";
+        window.showToast("❌ Error: " + msg, 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+};
+
+window.rejectOrder = async function(deliveryId) {
+    const confirmed = confirm("Are you sure you want to reject this order?");
+    if (!confirmed) return;
+
+    const btn = document.querySelector('.btn-reject');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Rejecting...';
+    btn.disabled = true;
+
+    try {
+        await ApiService.post(`/delivery/${deliveryId}/respond/`, { action: 'reject' });
+        window.showToast("✅ Order Rejected. Looking for next delivery...", 'info');
+        await checkActiveJobs();
+    } catch (e) {
+        console.error("Reject Error:", e);
+        let msg = e.message || "Failed to reject order";
+        window.showToast("❌ Error: " + msg, 'error');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+};
+// ==========================================
+
 
 window.scanQR = async function(orderId) {
     const confirmPickup = confirm(`Simulate Scanning QR Code for Order #${orderId}?\n\n(In production, this opens camera)`);
