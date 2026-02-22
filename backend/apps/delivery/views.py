@@ -188,9 +188,6 @@ class RiderAcceptDeliveryAPIView(APIView):
             if delivery.status != 'assigned':
                  return Response({"error": "Delivery no longer available"}, status=status.HTTP_400_BAD_REQUEST)
             
-            # 🔥 Naya Update Yahan Hai 🔥
-            # Agar aap apne model me "accepted" status use karna chahte hain toh line uncomment karein:
-            # delivery.status = 'accepted' 
             delivery.save() 
             return Response({"status": "accepted"})
             
