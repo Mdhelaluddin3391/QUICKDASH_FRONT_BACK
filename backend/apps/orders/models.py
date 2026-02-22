@@ -3,6 +3,7 @@ from django.db import models
 from django.utils import timezone
 from apps.warehouse.models import Warehouse
 from apps.catalog.models import Product
+from decimal import Decimal
 
 User = settings.AUTH_USER_MODEL
 
@@ -80,7 +81,6 @@ class OrderAbuseLog(models.Model):
     def is_blocked(self):
         return self.blocked_until and self.blocked_until > timezone.now()
 
-
 class Cart(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="cart")
     
@@ -94,9 +94,30 @@ class Cart(models.Model):
     def __str__(self):
         return f"Cart({self.user}) - {self.warehouse.code if self.warehouse else 'No WH'}"
 
+    # ✅ NAYA LOGIC: Sirf items ka total nikalne ke liye
+    @property
+    def items_total(self):
+        return sum(item.total_price for item in self.items.all())
+
+    # ✅ NAYA LOGIC: Dynamic Delivery Fee calculate karne ke liye
+    @property
+    def delivery_fee(self):
+        subtotal = self.items_total
+        
+        # Agar cart khali hai toh 0 delivery fee
+        if subtotal == 0:
+            return Decimal('0.00')
+            
+        # Agar subtotal 200 se kam hai, toh 15 Rs delivery charge, warna Free (0 Rs)
+        if subtotal < Decimal('200.00'):
+            return Decimal('15.00')
+            
+        return Decimal('0.00')
+
+    # ✅ NAYA LOGIC: Ab total_amount mein items ka price + delivery fee judega
     @property
     def total_amount(self):
-        return sum(item.total_price for item in self.items.all())
+        return self.items_total + self.delivery_fee
 
 
 class CartItem(models.Model):

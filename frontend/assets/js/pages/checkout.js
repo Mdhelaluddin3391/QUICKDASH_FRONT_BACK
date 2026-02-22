@@ -3,7 +3,7 @@
 let selectedAddressId = null;
 let paymentMethod = 'COD';
 let resolvedWarehouseId = null; // Used only for UI state, not submitted
-const DELIVERY_FEE = 5.00;
+// const DELIVERY_FEE = 5.00;
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -186,17 +186,18 @@ async function loadSummary() {
             </div>
         `).join('');
 
-        // ✅ Subtotal और Total में Delivery Fee जोड़ें
-        const subtotal = parseFloat(cart.total_amount || 0);
-        const total = subtotal + DELIVERY_FEE;
+        // ✅ Backend se aayi dynamic fields ka use karein
+        const subtotal = parseFloat(cart.items_total || 0); 
+        const dynamicDeliveryFee = parseFloat(cart.delivery_fee || 0);
+        const total = parseFloat(cart.total_amount || 0);
 
         // UI अपडेट करें
         document.getElementById('summ-subtotal').innerText = Formatters.currency(subtotal);
         
         const delEl = document.getElementById('summ-delivery');
         if (delEl) {
-            if (DELIVERY_FEE > 0) {
-                delEl.innerText = Formatters.currency(DELIVERY_FEE);
+            if (dynamicDeliveryFee > 0) {
+                delEl.innerText = Formatters.currency(dynamicDeliveryFee);
                 delEl.classList.remove('text-success'); // हरा रंग हटाएं
             } else {
                 delEl.innerText = 'FREE';
@@ -344,8 +345,8 @@ async function placeOrder() {
             delivery_address_id: selectedAddressId, 
             payment_method: paymentMethod,
             delivery_type: 'express',
-            // ✅ यहाँ डिलीवरी फीस जोड़कर बैकएंड को भेजें
-            total_amount: (parseFloat(cart.total_amount) + DELIVERY_FEE) 
+            // ✅ Backend ki total_amount ab final hai, toh seedha wahi bhej dein
+            total_amount: parseFloat(cart.total_amount) 
         };
 
         const orderRes = await ApiService.post('/orders/create/', orderPayload);

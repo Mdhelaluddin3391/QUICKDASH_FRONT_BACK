@@ -1,5 +1,5 @@
 // ✅ Delivery Fee Variable add kiya gaya hai
-const DELIVERY_FEE = 5.00;
+// const DELIVERY_FEE = 5.00;
 
 document.addEventListener('DOMContentLoaded', async () => {
     // Auth Check
@@ -63,10 +63,10 @@ async function loadCart() {
 `}).join('');
 
         // ✅ Sirf 'Total (To Pay)' Update karein
-        const subtotal = parseFloat(cart.total_amount || 0);
-        const total = subtotal + DELIVERY_FEE;
-
-        // Subtotal aur Delivery ki extra lines hata di hain, taaki error na aaye
+        // ✅ Ab backend se pura total_amount (subtotal + dynamic delivery) calculate hokar aa raha hai
+        const total = parseFloat(cart.total_amount || 0);
+        
+        // Seedha total UI mein dikhayein
         document.getElementById('total').innerText = Formatters.currency(total);
 
     } catch (e) {

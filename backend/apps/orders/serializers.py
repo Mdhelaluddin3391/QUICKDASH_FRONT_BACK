@@ -34,9 +34,14 @@ class CartItemSerializer(serializers.ModelSerializer):
 class CartSerializer(serializers.ModelSerializer):
     items = CartItemSerializer(many=True, read_only=True)
     
+    # ✅ NAYI LINES: Frontend ko delivery_fee aur items_total bhejne ke liye
+    delivery_fee = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    items_total = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    
     class Meta:
         model = Cart
-        fields = ('id', 'items', 'total_amount', 'warehouse')
+        # ✅ 'delivery_fee' aur 'items_total' ko fields list mein daala gaya hai
+        fields = ('id', 'items', 'items_total', 'delivery_fee', 'total_amount', 'warehouse')
 
 class OrderItemSerializer(serializers.ModelSerializer):
     sku_image = serializers.SerializerMethodField()
