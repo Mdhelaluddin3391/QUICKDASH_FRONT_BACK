@@ -168,7 +168,6 @@ class GenerateUploadURLAPIView(APIView):
             logger.error(f"S3 Error: {e}")
             return Response({"error": "Storage service unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-
 class RiderAcceptDeliveryAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -188,6 +187,11 @@ class RiderAcceptDeliveryAPIView(APIView):
         if action == 'accept':
             if delivery.status != 'assigned':
                  return Response({"error": "Delivery no longer available"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # 🔥 Naya Update Yahan Hai 🔥
+            # Agar aap apne model me "accepted" status use karna chahte hain toh line uncomment karein:
+            # delivery.status = 'accepted' 
+            delivery.save() 
             return Response({"status": "accepted"})
             
         elif action == 'reject':
@@ -197,7 +201,6 @@ class RiderAcceptDeliveryAPIView(APIView):
             delivery.save()
             retry_auto_assign_rider.delay(delivery.order.id)
             return Response({"status": "rejected"})
-
 
 class HandoverVerificationAPIView(APIView):
     """
