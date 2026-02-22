@@ -114,7 +114,32 @@ function openAddressForm(data) {
     // Landmark hamesha empty rakhein taaki user khud type kare
     const landmarkEl = document.getElementById('a-landmark');
     if(landmarkEl) landmarkEl.value = '';
+
+    try {
+        // Aapke project mein jis bhi naam se user ka data save hota hai (jaise 'user', 'user_info', ya 'profile')
+        const userDataStr = localStorage.getItem('user') || localStorage.getItem('user_info'); 
+        
+        if (userDataStr) {
+            const user = JSON.parse(userDataStr);
+            
+            const nameEl = document.getElementById('a-name');
+            const phoneEl = document.getElementById('a-phone');
+
+            // Agar input fields hain aur khali hain, toh profile se data bhar do
+            if (nameEl && !nameEl.value) {
+                nameEl.value = user.name || user.first_name || ''; 
+            }
+            if (phoneEl && !phoneEl.value) {
+                phoneEl.value = user.phone || user.phone_number || user.mobile || ''; 
+            }
+        }
+    } catch(e) {
+        console.warn("Could not auto-fill user details", e);
+    }
+
+    
 }
+
 
 
 
