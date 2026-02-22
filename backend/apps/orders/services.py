@@ -112,8 +112,6 @@ class OrderService:
         if warehouse.delivery_zone and warehouse.delivery_zone.contains(address_point):
             is_serviceable = True
         elif not warehouse.delivery_zone:
-            # Fallback for old warehouses without polygons (check radius or allow)
-            # For strict production systems, we might log a warning
             is_serviceable = True 
         
         if not is_serviceable:
@@ -155,14 +153,19 @@ class OrderService:
             )
             total += inventory.price * qty
 
-        # 6. Pricing & Save
+        # 6. Pricing & Save (DYNAMIC FEE LOGIC)
         surge_multiplier = SurgePricingService.calculate(order)
         
-        # ✅ यहाँ डिलीवरी फीस ₹5 फिक्स की गई है
-        base_delivery_fee = Decimal("5.00") 
-        actual_delivery_fee = base_delivery_fee # अभी के लिए Surge बंद रखा है, ताकि फीस डबल न हो।
+        from apps.orders.models import OrderConfiguration
+        config = OrderConfiguration.objects.first()
+        base_delivery_fee = config.delivery_fee if config else Decimal("5.00")
+        threshold = config.free_delivery_threshold if config else Decimal("100.00")
         
-        # ✅ Final Amount = Items का Total + डिलीवरी फीस
+        if total >= threshold:
+            actual_delivery_fee = Decimal("0.00")
+        else:
+            actual_delivery_fee = base_delivery_fee 
+        
         order.total_amount = total + actual_delivery_fee
         
         if hasattr(order, "surge_multiplier"): 

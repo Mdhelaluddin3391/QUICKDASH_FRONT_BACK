@@ -3,7 +3,7 @@
 let selectedAddressId = null;
 let paymentMethod = 'COD';
 let resolvedWarehouseId = null; // Used only for UI state, not submitted
-const DELIVERY_FEE = 0.00;
+// const DELIVERY_FEE = 0.00;
 
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -187,21 +187,22 @@ async function loadSummary() {
             </div>
         `).join('');
 
-        // ✅ Subtotal और Total में Delivery Fee जोड़ें
+        // API values
         const subtotal = parseFloat(cart.total_amount || 0);
-        const total = subtotal + DELIVERY_FEE;
+        const deliveryFee = parseFloat(cart.delivery_fee || 0);
+        const total = parseFloat(cart.final_total || 0);
 
-        // UI अपडेट करें
+        // UI Updates
         document.getElementById('summ-subtotal').innerText = Formatters.currency(subtotal);
         
         const delEl = document.getElementById('summ-delivery');
         if (delEl) {
-            if (DELIVERY_FEE > 0) {
-                delEl.innerText = Formatters.currency(DELIVERY_FEE);
-                delEl.classList.remove('text-success'); // हरा रंग हटाएं
+            if (deliveryFee > 0) {
+                delEl.innerText = Formatters.currency(deliveryFee);
+                delEl.classList.remove('text-success');
             } else {
                 delEl.innerText = 'FREE';
-                delEl.classList.add('text-success'); // हरा रंग लगाएं
+                delEl.classList.add('text-success');
             }
         }
 
@@ -335,9 +336,8 @@ async function placeOrder() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
 
     try {
-        // Get cart total
         const cart = await ApiService.get('/orders/cart/');
-        if (!cart || !cart.total_amount) {
+        if (!cart || !cart.final_total) {
             throw new Error("Unable to get cart total");
         }
 
@@ -345,8 +345,8 @@ async function placeOrder() {
             delivery_address_id: selectedAddressId, 
             payment_method: paymentMethod,
             delivery_type: 'express',
-            // ✅ यहाँ डिलीवरी फीस जोड़कर बैकएंड को भेजें
-            total_amount: (parseFloat(cart.total_amount) + DELIVERY_FEE) 
+            // ✅ API ka calculate kiya hua Final Total Bhejein
+            total_amount: parseFloat(cart.final_total) 
         };
 
         const orderRes = await ApiService.post('/orders/create/', orderPayload);

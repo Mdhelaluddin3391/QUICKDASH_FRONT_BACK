@@ -31,12 +31,16 @@ class CartItemSerializer(serializers.ModelSerializer):
             
         return p.image
 
+# Apne purane CartSerializer ko isse REPLACE karein:
 class CartSerializer(serializers.ModelSerializer):
     items = CartItemSerializer(many=True, read_only=True)
+    # Nayi fields jo api me aayengi
+    delivery_fee = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    final_total = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     
     class Meta:
         model = Cart
-        fields = ('id', 'items', 'total_amount', 'warehouse')
+        fields = ('id', 'items', 'total_amount', 'delivery_fee', 'final_total', 'warehouse')
 
 class OrderItemSerializer(serializers.ModelSerializer):
     sku_image = serializers.SerializerMethodField()
