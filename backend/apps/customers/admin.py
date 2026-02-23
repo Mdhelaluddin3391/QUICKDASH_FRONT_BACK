@@ -42,33 +42,29 @@ class CustomerProfileAdmin(admin.ModelAdmin):
     raw_id_fields = ('user',)
     list_per_page = 25
 
-    # 👇 2. Inlines me Address ko add kar diya 
     inlines = [CustomerAddressInline]
 
-    # 👇 3. Detail View (Profile form) me saari details dikhane ke liye Fieldsets update kiye
     fieldsets = (
-        ('👤 Basic User Information', {
+        ('Basic User Information', {
             'fields': ('user', 'user_name', 'user_phone', 'user_email')
         }),
-        ('🛒 Order & Spends Summary', {
+        ('Order & Spends Summary', {
             'fields': ('total_orders', 'total_spent')
         }),
-        ('🎧 Support Summary', {
+        ('Support Summary', {
             'fields': ('support_tickets_count',)
         }),
-        ('⏱️ Timestamps', {
+        ('Timestamps', {
             'fields': ('created_at',),
             'classes': ('collapse',)
         }),
     )
 
-    # 👇 4. In fields ko readonly bana diya taaki admin yahan se siraf details dekh sake
     readonly_fields = (
         'created_at', 'user_name', 'user_phone', 'user_email',
         'total_orders', 'total_spent', 'support_tickets_count'
     )
 
-    # --- CUSTOM METHODS ---
 
     def user_phone(self, obj):
         return obj.user.phone
@@ -86,7 +82,6 @@ class CustomerProfileAdmin(admin.ModelAdmin):
 
     def total_orders(self, obj):
         count = obj.user.orders.count()
-        # 👇 Clickable Link banaya hai - ispe click karte hi is customer ke saare orders open ho jayenge
         url = reverse('admin:orders_order_changelist') + f'?user__id__exact={obj.user.id}'
         return format_html('<a href="{}" style="font-weight: bold; color: #007bff;">{} Orders</a>', url, count)
     total_orders.short_description = "Total Orders"
@@ -100,7 +95,6 @@ class CustomerProfileAdmin(admin.ModelAdmin):
 
     def support_tickets_count(self, obj):
         count = obj.user.supportticket_set.count()
-        # 👇 Clickable Link banaya hai - ispe click karte hi is customer ki saari tickets open ho jayengi
         url = reverse('admin:customers_supportticket_changelist') + f'?user__id__exact={obj.user.id}'
         return format_html('<a href="{}" style="font-weight: bold; color: #dc3545;">{} Tickets</a>', url, count)
     support_tickets_count.short_description = "Support Tickets"
