@@ -68,7 +68,7 @@ class SkuListAPIView(generics.ListAPIView):
     # YAHAN SE 'category__slug' KO REMOVE KAR DIYA HAI
     filterset_fields = ['is_active'] 
     
-    search_fields = ['name', 'sku', 'description', 'category__name']
+    search_fields = ['name', 'sku', 'description', 'category__name', 'category__parent__name']
     ordering_fields = ['effective_price', 'created_at']
 
     def get_queryset(self):
@@ -393,7 +393,8 @@ class GlobalSearchAPIView(APIView):
                     Q(name__icontains=word) | 
                     Q(sku__icontains=word) |
                     Q(description__icontains=word) |
-                    Q(category__name__icontains=word)
+                    Q(category__name__icontains=word) |
+                    Q(category__parent__name__icontains=word)
                 )
             
             # ADVANCED: Relevance Ranking (Exact match ko top par rakhega)
@@ -427,7 +428,7 @@ class SearchSuggestAPIView(APIView):
         
         for word in words:
             product_results = product_results.filter(
-                Q(name__icontains=word) | Q(category__name__icontains=word) | Q(sku__icontains=word)
+                Q(name__icontains=word) | Q(category__name__icontains=word) | Q(category__parent__name__icontains=word) | Q(sku__icontains=word)
             )
             brand_results = brand_results.filter(name__icontains=word)
             
