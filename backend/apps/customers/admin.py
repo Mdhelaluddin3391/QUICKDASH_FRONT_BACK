@@ -3,6 +3,22 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from .models import CustomerProfile, CustomerAddress, SupportTicket
+from django.db import models
+
+
+
+class CustomerAddressInline(admin.StackedInline):
+    model = CustomerAddress
+    extra = 0
+    classes = ('collapse',) # By default band rahega, click karke open kar sakte hain
+    fields = ('label', 'address_summary_view', 'city', 'pincode', 'is_default')
+    readonly_fields = ('address_summary_view',)
+    can_delete = False
+
+    def address_summary_view(self, obj):
+        return f"{obj.house_no}, {obj.apartment_name}, {obj.landmark} - {obj.google_address_text}"
+    address_summary_view.short_description = "Full Address"
+
 
 
 @admin.register(CustomerProfile)
@@ -26,17 +42,33 @@ class CustomerProfileAdmin(admin.ModelAdmin):
     raw_id_fields = ('user',)
     list_per_page = 25
 
+    # 👇 2. Inlines me Address ko add kar diya 
+    inlines = [CustomerAddressInline]
+
+    # 👇 3. Detail View (Profile form) me saari details dikhane ke liye Fieldsets update kiye
     fieldsets = (
-        ('User Information', {
-            'fields': ('user',)
+        ('👤 Basic User Information', {
+            'fields': ('user', 'user_name', 'user_phone', 'user_email')
         }),
-        ('Timestamps', {
+        ('🛒 Order & Spends Summary', {
+            'fields': ('total_orders', 'total_spent')
+        }),
+        ('🎧 Support Summary', {
+            'fields': ('support_tickets_count',)
+        }),
+        ('⏱️ Timestamps', {
             'fields': ('created_at',),
             'classes': ('collapse',)
         }),
     )
 
-    readonly_fields = ('created_at',)
+    # 👇 4. In fields ko readonly bana diya taaki admin yahan se siraf details dekh sake
+    readonly_fields = (
+        'created_at', 'user_name', 'user_phone', 'user_email',
+        'total_orders', 'total_spent', 'support_tickets_count'
+    )
+
+    # --- CUSTOM METHODS ---
 
     def user_phone(self, obj):
         return obj.user.phone
@@ -45,29 +77,38 @@ class CustomerProfileAdmin(admin.ModelAdmin):
 
     def user_name(self, obj):
         return f"{obj.user.first_name} {obj.user.last_name}".strip() or "N/A"
-    user_name.short_description = "Name"
+    user_name.short_description = "Full Name"
     user_name.admin_order_field = 'user__first_name'
 
+    def user_email(self, obj):
+        return obj.user.email
+    user_email.short_description = "Email ID"
+
     def total_orders(self, obj):
-        return obj.user.orders.count()
-    total_orders.short_description = "Orders"
+        count = obj.user.orders.count()
+        # 👇 Clickable Link banaya hai - ispe click karte hi is customer ke saare orders open ho jayenge
+        url = reverse('admin:orders_order_changelist') + f'?user__id__exact={obj.user.id}'
+        return format_html('<a href="{}" style="font-weight: bold; color: #007bff;">{} Orders</a>', url, count)
+    total_orders.short_description = "Total Orders"
 
     def total_spent(self, obj):
         total = obj.user.orders.filter(status='delivered').aggregate(
             total=models.Sum('total_amount')
         )['total'] or 0
-        return f"₹{total:.2f}"
-    total_spent.short_description = "Total Spent"
+        return format_html('<span style="color: green; font-weight: bold;">₹{:.2f}</span>', total)
+    total_spent.short_description = "Total Spent (Delivered)"
 
     def support_tickets_count(self, obj):
-        return obj.user.support_tickets.count()
+        count = obj.user.supportticket_set.count()
+        # 👇 Clickable Link banaya hai - ispe click karte hi is customer ki saari tickets open ho jayengi
+        url = reverse('admin:customers_supportticket_changelist') + f'?user__id__exact={obj.user.id}'
+        return format_html('<a href="{}" style="font-weight: bold; color: #dc3545;">{} Tickets</a>', url, count)
     support_tickets_count.short_description = "Support Tickets"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y')
-    created_at_date.short_description = "Joined"
+        return obj.created_at.strftime('%d/%m/%Y %I:%M %p')
+    created_at_date.short_description = "Joined Date"
     created_at_date.admin_order_field = 'created_at'
-
 
 @admin.register(CustomerAddress)
 class CustomerAddressAdmin(admin.ModelAdmin):
