@@ -239,16 +239,18 @@
 
 /* Sticky Horizontal Strip Container */
 .sub-cat-strip {
-    position: sticky;
-    top: 60px; /* Agar aapka navbar bada hai, toh isko 70px ya 80px kar lena */
-    z-index: 100;
+    /* position: sticky;  <-- Yeh hata diya */
+    /* top: 60px;        <-- Yeh hata diya */
+    position: relative; /* Normal position ke liye */
+    z-index: 10;        /* Main content ke upar rakhne ke liye chota z-index */
     background: #fff;
     padding: 12px 15px;
     display: flex;
     overflow-x: auto;
     gap: 10px;
     border-bottom: 1px solid #eee;
-    -webkit-overflow-scrolling: touch; /* Mobile me smooth swipe ke liye */
+    margin-bottom: 20px; /* Neeche wale content se thoda gap dene ke liye */
+    -webkit-overflow-scrolling: touch; 
 }
 
 /* Scrollbar Hide Karne ke liye */
