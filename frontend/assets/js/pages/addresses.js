@@ -112,62 +112,79 @@ window.closeModal = function() {
 }
 
 // --- 3. Form Submission ---
+// --- 3. Form Submission ---
 async function saveAddress(e) {
     e.preventDefault();
+
+    // 1. Sabse pehle saari values get kar rahe hain (.trim() laga kar space hata rahe hain)
+    const name = document.getElementById('a-name').value.trim();
+    const phone = document.getElementById('a-phone').value.trim();
+    const house = document.getElementById('a-house').value.trim();
+    const building = document.getElementById('a-building').value.trim();
+    const landmark = document.getElementById('a-landmark').value.trim();
+    const city = document.getElementById('a-city').value.trim();
+    const pincode = document.getElementById('a-pin').value.trim();
+    const lat = document.getElementById('a-lat').value;
+    const lng = document.getElementById('a-lng').value;
+    const floor = document.getElementById('a-floor').value.trim();
+
+    // 2. 🔴 MANUAL STRICT VALIDATION (Yeh line API call ko rok degi agar details khali hain)
+    if (!name || !phone || !house || !building || !city || !pincode || !landmark) {
+        if(window.Toast) Toast.error("Please fill all required fields, including Landmark.");
+        else alert("Please fill all required fields, including Landmark!");
+        return; // Function yahin se waapis chala jayega, aage execute nahi hoga
+    }
+
+    if (phone.length < 10) {
+        if(window.Toast) Toast.error("Please enter a valid 10-digit phone number");
+        else alert("Please enter a valid 10-digit phone number");
+        return;
+    }
+
+    // 3. Sab theek hai toh Button ko loading state me daalo
     const btn = e.target.querySelector('button[type="submit"]');
     const originalText = btn.innerText;
     btn.disabled = true;
     btn.innerText = "Saving...";
 
-    const lat = document.getElementById('a-lat').value;
-    const lng = document.getElementById('a-lng').value;
-
-    // Serviceability Check
+    // 4. Serviceability Check (Purana Logic as it is)
     try {
         const checkRes = await ApiService.post('/warehouse/find-serviceable/', { latitude: lat, longitude: lng });
         if (!checkRes.serviceable) {
-            // Show warning but continue
             alert("Location currently unserviceable, but address will be saved.");
         }
     } catch (checkError) {
         console.warn("Serviceability check failed, proceeding with save", checkError);
     }
 
-    // --- LOGIC KEPT: Form Data ko combine karke address banana ---
-    const house = document.getElementById('a-house').value;
-    const building = document.getElementById('a-building').value;
-    const landmark = document.getElementById('a-landmark').value;
-    const city = document.getElementById('a-city').value;
-    const pincode = document.getElementById('a-pin').value;
-
-    // Hum Map wale purane text ko ignore karke, user ne jo form me bhara hai 
-    // usse naya address text bana rahe hain.
+    // 5. Address combine karne ka Logic
     let fullAddressText = `${house}, ${building}`;
     if (landmark) fullAddressText += `, ${landmark}`;
     fullAddressText += `, ${city}, ${pincode}`;
-    // -----------------------------------------------------------
 
+    // 6. Payload Setup
     const payload = {
         label: document.querySelector('input[name="atype"]:checked').value,
         house_no: house,
         apartment_name: building,
         landmark: landmark,
-        google_address_text: fullAddressText, // Updated Address here
+        google_address_text: fullAddressText,
         city: city,
         pincode: pincode,
         latitude: lat,
         longitude: lng,
-        receiver_name: document.getElementById('a-name').value,
-        receiver_phone: document.getElementById('a-phone').value,
-        floor_no: document.getElementById('a-floor').value,
+        receiver_name: name,
+        receiver_phone: phone,
+        floor_no: floor,
         is_default: false 
     };
 
+    // 7. API Call
     try {
         await ApiService.post('/auth/customer/addresses/', payload);
         
         // Success
-            ApiService.clearCache();
+        ApiService.clearCache();
         closeModal();
         loadAddresses(); // Reload list
         if(window.Toast) Toast.success("Address saved successfully");
