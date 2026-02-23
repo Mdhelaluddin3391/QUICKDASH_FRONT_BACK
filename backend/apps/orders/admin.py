@@ -5,6 +5,7 @@ from .models import Order, OrderItem
 from .models import OrderConfiguration
 from apps.catalog.models import Product
 from apps.delivery.tasks import retry_auto_assign_rider
+from apps.customers.models import CustomerAddress # NEW IMPORT ADDED
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
@@ -87,7 +88,6 @@ class OrderAdmin(admin.ModelAdmin):
             'fields': ('status', 'delivery_type', 'payment_method', 'total_amount')
         }),
         ('Delivery Address Details', {
-            # Yahan humne naya 'full_delivery_address' add kiya hai taaki saari details dikhein
             'fields': ('delivery_name', 'delivery_phone', 'full_delivery_address', 'Maps_link')
         }),
         ('Raw Delivery JSON (For Debugging)', {
@@ -141,60 +141,95 @@ class OrderAdmin(admin.ModelAdmin):
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
-    # --- Delivery address helpers ---
+    # --- Delivery address helpers (SUPER SMART FIX) ---
     def delivery_name(self, obj):
         addr = obj.delivery_address_json or {}
-        # Frontend se data 'receiver_name' field mein aata hai
-        name = addr.get('receiver_name') or addr.get('name') or addr.get('full_name') or addr.get('contact_name')
+        name = addr.get('receiver_name') or addr.get('name')
+        
+        # 1. Agar JSON me name nahi hai, toh Database se real address nikal kar check karo
+        if not name and addr.get('id'):
+            try:
+                real_addr = CustomerAddress.objects.get(id=addr.get('id'))
+                name = real_addr.receiver_name
+            except Exception:
+                pass
+                
+        # 2. Agar phir bhi naam nahi mila, toh User Profile se lo
+        if not name and obj.user:
+            name = f"{obj.user.first_name} {obj.user.last_name}".strip()
+            
         return name or "N/A"
     delivery_name.short_description = "Delivery Name"
 
     def delivery_phone(self, obj):
         addr = obj.delivery_address_json or {}
-        # Frontend se data 'receiver_phone' field mein aata hai
-        phone = addr.get('receiver_phone') or addr.get('phone') or addr.get('mobile') or addr.get('phone_number')
+        phone = addr.get('receiver_phone') or addr.get('phone')
+        
+        # 1. Agar JSON me phone nahi hai, toh Database se original address nikal kar check karo
+        if not phone and addr.get('id'):
+            try:
+                real_addr = CustomerAddress.objects.get(id=addr.get('id'))
+                phone = real_addr.receiver_phone
+            except Exception:
+                pass
+                
+        # 2. Agar phir bhi phone nahi mila, toh User Profile se lo
+        if not phone and obj.user:
+            phone = getattr(obj.user, 'phone', None)
+            
         return phone or "N/A"
     delivery_phone.short_description = "Delivery Phone"
 
-    # NAYA FUNCTION: Frontend ka poora data neatly line-by-line dikhane ke liye
     def full_delivery_address(self, obj):
-        addr = obj.delivery_address_json or {}
-        if not addr:
+        addr_json = obj.delivery_address_json or {}
+        if not addr_json:
             return "No Address Details Found"
             
         details = []
-        if addr.get('house_no'): details.append(f"<b>House/Flat:</b> {addr.get('house_no')}")
-        if addr.get('floor_no'): details.append(f"<b>Floor:</b> {addr.get('floor_no')}")
-        if addr.get('apartment_name'): details.append(f"<b>Building:</b> {addr.get('apartment_name')}")
-        if addr.get('landmark'): details.append(f"<b>Landmark:</b> {addr.get('landmark')}")
         
-        city = addr.get('city', '')
-        pin = addr.get('pincode', '')
-        if city or pin:
-            details.append(f"<b>Area:</b> {city} - {pin}")
+        # SUPER SMART ADDRESS FETCHER: ID use karke original Address Model dhundo
+        real_addr = None
+        if addr_json.get('id'):
+            try:
+                real_addr = CustomerAddress.objects.get(id=addr_json.get('id'))
+            except Exception:
+                pass
+
+        # Agar real address database me mil gaya, toh saari details proper dikhao
+        if real_addr:
+            if real_addr.house_no: details.append(f"<b>House/Flat:</b> {real_addr.house_no}")
+            if real_addr.floor_no: details.append(f"<b>Floor:</b> {real_addr.floor_no}")
+            if real_addr.apartment_name: details.append(f"<b>Building:</b> {real_addr.apartment_name}")
+            if real_addr.landmark: details.append(f"<b>Landmark:</b> {real_addr.landmark}")
             
-        if addr.get('google_address_text'): 
-            details.append(f"<b>Map Address:</b> {addr.get('google_address_text')}")
+            city = real_addr.city or addr_json.get('city', '')
+            if city or real_addr.pincode:
+                details.append(f"<b>Area:</b> {city} - {real_addr.pincode}")
+                
+            if real_addr.google_address_text: 
+                details.append(f"<b>Map Address:</b> {real_addr.google_address_text}")
+        else:
+            # Fallback (Agar database se wo address delete ho gaya ho)
+            if addr_json.get('full_address'): 
+                details.append(f"<b>Full Address:</b> {addr_json.get('full_address')}")
+            if addr_json.get('city'):
+                details.append(f"<b>City:</b> {addr_json.get('city')}")
             
         if not details:
-            return "Address format is empty"
+            return str(addr_json) 
             
         return format_html("<br>".join(details))
     full_delivery_address.short_description = "Complete Address Details"
 
     def Maps_link(self, obj):
         addr = obj.delivery_address_json or {}
-        # Safely get latitude / longitude
         lat = addr.get('latitude') or addr.get('lat')
         lng = addr.get('longitude') or addr.get('lng')
         
         if lat is None or lng is None:
             return format_html('<span style="color:red;">Location Missing</span>')
             
-        # Naya Standard Google Maps Directions URL (Route map open karne ke liye)
         url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}"
-        
-        # Ek clear button style UI 
         return format_html(
             '<a style="background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block;" href="{}" target="_blank" rel="noopener noreferrer">📍 Get Directions</a>', 
             url
@@ -215,17 +250,14 @@ class OrderAdmin(admin.ModelAdmin):
 
     # 2. Logic Update: Update status AND Trigger Rider Search
     def mark_as_packed(self, request, queryset):
-        # ऑर्डर्स की ID निकालें
         orders_to_update = list(queryset.filter(status__in=['created', 'confirmed', 'picking']).values_list('id', flat=True))
         
         if not orders_to_update:
             self.message_user(request, "No eligible orders found.")
             return
 
-        # Status Update करें
         updated = queryset.filter(id__in=orders_to_update).update(status='packed')
         
-        # हर ऑर्डर के लिए राइडर ढूंढना शुरू करें
         for order_id in orders_to_update:
             retry_auto_assign_rider.delay(order_id)
 
