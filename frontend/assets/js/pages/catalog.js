@@ -21,26 +21,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // --- 1. Infinite Scroll Setup ---
+// --- 1. Infinite Scroll Setup ---
 function setupInfiniteScroll() {
     const list = document.getElementById('product-list');
     if (!list) return;
 
-    // Sentinel Element (Trigger point)
+    // Purana sentinel (trigger point) hatao agar pehle se hai toh
+    const oldSentinel = document.getElementById('catalog-sentinel');
+    if (oldSentinel) oldSentinel.remove();
+
+    // Naya Sentinel Element banayen
     const sentinel = document.createElement('div');
     sentinel.id = 'catalog-sentinel';
     sentinel.style.width = '100%';
-    sentinel.style.height = '50px';
+    sentinel.style.padding = '20px 0';
+    sentinel.style.marginTop = '10px';
     sentinel.style.textAlign = 'center';
-    sentinel.innerHTML = '<div class="loader-spinner d-none"></div>';
+    
+    // Yahan spinner ko home.js jaisa properly style kiya gaya hai
+    sentinel.innerHTML = '<div class="loader-spinner d-none" style="width:30px; height:30px; margin:auto;"></div>';
     
     list.parentNode.insertBefore(sentinel, list.nextSibling);
 
     const observer = new IntersectionObserver((entries) => {
+        // Jab list ka end screen par aane wala ho, aur loading na ho rahi ho, aur aage data bacha ho
         if (entries[0].isIntersecting && !isLoading && hasNext) {
             currentPage++;
-            loadProducts(false); // Append data
+            loadProducts(false); // Naya data append karega (bina page clear kiye)
         }
-    }, { rootMargin: '300px' });
+    }, { rootMargin: '300px' }); // 300px pehle hi backend se data mangna shuru kar dega (smoothness ke liye)
 
     observer.observe(sentinel);
 }

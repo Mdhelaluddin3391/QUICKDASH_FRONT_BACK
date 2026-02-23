@@ -19,11 +19,17 @@ from rest_framework.exceptions import NotFound
 from django.db.models import Q
 from apps.warehouse.services import WarehouseService
 from apps.inventory.models import InventoryItem
+from rest_framework.pagination import PageNumberPagination
 
 # ==============================================================================
 # PUBLIC CATALOG APIS
 # Authentication classes empty to allow Guest Browsing
 # ==============================================================================
+class SkuPagination(PageNumberPagination):
+    page_size = 12
+
+
+
 
 class NavbarCategoryAPIView(APIView):
     """
@@ -63,6 +69,7 @@ class SkuListAPIView(generics.ListAPIView):
     permission_classes = [AllowAny]
     authentication_classes = [] 
     serializer_class = ProductSerializer
+    pagination_class = SkuPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     
     # YAHAN SE 'category__slug' KO REMOVE KAR DIYA HAI
