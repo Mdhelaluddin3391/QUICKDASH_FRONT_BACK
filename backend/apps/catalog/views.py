@@ -65,14 +65,16 @@ class SkuListAPIView(generics.ListAPIView):
     serializer_class = ProductSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     
-    filterset_fields = ['category__slug', 'is_active'] 
+    # YAHAN SE 'category__slug' KO REMOVE KAR DIYA HAI
+    filterset_fields = ['is_active'] 
+    
     search_fields = ['name', 'sku', 'description', 'category__name']
     ordering_fields = ['effective_price', 'created_at']
 
     def get_queryset(self):
         qs = Product.objects.filter(is_active=True).select_related('category')
         
-        # Filters
+        # Custom Filters (Yahan category aur sub-category dono filter ho jayenge)
         category_slug = self.request.query_params.get('category__slug')
         if category_slug:
             qs = qs.filter(
@@ -88,17 +90,15 @@ class SkuListAPIView(generics.ListAPIView):
 
         # Sorting Logic
         ordering = self.request.query_params.get('ordering')
-        warehouse = getattr(self.request, 'warehouse', None) # From Middleware
+        warehouse = getattr(self.request, 'warehouse', None)
 
         if ordering in ['price_asc', 'price_desc', 'effective_price', '-effective_price']:
-            # Subquery to get price from Inventory based on Warehouse
             if warehouse:
                 price_subquery = InventoryItem.objects.filter(
                     sku=OuterRef('sku'),
                     bin__rack__aisle__zone__warehouse=warehouse
                 ).values('price')[:1]
             else:
-                # Fallback: Just take any price (or 0)
                 price_subquery = InventoryItem.objects.filter(
                     sku=OuterRef('sku')
                 ).values('price')[:1]
@@ -121,7 +121,6 @@ class SkuListAPIView(generics.ListAPIView):
 
     def list(self, request, *args, **kwargs):
         response = super().list(request, *args, **kwargs)
-        # Inject prices if not sorted by price (manual injection is faster for pagination)
         ordering = request.query_params.get('ordering')
         if ordering not in ['price_asc', 'price_desc', 'effective_price', '-effective_price']:
             self._inject_warehouse_prices(response.data, request)
@@ -132,7 +131,6 @@ class SkuListAPIView(generics.ListAPIView):
         results = data.get('results') if isinstance(data, dict) else data
         if not results: return
 
-        # Agar warehouse set nahi hai, toh default stock 0 dikhaye
         if not warehouse: 
             for item in results:
                 item['available_stock'] = 0
@@ -141,29 +139,25 @@ class SkuListAPIView(generics.ListAPIView):
         skus = [item.get('sku') for item in results]
         if not skus: return
 
-        # Database se un SKUs ka data ek saath get karein
         inventory_items = InventoryItem.objects.filter(
             sku__in=skus,
             bin__rack__aisle__zone__warehouse=warehouse
         )
         
-        # Ek dictionary banayein inventory map karne ke liye
         inv_map = {}
         for inv in inventory_items:
             if inv.sku not in inv_map:
                 inv_map[inv.sku] = {'price': inv.price, 'stock': 0}
             
-            # Sahi available stock calculate karein
             inv_map[inv.sku]['stock'] += (inv.total_stock - inv.reserved_stock)
 
-        # Ab results ke andar loop chala kar data inject kar dein
         for item in results:
             sku = item.get('sku')
             if sku in inv_map:
                 item['sale_price'] = inv_map[sku]['price']
                 item['available_stock'] = inv_map[sku]['stock']
             else:
-                item['available_stock'] = 0  # Agar inventory me nahi hai toh Out of stock
+                item['available_stock'] = 0
 
 class SkuDetailAPIView(generics.RetrieveAPIView):
     """
