@@ -46,6 +46,9 @@ class OrderAdmin(admin.ModelAdmin):
         'payment_method',
         'total_amount_display',
         'delivery_type',
+        'delivery_name',
+        'delivery_phone',
+        'Maps_link',
         'created_at_date'
     )
     list_filter = (
@@ -87,13 +90,16 @@ class OrderAdmin(admin.ModelAdmin):
             'fields': ('delivery_address_json',),
             'classes': ('collapse',)
         }),
+        ('Delivery Address Details', {
+            'fields': ('delivery_name', 'delivery_phone', 'Maps_link')
+        }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
             'classes': ('collapse',)
         }),
     )
 
-    readonly_fields = ('id', 'created_at', 'updated_at', 'total_amount')
+    readonly_fields = ('id', 'created_at', 'updated_at', 'total_amount', 'delivery_name', 'delivery_phone', 'Maps_link')
 
     def customer_phone(self, obj):
         return obj.user.phone
@@ -133,6 +139,30 @@ class OrderAdmin(admin.ModelAdmin):
         return obj.created_at.strftime('%d/%m/%Y %H:%M')
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
+
+    # --- Delivery address helpers ---
+    def delivery_name(self, obj):
+        addr = obj.delivery_address_json or {}
+        # Try common keys for name
+        name = addr.get('name') or addr.get('full_name') or addr.get('contact_name')
+        return name or "N/A"
+    delivery_name.short_description = "Delivery Name"
+
+    def delivery_phone(self, obj):
+        addr = obj.delivery_address_json or {}
+        phone = addr.get('phone') or addr.get('mobile') or addr.get('phone_number')
+        return phone or "N/A"
+    delivery_phone.short_description = "Delivery Phone"
+
+    def Maps_link(self, obj):
+        addr = obj.delivery_address_json or {}
+        lat = addr.get('latitude')
+        lng = addr.get('longitude')
+        if lat is None or lng is None:
+            return "No Coordinates"
+        url = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
+        return format_html('<a class="button" href="{}" target="_blank" rel="noopener noreferrer">Open in Google Maps</a>', url)
+    Maps_link.short_description = "View on Map"
 
     # --- Admin Actions Updates ---
 
