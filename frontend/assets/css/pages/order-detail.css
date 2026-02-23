@@ -13,16 +13,27 @@
     gap: 30px;
 }
 
+/* Updated & Merged Item Row */
 .item-row {
     display: flex;
     align-items: center;
     gap: 15px;
-    padding: 15px 0;
-    border-bottom: 1px solid #eee;
+    background: #fafafa;
+    padding: 15px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+    border: 1px solid #f3f4f6;
+    transition: all 0.2s ease;
 }
 
 .item-row:last-child {
-    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.item-row:hover {
+    background: #ffffff;
+    border-color: #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
 }
 
 .otp-display-card {
@@ -49,31 +60,55 @@
     margin: 10px 0;
 }
 
+/* =============================
+   ORDER DETAILS ENHANCEMENTS
+   ============================= */
+#od-content .card {
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.04);
+    border: 1px solid #f3f4f6;
+}
+
+/* Order Summary Box Box-shadow */
+.od-grid > div:nth-child(2) {
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    border: 1px solid #e5e7eb;
+}
+
+/* Order Status Badges Colors */
+.status-badge {
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+    display: inline-block;
+}
+
+/* Dynamic colors based on order status */
+.status-created { background: #f3f4f6; color: #4b5563; }
+.status-confirmed { background: #e0f2fe; color: #0369a1; }
+.status-picking { background: #fef3c7; color: #b45309; }
+.status-packed { background: #f3e8ff; color: #7e22ce; }
+.status-out_for_delivery { background: #e0e7ff; color: #4338ca; }
+.status-delivered { background: #dcfce7; color: #15803d; }
+.status-cancelled { background: #fee2e2; color: #b91c1c; }
+
+/* Cancel order button */
+#action-buttons .btn-outline-danger {
+    padding: 6px 14px;
+    border-radius: 8px;
+}
+
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 768px) {
-    .od-grid {
-        grid-template-columns: 1fr;
-    }
-    .od-header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
-    .od-header .text-right {
-        text-align: left;
-        width: 100%;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
+    .od-grid { grid-template-columns: 1fr; }
+    .od-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .od-header .text-right { text-align: left; width: 100%; display: flex; justify-content: space-between; align-items: center; }
 }

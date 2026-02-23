@@ -5,6 +5,7 @@
     gap: 30px;
     min-height: 60vh;
 }
+
 .account-sidebar {
     background: #fff;
     border-radius: 12px;
@@ -14,7 +15,10 @@
     position: sticky;
     top: 100px;
 }
-.account-content { padding: 8px 0; }
+
+.account-content {
+    padding: 8px 0;
+}
 
 /* User brief */
 .user-profile-brief {
@@ -25,6 +29,7 @@
     border-bottom: 1px solid var(--border-color);
     margin-bottom: 12px;
 }
+
 .avatar-circle {
     width: 48px;
     height: 48px;
@@ -38,108 +43,169 @@
     font-size: 1rem;
 }
 
-/* Sidebar Link Styles (compatible with existing markup) */
+/* Sidebar Link Styles */
 .account-sidebar nav,
-.sidebar-nav { margin-top: 12px; display:flex; flex-direction:column; }
-.sidebar-link, .sidebar-nav a {
-    display: flex; align-items: center; gap: 12px;
-    padding: 14px 20px; color: var(--text-muted);
-    border-radius: 10px; margin-bottom: 8px; font-weight: 500;
-    transition: 0.2s; text-decoration: none; background: transparent; border: 0;
+.sidebar-nav {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
 }
-.sidebar-link:hover, .sidebar-link.active, .sidebar-nav a:hover, .sidebar-nav a.active {
-    background: var(--primary-light); color: var(--primary);
+
+.sidebar-link,
+.sidebar-nav a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    color: var(--text-muted);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    font-weight: 500;
+    transition: 0.2s;
+    text-decoration: none;
+    background: transparent;
+    border: 0;
 }
-.sidebar-link i, .sidebar-nav a i { width: 20px; text-align: center; }
-.sidebar-link.logout, .sidebar-nav button.logout {
-    width: 100%; text-align: left; padding: 14px 20px;
-    color: var(--danger); background: transparent; display: flex; gap: 12px;
-    font-weight: 500; margin-top: 10px; border-radius: 10px; border: 0;
+
+.sidebar-link:hover,
+.sidebar-link.active,
+.sidebar-nav a:hover,
+.sidebar-nav a.active {
+    background: var(--primary-light);
+    color: var(--primary);
 }
-.sidebar-link.logout:hover, .sidebar-nav button.logout:hover { background: #fef2f2; }
+
+.sidebar-link i,
+.sidebar-nav a i {
+    width: 20px;
+    text-align: center;
+}
+
+.sidebar-link.logout,
+.sidebar-nav button.logout {
+    width: 100%;
+    text-align: left;
+    padding: 14px 20px;
+    color: var(--danger);
+    background: transparent;
+    display: flex;
+    gap: 12px;
+    font-weight: 500;
+    margin-top: 10px;
+    border-radius: 10px;
+    border: 0;
+}
+
+.sidebar-link.logout:hover,
+.sidebar-nav button.logout:hover {
+    background: #fef2f2;
+}
 
 /* Responsive */
 @media(max-width: 768px) {
-    .account-layout { grid-template-columns: 1fr; }
-    .account-sidebar { position: static; margin-bottom: 20px; top: auto; }
+    .account-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .account-sidebar {
+        position: static;
+        margin-bottom: 20px;
+        top: auto;
+    }
 }
 
 /* Profile Stats Grid */
 .stat-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 20px; margin-bottom: 40px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
 }
+
 .stat-card {
-    background: #fff; padding: 25px; border-radius: 16px;
-    border: 1px solid var(--border-color); display: flex; align-items: center; gap: 20px;
+    background: #fff;
+    padding: 25px;
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    gap: 20px;
     box-shadow: var(--shadow-sm);
 }
+
 .icon-box {
-    width: 60px; height: 60px; border-radius: 12px;
-    display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
 }
+
 .bg-green { background: #dcfce7; color: #16a34a; }
 .bg-blue { background: #dbeafe; color: #2563eb; }
 
-/* Order Item Row */
+/* Order Item Row - Profile page fallback */
 .order-item-card {
-    background: #fff; border: 1px solid var(--border-color);
-    border-radius: 12px; padding: 20px; margin-bottom: 15px;
-    display: flex; justify-content: space-between; align-items: center;
+    background: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     transition: 0.2s;
 }
-.order-item-card:hover { border-color: var(--primary); box-shadow: var(--shadow-sm); }
 
-@media(max-width: 768px) {
-    .order-item-card { flex-direction: column; align-items: flex-start; gap: 15px; }
-    .order-item-card .text-right { text-align: left; width: 100%; display: flex; justify-content: space-between; align-items: center; }
+.order-item-card:hover {
+    border-color: var(--primary);
+    box-shadow: var(--shadow-sm);
 }
 
+@media(max-width: 768px) {
+    .order-item-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
 
-
-
-
-
+    .order-item-card .text-right {
+        text-align: left;
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+}
 
 /* =============================
    MODAL POPUP STYLES
    ============================= */
-
-/* 1. The Overlay (Background) */
 #profile-modal {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0, 0, 0, 0.6); /* Dark semi-transparent background */
-    backdrop-filter: blur(5px);           /* Blur effect for modern feel */
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(5px);
     z-index: 9999;
-    
-    /* Centering logic is handled by JS setting display:flex, 
-       but we ensure alignment here too */
     justify-content: center;
     align-items: center;
-    
-    /* Smooth fade in */
     animation: fadeIn 0.3s ease-out;
 }
 
-/* 2. The Box (Popup Card) */
 .modal-box {
     background: #ffffff;
     width: 90%;
-    max-width: 450px;       /* Not too wide */
+    max-width: 450px;
     padding: 30px;
-    border-radius: 16px;    /* Smooth rounded corners */
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25); /* Deep shadow for 'pop' effect */
+    border-radius: 16px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.25);
     position: relative;
-    
-    /* Animation: Slide up slightly */
     animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-/* 3. Form Inputs Styling inside Modal */
 .modal-box .form-label {
     font-size: 0.9rem;
     font-weight: 600;
@@ -161,29 +227,17 @@
 
 .modal-box .form-control:focus {
     background-color: #fff;
-    border-color: #007bff; /* Primary color */
+    border-color: #007bff;
     box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
     outline: none;
 }
 
-/* 4. Buttons */
-.modal-box .d-flex {
-    margin-top: 10px;
-    gap: 15px; /* Space between buttons */
-}
+.modal-box .d-flex { margin-top: 10px; gap: 15px; }
+.modal-box .btn { padding: 10px 20px; border-radius: 8px; font-weight: 500; flex: 1; }
 
-.modal-box .btn {
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-weight: 500;
-    flex: 1; /* Both buttons take equal width */
-}
-
-/* Close Button (X) */
 .close-modal {
     position: absolute;
-    top: 15px;
-    right: 15px;
+    top: 15px; right: 15px;
     background: transparent;
     border: none;
     font-size: 1.5rem;
@@ -192,25 +246,112 @@
     transition: color 0.2s;
 }
 
-.close-modal:hover {
-    color: #333;
-}
+.close-modal:hover { color: #333; }
 
 /* =============================
-   ANIMATIONS
+   SAVED ADDRESSES CARDS STYLING
    ============================= */
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+.address-card {
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    height: 100%;
+}
+
+.address-card:hover {
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+    border-color: var(--primary, #007bff);
+    transform: translateY(-2px);
+}
+
+.address-card .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #f3f4f6;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+}
+
+/* Badges for Home, Work, Other */
+.badge {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.badge-home { background: #e0f2fe; color: #1d4ed8; }
+.badge-work { background: #f3e8ff; color: #7e22ce; }
+.badge-other { background: #f3f4f6; color: #4b5563; }
+
+.address-card .card-body p {
+    margin-bottom: 5px;
+    line-height: 1.4;
+}
+
+/* Delete Button - Red */
+.address-card .card-actions {
+    margin-top: 15px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.btn-outline-danger {
+    color: #ef4444;
+    border: 1px solid #ef4444;
+    background: transparent;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-outline-danger:hover {
+    background: #ef4444;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.3);
+}
+
+/* Add New Address Blank Card */
+.add-new-card {
+    cursor: pointer;
+    background: #fafafa;
+    padding: 0;
+}
+
+.add-new-card .dashed-border {
+    height: 100%;
+    min-height: 150px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed #d1d5db;
+    border-radius: 10px;
+    color: #6b7280;
+    font-weight: 500;
+    gap: 12px;
+    transition: all 0.3s ease;
+}
+
+.add-new-card .dashed-border i { font-size: 2rem; }
+.add-new-card:hover .dashed-border {
+    border-color: var(--primary, #007bff);
+    color: var(--primary, #007bff);
+    background: #eff6ff;
 }
 
 @keyframes slideUp {
-    from { 
-        opacity: 0; 
-        transform: translateY(30px) scale(0.95); 
-    }
-    to { 
-        opacity: 1; 
-        transform: translateY(0) scale(1); 
-    }
+    from { opacity: 0; transform: translateY(30px) scale(0.95); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
 }
