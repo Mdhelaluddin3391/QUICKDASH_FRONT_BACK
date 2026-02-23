@@ -86,12 +86,13 @@ class OrderAdmin(admin.ModelAdmin):
         ('Order Details', {
             'fields': ('status', 'delivery_type', 'payment_method', 'total_amount')
         }),
-        ('Delivery Address', {
+        ('Delivery Address Details', {
+            # Yahan humne naya 'full_delivery_address' add kiya hai taaki saari details dikhein
+            'fields': ('delivery_name', 'delivery_phone', 'full_delivery_address', 'Maps_link')
+        }),
+        ('Raw Delivery JSON (For Debugging)', {
             'fields': ('delivery_address_json',),
             'classes': ('collapse',)
-        }),
-        ('Delivery Address Details', {
-            'fields': ('delivery_name', 'delivery_phone', 'Maps_link')
         }),
         ('Timestamps', {
             'fields': ('created_at', 'updated_at'),
@@ -99,7 +100,7 @@ class OrderAdmin(admin.ModelAdmin):
         }),
     )
 
-    readonly_fields = ('id', 'created_at', 'updated_at', 'total_amount', 'delivery_name', 'delivery_phone', 'Maps_link')
+    readonly_fields = ('id', 'created_at', 'updated_at', 'total_amount', 'delivery_name', 'delivery_phone', 'full_delivery_address', 'Maps_link')
 
     def customer_phone(self, obj):
         return obj.user.phone
@@ -143,26 +144,62 @@ class OrderAdmin(admin.ModelAdmin):
     # --- Delivery address helpers ---
     def delivery_name(self, obj):
         addr = obj.delivery_address_json or {}
-        # Try common keys for name
-        name = addr.get('name') or addr.get('full_name') or addr.get('contact_name')
+        # Frontend se data 'receiver_name' field mein aata hai
+        name = addr.get('receiver_name') or addr.get('name') or addr.get('full_name') or addr.get('contact_name')
         return name or "N/A"
     delivery_name.short_description = "Delivery Name"
 
     def delivery_phone(self, obj):
         addr = obj.delivery_address_json or {}
-        phone = addr.get('phone') or addr.get('mobile') or addr.get('phone_number')
+        # Frontend se data 'receiver_phone' field mein aata hai
+        phone = addr.get('receiver_phone') or addr.get('phone') or addr.get('mobile') or addr.get('phone_number')
         return phone or "N/A"
     delivery_phone.short_description = "Delivery Phone"
 
+    # NAYA FUNCTION: Frontend ka poora data neatly line-by-line dikhane ke liye
+    def full_delivery_address(self, obj):
+        addr = obj.delivery_address_json or {}
+        if not addr:
+            return "No Address Details Found"
+            
+        details = []
+        if addr.get('house_no'): details.append(f"<b>House/Flat:</b> {addr.get('house_no')}")
+        if addr.get('floor_no'): details.append(f"<b>Floor:</b> {addr.get('floor_no')}")
+        if addr.get('apartment_name'): details.append(f"<b>Building:</b> {addr.get('apartment_name')}")
+        if addr.get('landmark'): details.append(f"<b>Landmark:</b> {addr.get('landmark')}")
+        
+        city = addr.get('city', '')
+        pin = addr.get('pincode', '')
+        if city or pin:
+            details.append(f"<b>Area:</b> {city} - {pin}")
+            
+        if addr.get('google_address_text'): 
+            details.append(f"<b>Map Address:</b> {addr.get('google_address_text')}")
+            
+        if not details:
+            return "Address format is empty"
+            
+        return format_html("<br>".join(details))
+    full_delivery_address.short_description = "Complete Address Details"
+
     def Maps_link(self, obj):
         addr = obj.delivery_address_json or {}
-        lat = addr.get('latitude')
-        lng = addr.get('longitude')
+        # Safely get latitude / longitude
+        lat = addr.get('latitude') or addr.get('lat')
+        lng = addr.get('longitude') or addr.get('lng')
+        
         if lat is None or lng is None:
-            return "No Coordinates"
-        url = f"https://www.google.com/maps/search/?api=1&query={lat},{lng}"
-        return format_html('<a class="button" href="{}" target="_blank" rel="noopener noreferrer">Open in Google Maps</a>', url)
-    Maps_link.short_description = "View on Map"
+            return format_html('<span style="color:red;">Location Missing</span>')
+            
+        # Naya Standard Google Maps Directions URL (Route map open karne ke liye)
+        url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}"
+        
+        # Ek clear button style UI 
+        return format_html(
+            '<a style="background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block;" href="{}" target="_blank" rel="noopener noreferrer">📍 Get Directions</a>', 
+            url
+        )
+    Maps_link.short_description = "Customer Map Location"
 
     # --- Admin Actions Updates ---
 
@@ -210,7 +247,6 @@ class OrderAdmin(admin.ModelAdmin):
         updated = queryset.exclude(status__in=['delivered', 'cancelled']).update(status='cancelled')
         self.message_user(request, f"{updated} orders cancelled.")
     cancel_orders.short_description = "Cancel selected orders"
-
 
 
 @admin.register(OrderConfiguration)
