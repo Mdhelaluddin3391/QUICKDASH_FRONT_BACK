@@ -189,3 +189,11 @@ footer {
     color: var(--primary-color, #ff6b6b);
     opacity: 0.8;
 }
+
+
+
+#navbar-placeholder {
+    min-height: 70px; /* Aapke navbar ki jo bhi exact height hai, wo yahan daalein */
+    background-color: #ffffff; /* Taki khali jagah ajeeb na lage */
+    width: 100%;
+}

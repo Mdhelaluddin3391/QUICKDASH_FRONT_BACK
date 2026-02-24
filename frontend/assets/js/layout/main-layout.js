@@ -321,22 +321,35 @@
         const API_URL = `${window.APP_CONFIG.API_BASE_URL}/catalog/categories/parents/`;
         const CACHE_KEY = 'nav_parents_cache';
         
-        try {
-            const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
-            if (cached && (Date.now() - cached.ts) < 3600000 && Array.isArray(cached.data)) {
-                renderNav(cached.data);
-                return;
+        // 1. Pehle Local Storage se direct cache check karein (Fastest path)
+        const cachedStr = localStorage.getItem(CACHE_KEY);
+        if (cachedStr) {
+            try {
+                const cached = JSON.parse(cachedStr);
+                // Agar cache 1 ghante (3600000ms) se purana nahi hai, toh turant render karein
+                if (cached && (Date.now() - cached.ts) < 3600000 && Array.isArray(cached.data)) {
+                    renderNav(cached.data);
+                    return; // Cache mil gaya, aage API call karne ki zaroorat nahi
+                }
+            } catch (e) {
+                console.warn("Nav Cache invalid, fetching fresh data...");
             }
-        } catch (e) { }
+        }
 
+        // 2. Agar cache nahi hai ya purana ho gaya hai, tabhi API call karein
         try {
             const resp = await fetch(API_URL);
+            if (!resp.ok) throw new Error(`API failed with status: ${resp.status}`);
             const data = await resp.json();
+            
             if (Array.isArray(data)) {
+                // Naya data LocalStorage me save karein aur render karein
                 localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: data }));
                 renderNav(data);
             }
-        } catch (err) { }
+        } catch (err) { 
+            console.error("Failed to load nav categories:", err);
+        }
     }
 
     function renderNav(categories) {
