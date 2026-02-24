@@ -2,10 +2,10 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.db import models
-from django.urls import path            # ✅ Added: URL routing ke liye
-from django.http import JsonResponse    # ✅ Added: Data wapas bhejne ke liye
+from django.urls import path            
+from django.http import JsonResponse    
 from .models import InventoryItem, InventoryTransaction
-from apps.catalog.models import Product # ✅ Added: Product search karne ke liye
+from apps.catalog.models import Product 
 
 
 @admin.register(InventoryItem)
@@ -14,9 +14,11 @@ class InventoryItemAdmin(admin.ModelAdmin):
     class Media:
         js = ('inventory/js/sku_lookup.js',)
 
+    # ✅ 'price' ko list_display me add kiya gaya taaki bahar table me dikhe
     list_display = (
         'sku',
         'product_name',
+        'price', # <-- Naya Add kiya gaya: Inventory Price
         'warehouse_name',
         'bin_location',
         'total_stock',
@@ -47,12 +49,15 @@ class InventoryItemAdmin(admin.ModelAdmin):
     )
     raw_id_fields = ('bin',)
     list_per_page = 25
-    list_editable = ('total_stock', 'reserved_stock')
+    
+    # ✅ 'price' ko list_editable me bhi add kiya, taaki bahar table se hi direct edit kar sakein
+    list_editable = ('total_stock', 'reserved_stock', 'price')
     actions = ['mark_low_stock', 'clear_reservations', 'update_from_catalog']
 
+    # ✅ 'product_mrp_display' (Read-only) aur 'price' (Editable) dono add kiye gaye
     fieldsets = (
         ('Product Information', {
-            'fields': ('bin', 'sku', 'product_name', 'price')
+            'fields': ('bin', 'sku', 'product_name', 'product_mrp_display', 'price')
         }),
         ('Stock Levels', {
             'fields': ('total_stock', 'reserved_stock', 'mode', 'lead_time_hours')
@@ -63,9 +68,10 @@ class InventoryItemAdmin(admin.ModelAdmin):
         }),
     )
 
-    readonly_fields = ('updated_at',)
+    # ✅ 'product_mrp_display' ko readonly field banaya
+    readonly_fields = ('updated_at', 'product_mrp_display')
 
-    # ✅ NAYA CODE: Custom URL add kiya taaki JS ispe request bhej sake
+    # ✅ Custom URL add kiya taaki JS ispe request bhej sake
     def get_urls(self):
         urls = super().get_urls()
         my_urls = [
@@ -73,7 +79,7 @@ class InventoryItemAdmin(admin.ModelAdmin):
         ]
         return my_urls + urls
 
-    # ✅ NAYA CODE: Backend logic jo Catalog me SKU dhundega
+    # ✅ Backend logic jo Catalog me SKU dhundega
     def lookup_product_data(self, request):
         sku = request.GET.get('sku')
         data = {'found': False}
@@ -87,6 +93,15 @@ class InventoryItemAdmin(admin.ModelAdmin):
                     'price': str(product.mrp) # Decimal ko string banaya JSON ke liye
                 }
         return JsonResponse(data)
+
+    # ✅ NAYA CODE: Catalog se MRP nikal kar sirf dikhane (Read-only) ke liye function
+    def product_mrp_display(self, obj):
+        if obj and obj.sku:
+            product = Product.objects.filter(sku__iexact=obj.sku).first()
+            if product:
+                return f"₹ {product.mrp}"
+        return "Not Found in Catalog"
+    product_mrp_display.short_description = "Product Base MRP (Read Only)"
 
     # --- Niche ka sara code wahi purana hai ---
 
