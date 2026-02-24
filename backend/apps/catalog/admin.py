@@ -27,12 +27,14 @@ class ProductImageInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    change_list_template = "admin/catalog/product/change_list.html"  # ✅ CSV Button ke liye template
+    change_list_template = "admin/catalog/product/change_list.html"
 
+    # ✅ 'image' ko list_display me add kiya
     list_display = (
         'name',
         'sku',
         'image_preview',
+        'image',  # <--- NAYA ADD KIYA
         'category_name',
         'mrp',
         'stock_status',
@@ -54,7 +56,9 @@ class ProductAdmin(admin.ModelAdmin):
     )
     list_select_related = ('category', 'brand')
     raw_id_fields = ('category', 'brand')
-    list_editable = ('mrp', 'is_active')
+    
+    # ✅ 'image' ko list_editable me add kiya
+    list_editable = ('mrp', 'is_active', 'image') # <--- NAYA ADD KIYA
     list_per_page = 25
     actions = ['activate_products', 'deactivate_products', 'mark_featured', 'unmark_featured']
 
@@ -62,7 +66,7 @@ class ProductAdmin(admin.ModelAdmin):
         ('Basic Information', {
             'fields': ('name', 'sku', 'description', 'unit')
         }),
-        ('Shop by Store', {  # ✅ Yahan naam change kiya gaya hai
+        ('Shop by Store', {  
             'fields': ('category', 'brand')
         }),
         ('Pricing & Inventory', {
@@ -190,7 +194,6 @@ class ProductAdmin(admin.ModelAdmin):
         payload = {"form": form}
         return render(request, "admin/csv_form.html", payload)
 
-    # --- Purane Functions ---
 
     def image_preview(self, obj):
         if obj.image:
@@ -271,12 +274,15 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'icon_preview', 'parent_name', 'is_active', 'product_count')
+    # ✅ 'icon' ko list_display me add kiya
+    list_display = ('name', 'icon_preview', 'icon', 'parent_name', 'is_active', 'product_count')
     list_filter = ('is_active', 'parent')
     search_fields = ('name', 'parent__name')
     list_select_related = ('parent',)
     raw_id_fields = ('parent',)
-    list_editable = ('is_active',)
+    
+    # ✅ 'icon' ko list_editable me add kiya
+    list_editable = ('is_active', 'icon')  # <--- NAYA ADD KIYA
     list_per_page = 25
     actions = ['activate_categories', 'deactivate_categories']
 
@@ -335,10 +341,13 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):
-    list_display = ('name', 'logo_preview', 'is_active', 'product_count')
+    # ✅ 'logo' ko list_display me add kiya
+    list_display = ('name', 'logo_preview', 'logo', 'is_active', 'product_count')
     list_filter = ('is_active',)
     search_fields = ('name',)
-    list_editable = ('is_active',)
+    
+    # ✅ 'logo' ko list_editable me add kiya
+    list_editable = ('is_active', 'logo')  # <--- NAYA ADD KIYA
     list_per_page = 25
     actions = ['activate_brands', 'deactivate_brands']
 
