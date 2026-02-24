@@ -13,10 +13,12 @@
                 </div>
             </div>
 
-            <form class="search-bar-row" method="GET" action="./search_results.html">
+            <form class="search-bar-row" method="GET" action="./search_results.html" style="position: relative;">
                 <i class="fas fa-search"></i>
-                <input type="text" name="search" placeholder="Search for milk, vegetables, snacks..."
+                <input type="text" id="search-input" name="search" placeholder="Search for milk, vegetables, snacks..."
                     autocomplete="off">
+                <div id="search-suggestions-box" class="search-suggestions-dropdown" style="display: none; position: absolute; top: 100%; left: 0; width: 100%; background: white; z-index: 1000; box-shadow: 0px 4px 6px rgba(0,0,0,0.1); border-radius: 8px; margin-top: 5px; max-height: 400px; overflow-y: auto;">
+                    </div>
             </form>
 
             <div class="header-icons">

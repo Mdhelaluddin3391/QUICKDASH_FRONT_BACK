@@ -411,7 +411,10 @@ class GlobalSearchAPIView(APIView):
                     When(sku__iexact=query, then=Value(2)),
                     When(name__istartswith=query, then=Value(3)),
                     When(name__icontains=query, then=Value(4)),
-                    default=Value(5),
+                    When(description__icontains=query, then=Value(5)),
+                    When(category__name__icontains=query, then=Value(6)),
+                    When(category__parent__name__icontains=query, then=Value(7)),
+                    default=Value(8), # FIXED: Default value ko 8 kiya taaki upar ki priority clash na ho
                     output_field=IntegerField()
                 )
             ).order_by('relevance', '-created_at')
@@ -434,14 +437,25 @@ class SearchSuggestAPIView(APIView):
         brand_results = Brand.objects.filter(is_active=True)
         
         for word in words:
+            # ADDED: Q(description__icontains=word) jisse description se bhi search ho
             product_results = product_results.filter(
-                Q(name__icontains=word) | Q(category__name__icontains=word) | Q(category__parent__name__icontains=word) | Q(sku__icontains=word)
+                Q(name__icontains=word) | 
+                Q(description__icontains=word) | 
+                Q(category__name__icontains=word) | 
+                Q(category__parent__name__icontains=word) | 
+                Q(sku__icontains=word)
             )
             brand_results = brand_results.filter(name__icontains=word)
             
-        # Relevance Ranking for top results
+        # ADDED: Relevance Ranking for top results (Description priority added)
         product_results = product_results.annotate(
-            relevance=Case(When(name__istartswith=query, then=Value(1)), default=Value(2), output_field=IntegerField())
+            relevance=Case(
+                When(name__istartswith=query, then=Value(1)), 
+                When(name__icontains=query, then=Value(2)),
+                When(description__icontains=query, then=Value(3)), 
+                default=Value(4), 
+                output_field=IntegerField()
+            )
         ).order_by('relevance')[:5]
         
         brand_results = brand_results[:3]
