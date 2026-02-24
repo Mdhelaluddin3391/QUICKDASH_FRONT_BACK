@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
+from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
 from .models import Payment, Refund
 
@@ -79,7 +80,9 @@ class PaymentAdmin(admin.ModelAdmin):
     status_badge.short_description = "Status"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y %H:%M')
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+        return "N/A"
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
@@ -171,7 +174,9 @@ class RefundAdmin(admin.ModelAdmin):
     status_badge.short_description = "Status"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y %H:%M')
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+        return "N/A"
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 

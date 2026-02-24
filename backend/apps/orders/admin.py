@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
+from django.utils.timezone import localtime
 from .models import Order, OrderItem
 from .models import OrderConfiguration
 from apps.catalog.models import Product
@@ -137,7 +138,9 @@ class OrderAdmin(admin.ModelAdmin):
     total_amount_display.admin_order_field = 'total_amount'
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y %H:%M')
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+        return "N/A"
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 

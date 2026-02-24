@@ -1,6 +1,7 @@
 # apps/notifications/admin.py
 from django.contrib import admin
 from django.utils.html import format_html
+from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
 from .models import PhoneOTP, Notification, OTPAbuseLog
 
@@ -54,7 +55,9 @@ class PhoneOTPAdmin(admin.ModelAdmin):
     is_expired_badge.short_description = "Expiry"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y %H:%M')
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+        return "N/A"
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
@@ -131,7 +134,9 @@ class NotificationAdmin(admin.ModelAdmin):
     message_preview.short_description = "Message"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y %H:%M')
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+        return "N/A"
     created_at_date.short_description = "Sent"
     created_at_date.admin_order_field = 'created_at'
 
@@ -174,7 +179,9 @@ class OTPAbuseLogAdmin(admin.ModelAdmin):
     is_blocked_badge.short_description = "Status"
 
     def last_attempt_date(self, obj):
-        return obj.last_attempt.strftime('%d/%m/%Y %H:%M')
+        if hasattr(obj, 'last_attempt') and obj.last_attempt:
+            return localtime(obj.last_attempt).strftime('%d/%m/%Y %H:%M')
+        return "N/A"
     last_attempt_date.short_description = "Last Attempt"
     last_attempt_date.admin_order_field = 'last_attempt'
 

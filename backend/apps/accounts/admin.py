@@ -2,6 +2,7 @@ from django import forms
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.utils.html import format_html
+from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
 from .models import User, UserRole, Address
 
@@ -125,7 +126,9 @@ class CustomUserAdmin(UserAdmin):
     is_active_badge.short_description = "Status"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y')
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+        return "N/A"
     created_at_date.short_description = "Joined"
     created_at_date.admin_order_field = 'created_at'
 
@@ -184,7 +187,9 @@ class UserRoleAdmin(admin.ModelAdmin):
     role_badge.short_description = "Role"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y %H:%M') if hasattr(obj, 'created_at') else "N/A"
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+        return "N/A"
     created_at_date.short_description = "Assigned"
     created_at_date.admin_order_field = 'created_at'
 
@@ -214,7 +219,9 @@ class AddressAdmin(admin.ModelAdmin):
     is_default_badge.short_description = "Default"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y') if hasattr(obj, 'created_at') else "N/A"
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+        return "N/A"
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 

@@ -463,3 +463,25 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
 }
+
+
+
+
+
+
+# ==============================================================================
+# PHASE 18: TIME ZONE & I18N CONFIGURATION (India Time)
+# ==============================================================================
+LANGUAGE_CODE = 'en-us'
+
+# ✅ India ka Timezone set kiya
+TIME_ZONE = 'Asia/Kolkata' 
+
+USE_I18N = True
+# ✅ Ise True rakhna zaroori hai taaki Django database me UTC save kare aur 
+# display karte waqt 'Asia/Kolkata' me convert kare
+USE_TZ = True 
+
+# ✅ Global Date-Time Format (Optional: Admin me default time format ke liye)
+DATETIME_FORMAT = 'd/m/Y H:i'
+DATE_FORMAT = 'd/m/Y'

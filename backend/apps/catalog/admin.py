@@ -6,6 +6,7 @@ from django.urls import path
 from django.contrib import admin
 from django.contrib import messages
 from django.utils.html import format_html
+from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Sum
 from .models import Product, Category, Brand, Banner, FlashSale
@@ -241,7 +242,9 @@ class ProductAdmin(admin.ModelAdmin):
     is_active_badge.short_description = "Status"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y')
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return localtime(obj.created_at).strftime('%d/%m/%Y')
+        return "N/A"
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
@@ -325,7 +328,9 @@ class CategoryAdmin(admin.ModelAdmin):
     product_count.short_description = "Products"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y') if hasattr(obj, 'created_at') else "N/A"
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return localtime(obj.created_at).strftime('%d/%m/%Y')
+        return "N/A"
     created_at_date.short_description = "Created"
 
     @admin.action(description='Activate selected categories')
@@ -385,7 +390,9 @@ class BrandAdmin(admin.ModelAdmin):
     product_count.short_description = "Products"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y') if hasattr(obj, 'created_at') else "N/A"
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return localtime(obj.created_at).strftime('%d/%m/%Y')
+        return "N/A"
     created_at_date.short_description = "Created"
 
     @admin.action(description='Activate selected brands')
@@ -432,7 +439,9 @@ class BannerAdmin(admin.ModelAdmin):
     is_active_badge.short_description = "Status"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y') if hasattr(obj, 'created_at') else "N/A"
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return localtime(obj.created_at).strftime('%d/%m/%Y')
+        return "N/A"
     created_at_date.short_description = "Created"
 
 

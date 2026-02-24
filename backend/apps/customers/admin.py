@@ -2,6 +2,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
+from django.utils.timezone import localtime
 from .models import CustomerProfile, CustomerAddress, SupportTicket
 from django.db import models
 from django.urls import reverse
@@ -100,7 +101,9 @@ class CustomerProfileAdmin(admin.ModelAdmin):
     support_tickets_count.short_description = "Support Tickets"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y %I:%M %p')
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+        return "N/A"
     created_at_date.short_description = "Joined Date"
     created_at_date.admin_order_field = 'created_at'
 
@@ -198,7 +201,9 @@ class CustomerAddressAdmin(admin.ModelAdmin):
     is_deleted_badge.short_description = "Status"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y %H:%M')
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+        return "N/A"
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
@@ -312,7 +317,9 @@ class SupportTicketAdmin(admin.ModelAdmin):
     description_preview.short_description = "Description"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y %H:%M')
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+        return "N/A"
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
