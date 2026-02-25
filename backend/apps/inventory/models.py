@@ -60,16 +60,27 @@ class InventoryItem(models.Model):
             raise ValidationError("Total stock cannot be less than reserved stock.")
 
     def save(self, *args, **kwargs):
-        # Sync with Catalog if details missing
-        if not self.product_name or self.price <= 0:
-            from apps.catalog.models import Product
-            product = Product.objects.filter(sku=self.sku).first()
-            if product:
-                if not self.product_name:
-                    self.product_name = product.name
-                if self.price <= 0:
-                    self.price = product.mrp
+        # Product details fetch karne ke liye import kiya
+        from apps.catalog.models import Product
+        
+        # Pehle hum SKU ke base par related product fetch karenge
+        product = Product.objects.filter(sku=self.sku).first()
+        
+        if product:
+            # Sync product name if missing
+            if not self.product_name:
+                self.product_name = product.name
+                
+            # Agar price 0 ya negative hai, toh seedha MRP laga do
+            if self.price <= 0:
+                self.price = product.mrp
+            # AUTO-CORRECTION LOGIC: 
+            # Agar inventory ki selling price product ke MRP se zyada hai,
+            # toh usko automatically reduce karke MRP ke barabar kar do.
+            elif self.price > product.mrp:
+                self.price = product.mrp
 
+        # Baaki ka default save behavior run karega
         super().save(*args, **kwargs)
 
     def __str__(self):
