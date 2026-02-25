@@ -68,18 +68,15 @@ window.SearchManager = {
 
     async fetchSuggestions(query) {
         try {
-            // Yahan dhyan rakhein, aapke code mein ApiService.get use ho raha tha, 
-            // agar API service globally set hai toh chalega, warna normal fetch best rehta hai.
-            // Main safe fetch use kar raha hu taki error na aaye.
+            // Yahan humne direct fetch ki jagah ApiService ka use kiya hai.
+            // Isme API_BASE_URL (http://127.0.0.1 ya production URL) auto-handle ho jayega.
+            const response = await window.ApiService.get(`/catalog/search/suggest/?q=${encodeURIComponent(query)}`);
             
-            const apiUrl = window.CONFIG?.API_URL || 'http://127.0.0.1:8000';
-            const response = await fetch(`${apiUrl}/api/catalog/search/suggest/?q=${encodeURIComponent(query)}`);
-            
-            if(response.ok) {
-                const res = await response.json();
-                this.renderSuggestions(res, query);
+            // ApiService response json return karta hai, toh hume res.json() karne ki zaroorat nahi.
+            if(response) {
+                this.renderSuggestions(response, query);
             } else {
-                throw new Error("API Response not ok");
+                 throw new Error("API Response not ok");
             }
             
         } catch (e) { 

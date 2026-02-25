@@ -168,8 +168,8 @@ async function addToCart() {
 // NEW CODE: Function to load and render recommended products
 async function loadRelatedProducts(mainProduct) {
     try {
-        // Fetch random/mixed 10 products from your catalog
-        const endpoint = `/catalog/products/?limit=10`;
+        // Yahan humne products/ ki jagah skus/ kar diya hai
+        const endpoint = `/catalog/skus/?limit=10`;
         const response = await window.ApiService.get(endpoint);
         
         // Handle pagination object if your API uses it (e.g. Django REST Framework)
@@ -218,6 +218,5 @@ async function loadRelatedProducts(mainProduct) {
         }
     } catch (error) {
         console.warn("Silent Fail: Related products could not be loaded", error);
-        // We use silent fail (no alert) so it doesn't interrupt the main product page experience
     }
 }
