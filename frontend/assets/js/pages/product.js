@@ -39,6 +39,9 @@ async function loadProduct(skuCode) {
 
         renderProduct(product);
 
+        // NEW CODE: Load related products in the background
+        loadRelatedProducts(product);
+
         // Show
         loader.classList.add('d-none');
         content.classList.remove('d-none');
@@ -159,5 +162,62 @@ async function addToCart() {
         if(window.Toast) window.Toast.error(e.message || "Failed to add to cart");
         btn.disabled = false;
         btn.innerHTML = originalText;
+    }
+}
+
+// NEW CODE: Function to load and render recommended products
+async function loadRelatedProducts(mainProduct) {
+    try {
+        // Fetch random/mixed 10 products from your catalog
+        const endpoint = `/catalog/products/?limit=10`;
+        const response = await window.ApiService.get(endpoint);
+        
+        // Handle pagination object if your API uses it (e.g. Django REST Framework)
+        let allProducts = response.results ? response.results : response;
+
+        if (!Array.isArray(allProducts)) return;
+
+        // Make sure we don't show the exact same product that user is currently viewing
+        let filteredProducts = allProducts.filter(p => p.sku !== mainProduct.sku && p.id !== mainProduct.id);
+        
+        // Take top 5 items for display
+        const productsToShow = filteredProducts.slice(0, 5);
+
+        const section = document.getElementById('related-products-section');
+        const grid = document.getElementById('related-products-grid');
+
+        if (productsToShow.length > 0 && section && grid) {
+            section.classList.remove('d-none'); // Unhide the container
+            
+            // Build and inject HTML for cards
+            grid.innerHTML = productsToShow.map(p => {
+                const finalPrice = p.sale_price || p.selling_price || p.price;
+                const imageSrc = p.image || p.image_url || 'https://via.placeholder.com/200';
+                
+                // Make sure window.Formatters works safely
+                const formattedPrice = window.Formatters ? window.Formatters.currency(finalPrice) : '₹' + finalPrice;
+                
+                return `
+                    <div class="related-card border rounded p-3 d-flex flex-column align-items-center" style="background:#fff; transition: transform 0.2s;">
+                        <img src="${imageSrc}" alt="${p.name}" style="width: 100%; height: 140px; object-fit: contain; cursor: pointer;" onclick="window.location.href='./product.html?code=${p.sku || p.id}'">
+                        <div class="mt-3 w-100 text-left">
+                            <div class="text-muted small mb-1">${p.unit || ''}</div>
+                            <h6 class="text-truncate mb-2" style="font-size: 1rem; cursor: pointer;" onclick="window.location.href='./product.html?code=${p.sku || p.id}'" title="${p.name}">${p.name}</h6>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong>${formattedPrice}</strong>
+                                ${p.available_stock > 0 ? 
+                                    `<button class="btn btn-sm btn-outline-primary" style="padding: 2px 10px;" onclick="window.location.href='./product.html?code=${p.sku || p.id}'">View</button>` 
+                                    : 
+                                    `<span class="badge bg-secondary text-white" style="font-size:0.7rem;">Out of Stock</span>`
+                                }
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    } catch (error) {
+        console.warn("Silent Fail: Related products could not be loaded", error);
+        // We use silent fail (no alert) so it doesn't interrupt the main product page experience
     }
 }
