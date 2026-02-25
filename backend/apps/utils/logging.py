@@ -1,4 +1,3 @@
-# apps/utils/logging.py
 import logging
 import json
 import re
@@ -9,7 +8,6 @@ class GDPRJsonFormatter(logging.Formatter):
     Safe for production log aggregation systems.
     """
     
-    # Regex patterns for sensitive data in strings
     SENSITIVE_PATTERNS = {
         r'"password":\s*".*?"': '"password": "***MASKED***"',
         r'"token":\s*".*?"': '"token": "***MASKED***"',
@@ -19,7 +17,6 @@ class GDPRJsonFormatter(logging.Formatter):
         r'"phone":\s*"\+?(\d{2,4})\d{6,}"': r'"phone": "\1******"',
     }
 
-    # Keys to scrub in dictionaries
     SENSITIVE_KEYS = {'password', 'token', 'access', 'refresh', 'credit_card', 'secret', 'key', 'otp'}
 
     def format(self, record):
@@ -33,19 +30,15 @@ class GDPRJsonFormatter(logging.Formatter):
             "correlation_id": getattr(record, "correlation_id", "N/A"),
         }
 
-        # 1. Structured Metadata Scrubbing
         if hasattr(record, "metadata") and isinstance(record.metadata, dict):
-            # Safe scrub with depth limit
             log_record["metadata"] = self._recursive_scrub(record.metadata)
 
         try:
             json_output = json.dumps(log_record)
         except (TypeError, ValueError):
-            # Fallback if metadata is not serializable
             log_record["metadata"] = str(getattr(record, "metadata", ""))
             json_output = json.dumps(log_record)
 
-        # 2. Regex PII Masking (Safety Net for stringified JSON)
         for pattern, replacement in self.SENSITIVE_PATTERNS.items():
             json_output = re.sub(pattern, replacement, json_output)
 

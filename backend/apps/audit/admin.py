@@ -1,4 +1,3 @@
-# apps/audit/admin.py
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.timezone import localtime
@@ -46,7 +45,6 @@ class AuditLogAdmin(admin.ModelAdmin):
     readonly_fields = ('action', 'reference_id', 'user', 'metadata', 'created_at')
 
     def action_badge(self, obj):
-        # Color coding based on action type
         action_colors = {
             'order_created': '#28a745',
             'order_cancelled': '#dc3545',
@@ -78,7 +76,6 @@ class AuditLogAdmin(admin.ModelAdmin):
 
     def metadata_preview(self, obj):
         if obj.metadata:
-            # Show a preview of the metadata
             preview = str(obj.metadata)
             return preview[:50] + "..." if len(preview) > 50 else preview
         return "N/A"
@@ -91,7 +88,6 @@ class AuditLogAdmin(admin.ModelAdmin):
     created_at_date.short_description = "Timestamp"
     created_at_date.admin_order_field = 'created_at'
 
-    # Completely Read-Only - No modifications allowed
     def has_add_permission(self, request):
         return False
 
@@ -101,7 +97,6 @@ class AuditLogAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         return False
 
-    # Override get_actions to remove bulk actions
     def get_actions(self, request):
         actions = super().get_actions(request)
         if 'delete_selected' in actions:

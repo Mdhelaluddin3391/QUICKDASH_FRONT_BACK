@@ -23,7 +23,6 @@ def health_check(request):
     }
     http_status = 200
 
-    # 1. Check Database (Critical)
     try:
         with connection.cursor() as cursor:
             cursor.execute("SELECT 1")
@@ -33,7 +32,6 @@ def health_check(request):
         status_data["services"]["db"] = "unreachable"
         return JsonResponse(status_data, status=503)
 
-    # 2. Check Redis (Critical)
     try:
         cache.set("health_ping", "pong", timeout=5)
         if cache.get("health_ping") != "pong":
@@ -44,15 +42,12 @@ def health_check(request):
         status_data["services"]["redis"] = "unreachable"
         return JsonResponse(status_data, status=503)
 
-    # 3. Check Celery Beat (Non-Critical for Liveness, Critical for Alerts)
-    # Don't fail the HTTP probe (503) just because Beat is slow, 
-    # otherwise K8s will restart the Web container unnecessarily.
+ 
     try:
         last_beat = cache.get("celery_beat_health")
         if last_beat is None:
             status_data["services"]["beat"] = "warming_up"
         else:
-            # If heartbeat is older than 90s, mark as stuck but keep HTTP 200
             if time.time() - float(last_beat) > 90:
                  status_data["services"]["beat"] = "stuck"
                  status_data["status"] = "degraded" 
@@ -71,7 +66,6 @@ class AppConfigAPIView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # Fetch dynamic config from Redis or Env
         maintenance_mode = cache.get("config:maintenance_mode", False)
         
         return Response({

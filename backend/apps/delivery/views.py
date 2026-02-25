@@ -1,4 +1,3 @@
-# apps/delivery/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
@@ -38,7 +37,6 @@ class AdminAssignDeliveryAPIView(APIView):
             )
 
         delivery = DeliveryService.assign_rider(order, rider, actor=request.user)
-        # --- DEBUG LOG ---
         print(f"--- [DEBUG] Admin Assigned Order #{order.id} ---")
         print(f"OTP: {delivery.otp}")
         print("---------------------------------------------")
@@ -98,7 +96,6 @@ class DeliveryCompleteAPIView(APIView):
         except Exception as e:
             logger.exception("Delivery Completion Failed")
             print(f"!!! SERVER ERROR: {str(e)} !!!")
-            # Return JSON error to frontend instead of 500 HTML
             return Response(
                 {"error": str(e), "detail": "Server Logic Error. Check logs."}, 
                 status=status.HTTP_400_BAD_REQUEST
@@ -212,7 +209,6 @@ class HandoverVerificationAPIView(APIView):
 
         order = get_object_or_404(Order, id=order_id)
         
-        # NOTE: 'packed' or 'assigned' depends on your flow. Usually 'packed'.
         if order.status not in ["packed", "confirmed"]: 
              return Response({"error": f"Order is {order.status}, not ready for handover"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -225,7 +221,6 @@ class HandoverVerificationAPIView(APIView):
             order.status = 'out_for_delivery'
             order.save()
             
-            # --- DEBUG LOG ---
             print(f"--- [DEBUG] Rider Picked Up Order #{order.id} ---")
             print(f"OTP for Delivery: {delivery.otp}")
             print("---------------------------------------------")

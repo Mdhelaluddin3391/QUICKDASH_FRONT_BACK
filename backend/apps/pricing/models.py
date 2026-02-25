@@ -1,4 +1,3 @@
-# apps/pricing/models.py
 from django.db import models
 from django.utils import timezone
 from apps.warehouse.models import Warehouse

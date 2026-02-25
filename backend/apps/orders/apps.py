@@ -5,5 +5,4 @@ class OrdersConfig(AppConfig):
     name = 'apps.orders'
 
     def ready(self):
-        # Ye line zaroori hai signals ko activate karne ke liye
         import apps.orders.signals

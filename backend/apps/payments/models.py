@@ -1,4 +1,3 @@
-# apps/payments/models.py
 from django.db import models
 from django.utils import timezone
 from apps.orders.models import Order

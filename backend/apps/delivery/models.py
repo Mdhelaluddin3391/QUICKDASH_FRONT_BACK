@@ -1,4 +1,3 @@
-# apps/delivery/models.py
 from django.db import models
 from django.utils import timezone
 from django.db.models import Q
@@ -39,10 +38,8 @@ class Delivery(models.Model):
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="assigned")
     otp = models.CharField(max_length=6)
 
-    # Stores S3 Key Path (e.g., "proofs/order_123_abc.jpg")
     proof_image = models.CharField(max_length=255, blank=True, null=True)
     
-    # Optional: Dispatch Bin for warehouse handover
     dispatch_location = models.CharField(max_length=50, blank=True)
 
     created_at = models.DateTimeField(default=timezone.now)
@@ -50,7 +47,6 @@ class Delivery(models.Model):
 
     class Meta:
         indexes = [
-            # High frequency "Is Rider Busy?" query
             models.Index(
                 fields=['rider', 'status'], 
                 name='active_rider_delivery_idx',

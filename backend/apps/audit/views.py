@@ -1,4 +1,3 @@
-# apps/audit/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
@@ -20,7 +19,6 @@ class AuditLogListAPIView(APIView):
     def get(self, request):
         qs = AuditLog.objects.select_related('user').all().order_by("-created_at")
 
-        # Optional Filtering
         ref_id = request.query_params.get('reference_id')
         if ref_id:
             qs = qs.filter(reference_id=ref_id)

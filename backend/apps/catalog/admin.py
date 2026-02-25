@@ -1,4 +1,3 @@
-# apps/catalog/admin.py
 import csv
 import io
 from django.shortcuts import render, redirect
@@ -14,13 +13,13 @@ import requests
 
 
 class ProductImageInline(admin.TabularInline):
-    model = None  # Placeholder - ProductImage model may not exist yet
+    model = None  
     extra = 1
     readonly_fields = ('uploaded_at',)
     fields = ('image', 'is_primary', 'alt_text')
 
     def has_add_permission(self, request, obj=None):
-        return False  # Disable until ProductImage model is created
+        return False 
 
     def has_delete_permission(self, request, obj=None):
         return False
@@ -30,12 +29,11 @@ class ProductImageInline(admin.TabularInline):
 class ProductAdmin(admin.ModelAdmin):
     change_list_template = "admin/catalog/product/change_list.html"
 
-    # ✅ 'image' ko list_display me add kiya
     list_display = (
         'name',
         'sku',
         'image_preview',
-        'image',  # <--- NAYA ADD KIYA
+        'image', 
         'category_name',
         'mrp',
         'stock_status',
@@ -58,8 +56,7 @@ class ProductAdmin(admin.ModelAdmin):
     list_select_related = ('category', 'brand')
     raw_id_fields = ('category', 'brand')
     
-    # ✅ 'image' ko list_editable me add kiya
-    list_editable = ('mrp', 'is_active', 'image') # <--- NAYA ADD KIYA
+    list_editable = ('mrp', 'is_active', 'image')
     list_per_page = 25
     actions = ['activate_products', 'deactivate_products', 'mark_featured', 'unmark_featured']
 
@@ -85,7 +82,6 @@ class ProductAdmin(admin.ModelAdmin):
 
     readonly_fields = ('created_at', 'image_preview')
 
-    # ✅ CSV IMPORT URL ADDING
     def get_urls(self):
         urls = super().get_urls()
         new_urls = [
@@ -93,8 +89,7 @@ class ProductAdmin(admin.ModelAdmin):
         ]
         return new_urls + urls
 
-    # ✅ CSV IMPORT LOGIC
-    # ✅ SMART CSV IMPORT LOGIC
+  
     def import_csv(self, request):
         if request.method == "POST":
             csv_file = request.FILES["csv_file"]
@@ -112,9 +107,8 @@ class ProductAdmin(admin.ModelAdmin):
             for row in reader:
                 sku_val = row.get('sku', '').strip()
                 if not sku_val:
-                    continue  # Agar sku nahi hai toh wo line skip kardo
+                    continue 
                 
-                # CSV se data nikalna (agar hai toh)
                 name_val = row.get('name', '').strip()
                 brand_name = row.get('brand', '').strip()
                 category_name = row.get('category', '').strip()
@@ -122,7 +116,6 @@ class ProductAdmin(admin.ModelAdmin):
                 desc_val = row.get('description', '').strip()
                 mrp_val = row.get('mrp', 0.00)
 
-                # 🔥 API MAGIC: Agar name khali hai, toh OpenFoodFacts API se fetch karo
                 if not name_val:
                     api_url = f"https://world.openfoodfacts.org/api/v0/product/{sku_val}.json"
                     try:
@@ -136,16 +129,14 @@ class ProductAdmin(admin.ModelAdmin):
                             image_val = product_data.get('image_front_url', '')
                             desc_val = product_data.get('ingredients_text', '') 
                             
-                            # API se Brand aur Category laao (agar CSV me nahi thi)
                             if not brand_name and product_data.get('brands'):
                                 brand_name = product_data.get('brands').split(',')[0].strip()
                                 
                             if not category_name and product_data.get('categories'):
                                 category_name = product_data.get('categories').split(',')[0].strip()
                     except Exception as e:
-                        pass # API down ho toh error throw na kare
+                        pass 
 
-                # Agar API se bhi naam nahi mila aur CSV me bhi nahi tha
                 if not name_val:
                     name_val = f"Unknown Product (SKU: {sku_val})"
 
@@ -153,13 +144,11 @@ class ProductAdmin(admin.ModelAdmin):
                     category_name = "Uncategorized"
 
                 try:
-                    # Category dhoondo ya banao
                     category_obj, _ = Category.objects.get_or_create(
                         name=category_name, 
                         defaults={'slug': category_name.lower().replace(" ", "-")}
                     )
 
-                    # Brand dhoondo ya banao
                     brand_obj = None
                     if brand_name:
                         brand_obj, _ = Brand.objects.get_or_create(
@@ -169,7 +158,6 @@ class ProductAdmin(admin.ModelAdmin):
 
                     is_active_val = str(row.get('is_active', 'TRUE')).strip().upper() == 'TRUE'
 
-                    # Product Update ya Create karo
                     obj, created = Product.objects.update_or_create(
                         sku=sku_val,
                         defaults={
@@ -214,7 +202,6 @@ class ProductAdmin(admin.ModelAdmin):
 
     def stock_status(self, obj):
         from apps.inventory.models import InventoryItem
-        # Sirf total stock nahi, reserved stock bhi get karein
         stock_data = InventoryItem.objects.filter(sku=obj.sku).aggregate(
             t_stock=Sum('total_stock'),
             r_stock=Sum('reserved_stock')
@@ -223,7 +210,6 @@ class ProductAdmin(admin.ModelAdmin):
         t_stock = stock_data['t_stock'] or 0
         r_stock = stock_data['r_stock'] or 0
         
-        # Real stock nikalne ke liye total me se reserved minus karein
         available_stock = t_stock - r_stock
 
         if available_stock > 10:
@@ -277,15 +263,13 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    # ✅ 'icon' ko list_display me add kiya
     list_display = ('name', 'icon_preview', 'icon', 'parent_name', 'is_active', 'product_count')
     list_filter = ('is_active', 'parent')
     search_fields = ('name', 'parent__name')
     list_select_related = ('parent',)
     raw_id_fields = ('parent',)
     
-    # ✅ 'icon' ko list_editable me add kiya
-    list_editable = ('is_active', 'icon')  # <--- NAYA ADD KIYA
+    list_editable = ('is_active', 'icon') 
     list_per_page = 25
     actions = ['activate_categories', 'deactivate_categories']
 
@@ -346,13 +330,11 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Brand)
 class BrandAdmin(admin.ModelAdmin):
-    # ✅ 'logo' ko list_display me add kiya
     list_display = ('name', 'logo_preview', 'logo', 'is_active', 'product_count')
     list_filter = ('is_active',)
     search_fields = ('name',)
     
-    # ✅ 'logo' ko list_editable me add kiya
-    list_editable = ('is_active', 'logo')  # <--- NAYA ADD KIYA
+    list_editable = ('is_active', 'logo') 
     list_per_page = 25
     actions = ['activate_brands', 'deactivate_brands']
 

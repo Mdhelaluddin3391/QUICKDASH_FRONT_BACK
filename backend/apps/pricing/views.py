@@ -1,7 +1,7 @@
 from rest_framework import generics
 from rest_framework.permissions import IsAdminUser
 from .models import SurgeRule
-from .serializers import SurgeRuleSerializer # Hame serializer bhi chahiye hoga
+from .serializers import SurgeRuleSerializer 
 
 class SurgeRuleListCreateAPIView(generics.ListCreateAPIView):
     """

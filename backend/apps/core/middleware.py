@@ -5,7 +5,7 @@ from django.utils.deprecation import MiddlewareMixin
 from django.http import JsonResponse
 from django.core.cache import cache
 from django.contrib.gis.geos import Point
-from django.conf import settings  # ✅ FIX: Settings import किया गया
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,6 @@ class LocationContextMiddleware(MiddlewareMixin):
         lng = request.headers.get('X-Location-Lng')
         address_id = request.headers.get('X-Address-ID')
 
-        # Strategy A: Address ID (L2)
         if address_id and request.user.is_authenticated:
             from apps.customers.models import CustomerAddress
             try:
@@ -74,7 +73,6 @@ class LocationContextMiddleware(MiddlewareMixin):
             except CustomerAddress.DoesNotExist:
                 pass 
 
-        # Strategy B: Raw GPS (L1)
         if lat and lng:
             try:
                 lat = float(lat)
@@ -87,7 +85,6 @@ class LocationContextMiddleware(MiddlewareMixin):
     def _resolve_warehouse(self, lat, lng):
         from apps.warehouse.models import Warehouse
         
-        # FIX: Increased precision to 5 decimals (~1.1 meters)
         cache_key = f"wh_poly_lookup_{round(lat, 5)}_{round(lng, 5)}"
         cached_wh_id = None
         try:
@@ -106,7 +103,6 @@ class LocationContextMiddleware(MiddlewareMixin):
 
         point = Point(float(lng), float(lat), srid=4326)
         
-        # Deterministic selection: order by id to ensure consistency
         warehouse = Warehouse.objects.filter(
             delivery_zone__contains=point,
             is_active=True
@@ -118,16 +114,12 @@ class LocationContextMiddleware(MiddlewareMixin):
             except Exception as e:
                 logger.warning(f"Redis cache set error: {e}")
             return warehouse
-        
-        # ✅ FIX: Development Fallback (isolated to DEBUG only)
-        # अगर लोकेशन किसी भी जोन में नहीं है, लेकिन DEBUG मोड ऑन है,
-        # तो पहला एक्टिव वेयरहाउस उठा लो।
+       
         if settings.DEBUG:
             fallback = Warehouse.objects.filter(is_active=True).order_by('id').first()
             if fallback:
-                # सिर्फ एक बार लॉग में दिखा दो कि फॉलबैक यूज हो रहा है
                 if not cache.get("warn_fallback_active"):
-                    logger.warning(f"⚠️ DEBUG MODE: Using Fallback Warehouse '{fallback.name}' because exact location match failed.")
+                    logger.warning(f"DEBUG MODE: Using Fallback Warehouse '{fallback.name}' because exact location match failed.")
                     try:
                         cache.set("warn_fallback_active", "1", timeout=60)
                     except Exception:

@@ -1,4 +1,3 @@
-# apps/notifications/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -9,22 +8,21 @@ from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from .models import Notification
 from .serializers import NotificationSerializer
-
-# Security: Use ipware to robustly determine client IP
-try:
-    from ipware import get_client_ip
-except ImportError:
-    def get_client_ip(request):
-        return request.META.get('REMOTE_ADDR'), False
-
-# apps/notifications/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.permissions import AllowAny
 from rest_framework import status
 from .services import OTPService
-# ... baaki imports wese hi rahenge
+
+
+try:
+    from ipware import get_client_ip
+except ImportError:
+    def get_client_ip(request):
+        return request.META.get('REMOTE_ADDR'), False
+
+
 
 class SendOTPAPIView(APIView):
     """
@@ -39,25 +37,20 @@ class SendOTPAPIView(APIView):
         if not phone:
             return Response({"error": "phone required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Bot Detection logic (same as before)
         client_ip, is_routable = get_client_ip(request)
         if not client_ip:
             client_ip = request.META.get('REMOTE_ADDR')
 
         try:
-            # OTP create karein
             otp = OTPService.create_and_send(phone, ip_address=client_ip)
             
-            # YAHAN CHANGE HAI:
-            # Hum bina kisi 'if settings.DEBUG' check ke 'debug_otp' bhej rahe hain.
-            # Isse Production (Debug=False) mein bhi Frontend ko OTP milega.
+           
             return Response({
                 "status": "otp_sent", 
                 "debug_otp": otp 
             })
             
         except Exception as exc:
-            # Error handling same as before
             from apps.utils.exceptions import BusinessLogicException
             if isinstance(exc, BusinessLogicException):
                 return Response({

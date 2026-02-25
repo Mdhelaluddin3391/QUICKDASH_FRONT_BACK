@@ -1,20 +1,17 @@
-# apps/inventory/serializers.py
 from rest_framework import serializers
 from .models import InventoryItem
 from .models import InventoryTransaction
 
 class InventoryItemSerializer(serializers.ModelSerializer):
-    # Calculated field from model property
     available_stock = serializers.IntegerField(read_only=True)
 
-    # Price is editable to allow warehouse-specific pricing overrides
     price = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
 
     class Meta:
         model = InventoryItem
         fields = (
             "id",
-            "warehouse", # Read from property/relation
+            "warehouse", 
             "sku",
             "product_name",
             "price",

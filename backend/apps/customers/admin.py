@@ -1,4 +1,3 @@
-# apps/customers/admin.py
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
@@ -11,7 +10,7 @@ from django.urls import reverse
 class CustomerAddressInline(admin.StackedInline):
     model = CustomerAddress
     extra = 0
-    classes = ('collapse',) # By default band rahega, click karke open kar sakte hain
+    classes = ('collapse',) 
     fields = ('label', 'address_summary_view', 'city', 'pincode', 'is_default')
     readonly_fields = ('address_summary_view',)
     can_delete = False
@@ -207,10 +206,8 @@ class CustomerAddressAdmin(admin.ModelAdmin):
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
-    # Admin Actions
     @admin.action(description='Mark selected addresses as default')
     def mark_as_default(self, request, queryset):
-        # Clear other defaults for the same customer
         for address in queryset:
             CustomerAddress.objects.filter(
                 customer=address.customer,
@@ -323,7 +320,6 @@ class SupportTicketAdmin(admin.ModelAdmin):
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
-    # Admin Actions
     @admin.action(description='Resolve selected tickets')
     def resolve_tickets(self, request, queryset):
         updated = queryset.filter(status='open').update(status='resolved')

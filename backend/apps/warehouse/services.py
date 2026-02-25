@@ -12,7 +12,6 @@ from apps.orders.models import Order
 from apps.inventory.models import InventoryItem, InventoryTransaction
 from apps.inventory.services import InventoryService
 from apps.utils.exceptions import BusinessLogicException
-# 1. Task Import किया गया है
 from apps.delivery.tasks import retry_auto_assign_rider
 import logging
 
@@ -37,7 +36,6 @@ class WarehouseService:
         except (ValueError, TypeError):
             return None
 
-        # 1. Check Cache (Precision: 5 decimal places)
         cache_key = f"wh_lookup_{round(lat, 5)}_{round(lng, 5)}"
         cached_id = None
         try:
@@ -54,16 +52,13 @@ class WarehouseService:
                 except Exception:
                     pass
 
-        # 2. DB Spatial Query
         point = Point(lng, lat, srid=4326)
         
-        # Priority: Strict Polygon Containment (Deterministic: order by id)
         warehouse = Warehouse.objects.filter(
             delivery_zone__contains=point,
             is_active=True
         ).order_by('id').first()
 
-        # 3. Cache & Return
         if warehouse:
             try:
                 cache.set(cache_key, warehouse.id, timeout=WarehouseService.CACHE_TIMEOUT)
@@ -79,9 +74,7 @@ class WarehouseService:
         Validates if user is strictly inside the warehouse zone.
         """
         if not warehouse.delivery_zone:
-            # If no zone is defined, we might fallback to radius logic externally,
-            # but for strict validation, we return False or check radius here.
-            # Assuming Strict Mode for Checkout:
+          
             return False 
             
         point = Point(float(lng), float(lat), srid=4326)
@@ -94,7 +87,6 @@ class WarehouseService:
         except (ValueError, TypeError):
             return None
 
-        # 1. Check Strict Polygon First (Priority)
         warehouse_qs = Warehouse.objects.filter(
             is_active=True,
             delivery_zone__contains=user_point
@@ -104,13 +96,9 @@ class WarehouseService:
         if warehouse:
             return warehouse
 
-        # ---------------------------------------------------------
-        # FIX: Allow Radius Fallback even if Polygon exists
-        # (Comment out or remove 'delivery_zone__isnull=True')
-        # ---------------------------------------------------------
+      
         
         if delivery_type == "express":
-            # Settings se radius lein ya default 5km karein
             radius_km = getattr(settings, "WAREHOUSE_DARK_STORE_RADIUS_KM", 5) 
             warehouse_type_filter = ["dark_store"]
         else:
@@ -121,7 +109,6 @@ class WarehouseService:
             is_active=True,
             warehouse_type__in=warehouse_type_filter,
             location__distance_lte=(user_point, D(km=radius_km)),
-            # delivery_zone__isnull=True  <-- IS LINE KO COMMENT KAR DEIN YA HATA DEIN
         )
 
         warehouse = fallback_qs.annotate(
@@ -190,12 +177,10 @@ class WarehouseOperationsService:
         task.status = "picked"; task.picker = picker_user; task.picked_at = timezone.now(); task.save()
         order = Order.objects.select_for_update().get(id=task.order_id)
         
-        # Check if all tasks are picked
         if PickingTask.objects.filter(order=order).exclude(status="picked").count() == 0:
             if order.status != "packed":
                 order.status = "packed"; order.save(update_fields=["status"])
                 
-                # 2. Update: Directly Call Auto Assign Task
                 transaction.on_commit(lambda: retry_auto_assign_rider.delay(order.id))
                 return "Order Packed & Rider Search Started"
         
@@ -213,11 +198,9 @@ class WarehouseOperationsService:
         task.is_completed = True; task.packer = user; task.save()
         order = task.order
         
-        # 3. Update: Status should be 'packed', NOT 'confirmed'
         order.status = "packed"
         order.save(update_fields=["status"])
         
-        # 4. Update: Trigger Rider Search
         transaction.on_commit(lambda: retry_auto_assign_rider.delay(order.id))
 
     @staticmethod

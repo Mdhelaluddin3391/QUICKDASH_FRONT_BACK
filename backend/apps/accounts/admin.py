@@ -6,17 +6,13 @@ from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
 from .models import User, UserRole, Address
 
-# --- 1. Custom Form Add karein OTP based users ke liye ---
 class CustomUserCreationForm(forms.ModelForm):
     class Meta:
         model = User
-        # Yahan sirf zaroori fields rakhein, password nahi
         fields = ('phone', 'first_name', 'last_name', 'email')
 
     def save(self, commit=True):
-        # User object banayein bina save kiye
         user = super().save(commit=False)
-        # Django ko batayein ki is user ka koi password nahi hai (OTP login hoga)
         user.set_unusable_password()
         if commit:
             user.save()
@@ -33,7 +29,6 @@ class UserRoleInline(admin.TabularInline):
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
-    # --- 2. Admin ko batayein ki naya Custom Form use karna hai ---
     add_form = CustomUserCreationForm
 
     list_display = (
@@ -61,10 +56,9 @@ class CustomUserAdmin(UserAdmin):
     actions = ['activate_users', 'deactivate_users', 'make_staff', 'remove_staff']
     inlines = [UserRoleInline]
 
-    # --- 3. Yahan se 'password' field ko hata dein ---
     fieldsets = (
         ('Authentication Info', {
-            'fields': ('phone',)  # Pehle yahan 'password' tha
+            'fields': ('phone',) 
         }),
         ('Personal Info', {
             'fields': ('first_name', 'last_name', 'email')
@@ -78,11 +72,10 @@ class CustomUserAdmin(UserAdmin):
         }),
     )
 
-    # --- 4. Yahan se 'password1', 'password2' fields ko hata dein ---
     add_fieldsets = (
         ('Authentication Info', {
             'classes': ('wide',),
-            'fields': ('phone',)  # Pehle yahan 'password1', 'password2' tha
+            'fields': ('phone',) 
         }),
         ('Personal Info', {
             'classes': ('wide',),

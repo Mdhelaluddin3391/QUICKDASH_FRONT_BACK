@@ -105,7 +105,6 @@ class DeliveryAdmin(admin.ModelAdmin):
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
-    # Admin Actions
     @admin.action(description='Assign rider (mark job as assigned)')
     def assign_rider(self, request, queryset):
         updated = queryset.filter(rider__isnull=False, job_status='searching').update(job_status='assigned')

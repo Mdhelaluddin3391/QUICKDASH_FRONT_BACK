@@ -86,7 +86,6 @@ class PaymentAdmin(admin.ModelAdmin):
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
-    # Admin Actions
     @admin.action(description='Mark selected payments as paid')
     def mark_as_paid(self, request, queryset):
         updated = queryset.filter(status='created').update(status='paid')
@@ -180,7 +179,6 @@ class RefundAdmin(admin.ModelAdmin):
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
-    # Admin Actions
     @admin.action(description='Process selected refunds')
     def process_refunds(self, request, queryset):
         updated = queryset.filter(status='initiated').update(status='processed')

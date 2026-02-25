@@ -1,4 +1,3 @@
-# apps/riders/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
@@ -6,7 +5,7 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from .models import RiderDocument
 from .serializers import RiderDocumentSerializer
-from apps.delivery.services import StorageService # Re-use S3 validation logic
+from apps.delivery.services import StorageService 
 from .models import RiderProfile
 from .serializers import (
     RiderProfileSerializer, 
@@ -50,7 +49,6 @@ class RiderAvailabilityAPIView(APIView):
         available = serializer.validated_data["is_available"]
         profile = request.user.rider_profile
         
-        # Service handles validation (e.g. blocking if active order exists)
         RiderService.set_availability(profile, available)
         
         return Response({
@@ -113,7 +111,6 @@ class RiderDocumentUploadAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # List uploaded docs
         if not hasattr(request.user, 'rider_profile'):
              return Response({"error": "Not a rider"}, status=403)
         
@@ -125,20 +122,19 @@ class RiderDocumentUploadAPIView(APIView):
              return Response({"error": "Not a rider"}, status=403)
 
         doc_type = request.data.get("doc_type")
-        file_key = request.data.get("file_key") # S3 Key from frontend upload
+        file_key = request.data.get("file_key") 
 
         if not doc_type or not file_key:
             return Response({"error": "Missing fields"}, status=400)
 
-        # Optional: Validate file exists in S3 using StorageService
-        # StorageService.validate_upload(file_key) 
+       
 
         doc, created = RiderDocument.objects.update_or_create(
             rider=request.user.rider_profile,
             doc_type=doc_type,
             defaults={
                 "file_key": file_key,
-                "status": "pending" # Reset status on new upload
+                "status": "pending"
             }
         )
         
@@ -182,9 +178,7 @@ class RiderLocationUpdateAPIView(APIView):
 
         if lat is not None and lng is not None:
             profile = request.user.rider_profile
-            
-            # Note: Double check your RiderProfile model to ensure these field names match. 
-            # They might be 'latitude'/'longitude' or 'current_lat'/'current_lng'.
+           
             profile.current_lat = lat  
             profile.current_lng = lng
             profile.save()

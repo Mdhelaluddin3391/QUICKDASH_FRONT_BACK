@@ -5,7 +5,6 @@ from rest_framework.response import Response
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
 
-# Imports clean kar diye gaye hain
 from apps.accounts.serializers import UserSerializer
 from apps.warehouse.services import WarehouseService
 from .models import SupportTicket, CustomerAddress, CustomerProfile
@@ -24,26 +23,21 @@ class CustomerAddressListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # FIX 1: 'updated_at' ko 'created_at' mein badla gaya hai taaki crash na ho.
-        # Yeh properly logged in user ke hi addresses layega!
+      
         return CustomerAddress.objects.filter(
             customer__user=self.request.user, 
             is_deleted=False
         ).order_by('-is_default', '-created_at')
 
     def perform_create(self, serializer):
-        # FIX 2: Direct access ki jagah service use ki hai, taaki agar profile na ho toh ban jaye.
         profile = CustomerService.get_or_create_profile(self.request.user)
         
-        # Agar naye address ko default set kiya hai, toh baaki sabko normal kar do
         if serializer.validated_data.get('is_default', False):
             CustomerAddress.objects.filter(customer=profile).update(is_default=False)
             
-        # Address ko strictly current user (profile) ke under hi save karo
         serializer.save(customer=profile)
 
     def create(self, request, *args, **kwargs):
-        # Custom Create to Validate Serviceability immediately
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         
@@ -73,11 +67,9 @@ class CustomerAddressDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # Yeh ensure karega ki user sirf apna hi address edit/delete kar sake
         return CustomerAddress.objects.filter(customer__user=self.request.user, is_deleted=False)
 
     def perform_destroy(self, instance):
-        # Soft Delete
         instance.is_deleted = True
         instance.save()
 

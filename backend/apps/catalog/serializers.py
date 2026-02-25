@@ -1,4 +1,3 @@
-# apps/catalog/serializers.py
 from rest_framework import serializers
 from decimal import Decimal
 from .models import Category, Product, Brand, Banner, FlashSale
@@ -54,7 +53,6 @@ class ProductSerializer(serializers.ModelSerializer):
     sale_price = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
     
-    # Allow null to prevent crashes if inventory is missing
     effective_price = serializers.DecimalField(
         max_digits=10, 
         decimal_places=2, 
@@ -201,12 +199,10 @@ class SimpleCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = ("id", "name", "slug", "icon_url", "parent", "is_active")
-        # fields = ['id', 'name', 'slug', 'icon', 'parent', 'is_active']
 
     def get_icon_url(self, obj):
         if not hasattr(obj, 'icon') or not obj.icon:
             return None
         if obj.icon.startswith('http'):
             return obj.icon
-        # Yahan SimpleCategorySerializer mein request use nahi hota uske old code ke according, isliye waisa hi simple rakha
         return obj.icon

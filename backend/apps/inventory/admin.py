@@ -11,15 +11,13 @@ from apps.catalog.models import Product
 
 @admin.register(InventoryItem)
 class InventoryItemAdmin(admin.ModelAdmin):
-    # ✅ JS File Link ki gayi hai taaki browser me SKU change detect ho sake
     class Media:
         js = ('inventory/js/sku_lookup.js',)
 
-    # ✅ 'price' ko list_display me add kiya gaya taaki bahar table me dikhe
     list_display = (
         'sku',
         'product_name',
-        'price', # <-- Naya Add kiya gaya: Inventory Price
+        'price', 
         'warehouse_name',
         'bin_location',
         'total_stock',
@@ -40,7 +38,6 @@ class InventoryItemAdmin(admin.ModelAdmin):
         'bin__bin_code',
         'bin__rack__number'
     )
-    # Optimized to prevent N+1 queries
     list_select_related = (
         'bin', 
         'bin__rack', 
@@ -51,11 +48,9 @@ class InventoryItemAdmin(admin.ModelAdmin):
     raw_id_fields = ('bin',)
     list_per_page = 25
     
-    # ✅ 'price' ko list_editable me bhi add kiya, taaki bahar table se hi direct edit kar sakein
     list_editable = ('total_stock', 'reserved_stock', 'price')
     actions = ['mark_low_stock', 'clear_reservations', 'update_from_catalog']
 
-    # ✅ 'product_mrp_display' (Read-only) aur 'price' (Editable) dono add kiye gaye
     fieldsets = (
         ('Product Information', {
             'fields': ('bin', 'sku', 'product_name', 'product_mrp_display', 'price')
@@ -69,10 +64,8 @@ class InventoryItemAdmin(admin.ModelAdmin):
         }),
     )
 
-    # ✅ 'product_mrp_display' ko readonly field banaya
     readonly_fields = ('updated_at', 'product_mrp_display')
 
-    # ✅ Custom URL add kiya taaki JS ispe request bhej sake
     def get_urls(self):
         urls = super().get_urls()
         my_urls = [
@@ -80,22 +73,19 @@ class InventoryItemAdmin(admin.ModelAdmin):
         ]
         return my_urls + urls
 
-    # ✅ Backend logic jo Catalog me SKU dhundega
     def lookup_product_data(self, request):
         sku = request.GET.get('sku')
         data = {'found': False}
         if sku:
-            # Case-insensitive search
             product = Product.objects.filter(sku__iexact=sku).first()
             if product:
                 data = {
                     'found': True,
                     'name': product.name,
-                    'price': str(product.mrp) # Decimal ko string banaya JSON ke liye
+                    'price': str(product.mrp) 
                 }
         return JsonResponse(data)
 
-    # ✅ NAYA CODE: Catalog se MRP nikal kar sirf dikhane (Read-only) ke liye function
     def product_mrp_display(self, obj):
         if obj and obj.sku:
             product = Product.objects.filter(sku__iexact=obj.sku).first()
@@ -104,7 +94,6 @@ class InventoryItemAdmin(admin.ModelAdmin):
         return "Not Found in Catalog"
     product_mrp_display.short_description = "Product Base MRP (Read Only)"
 
-    # --- Niche ka sara code wahi purana hai ---
 
     def warehouse_name(self, obj):
         return obj.warehouse.name
@@ -112,7 +101,6 @@ class InventoryItemAdmin(admin.ModelAdmin):
     warehouse_name.admin_order_field = 'bin__rack__aisle__zone__warehouse__name'
 
     def bin_location(self, obj):
-        # FIXED: uses .number for both Aisle and Rack based on your warehouse/models.py
         return f"{obj.bin.rack.aisle.zone.name} - A{obj.bin.rack.aisle.number} - R{obj.bin.rack.number} - B{obj.bin.bin_code}"
     bin_location.short_description = "Bin Location"
 
@@ -152,7 +140,6 @@ class InventoryItemAdmin(admin.ModelAdmin):
     updated_at_date.short_description = "Updated"
     updated_at_date.admin_order_field = 'updated_at'
 
-    # Admin Actions
     @admin.action(description='Mark selected items as low stock (set reserved to total)')
     def mark_low_stock(self, request, queryset):
         updated = queryset.update(reserved_stock=models.F('total_stock'))

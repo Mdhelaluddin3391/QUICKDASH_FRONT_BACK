@@ -1,4 +1,3 @@
-# apps/orders/serializers.py
 from rest_framework import serializers
 from decimal import Decimal
 from .models import Order, OrderItem, Cart, CartItem
@@ -16,7 +15,6 @@ class CartItemSerializer(serializers.ModelSerializer):
         model = CartItem
         fields = ('id', 'sku_code', 'sku_name','product_name', 'quantity', 'price', 'total_price', 'image')
 
-    # ✅ FIXED: Removed .url and added check for External vs Local links
     def get_image(self, obj):
         p = Product.objects.filter(sku=obj.sku.sku).first()
         if not p or not p.image:
@@ -31,10 +29,8 @@ class CartItemSerializer(serializers.ModelSerializer):
             
         return p.image
 
-# Apne purane CartSerializer ko isse REPLACE karein:
 class CartSerializer(serializers.ModelSerializer):
     items = CartItemSerializer(many=True, read_only=True)
-    # Nayi fields jo api me aayengi
     delivery_fee = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     final_total = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     
@@ -51,7 +47,6 @@ class OrderItemSerializer(serializers.ModelSerializer):
         model = OrderItem
         fields = ("sku", "product_name", "sku_name", "quantity", "price", "total_price", "sku_image")
 
-    # ✅ FIXED: Removed .url and added check for External vs Local links
     def get_sku_image(self, obj):
         product = Product.objects.filter(sku=obj.sku).first()
         if not product or not product.image:
@@ -98,7 +93,6 @@ class OrderSerializer(serializers.ModelSerializer):
         )
 
     def get_delivery_otp(self, obj):
-        # Sirf tab dikhaye jab Delivery assign ho chuki ho
         if hasattr(obj, 'delivery') and obj.delivery:
             return obj.delivery.otp
         return None
@@ -131,18 +125,14 @@ class OrderListSerializer(serializers.ModelSerializer):
         return obj.items.count()
 
 class CreateOrderSerializer(serializers.Serializer):
-    # ✅ यहाँ PAYMENT_METHOD_CHOICES का सही इस्तेमाल किया गया है
     payment_method = serializers.ChoiceField(choices=Order.PAYMENT_METHOD_CHOICES, default="COD")
     
-    # Address ID required for delivery validation
     delivery_address_id = serializers.IntegerField(required=True)
     
-    # total_amount validation
     total_amount = serializers.DecimalField(max_digits=10, decimal_places=2) 
     
     delivery_type = serializers.ChoiceField(choices=Order.DELIVERY_TYPE_CHOICES, default="express")
     
-    # Optional Items (if not using Cart)
     items = serializers.ListField(child=serializers.DictField(), required=False, allow_null=True)
     
     max_accepted_amount = serializers.DecimalField(

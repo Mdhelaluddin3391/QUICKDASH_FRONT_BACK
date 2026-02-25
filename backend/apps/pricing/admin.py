@@ -1,4 +1,3 @@
-# apps/pricing/admin.py
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.timezone import localtime
@@ -56,8 +55,7 @@ class SurgeRuleAdmin(admin.ModelAdmin):
     base_factor_display.admin_order_field = 'base_factor'
 
     def current_surge_status(self, obj):
-        # This is a placeholder - in a real implementation, you'd calculate
-        # current surge based on demand, time, etc.
+      
         return format_html('<span style="color: green;">Normal (1.0x)</span>')
     current_surge_status.short_description = "Current Surge"
 

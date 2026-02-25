@@ -1,4 +1,3 @@
-# apps/utils/throttling.py (Conceptual)
 
 def check_throttle(user_key, limit=5, period=60):
     """

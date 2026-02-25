@@ -1,4 +1,3 @@
-# apps/core/tasks.py
 import logging
 import redis
 from celery import shared_task
@@ -27,7 +26,6 @@ def reconcile_inventory_redis_db():
 
     inventory_set_key = "active_inventory_keys"
     
-    # Use SSCAN to iterate safely without blocking Redis in production
     for key in r.sscan_iter(inventory_set_key, count=100):
         try:
             key_str = str(key)
@@ -36,21 +34,17 @@ def reconcile_inventory_redis_db():
                 r.srem(inventory_set_key, key)
                 continue
                 
-            # Extract Warehouse ID and SKU from key format: inventory:{wh_1}:SKU-123
             warehouse_id = parts[1].replace('{wh_', '').replace('}', '')
             sku = parts[2]
             
-            # DB Lookup with optimized query
             item = InventoryItem.objects.filter(
                 sku=sku,
                 bin__rack__aisle__zone__warehouse_id=warehouse_id
             ).first()
             
             if item:
-                # Force Sync: Overwrite Redis with fresh DB available_stock
                 InventoryService._sync_redis_stock(item.id)
             else:
-                # Cleanup zombie keys in Redis
                 r.delete(key_str)
                 r.srem(inventory_set_key, key)
                 
@@ -64,11 +58,9 @@ def monitor_stuck_orders():
     """
     limit = timezone.now() - timedelta(minutes=10)
     
-    # Check 1: Stuck in Warehouse
     stuck_picking = Order.objects.filter(status="picking", updated_at__lt=limit).count()
     stuck_packing = Order.objects.filter(status="packed", updated_at__lt=limit).count()
     
-    # Check 2: Stuck finding a rider
     stuck_searching = Order.objects.filter(
         delivery__job_status="searching", 
         updated_at__lt=limit

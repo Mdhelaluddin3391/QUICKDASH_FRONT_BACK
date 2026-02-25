@@ -1,4 +1,3 @@
-# apps/customers/services.py
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
@@ -16,7 +15,6 @@ class CustomerService:
         from apps.orders.models import Order
         order_id = data.get("order_id")
         
-        # Validation: User must own the order
         order = get_object_or_404(Order, id=order_id, user=user)
         
         return SupportTicket.objects.create(
@@ -36,7 +34,6 @@ class CustomerService:
     def add_address(user: User, data: dict) -> CustomerAddress:
         profile = CustomerService.get_or_create_profile(user)
 
-        # Logic: If this is the first active address, force it to be default
         has_active_addresses = profile.addresses.filter(is_deleted=False).exists()
         is_default = data.get("is_default", False)
 
@@ -44,7 +41,6 @@ class CustomerService:
             is_default = True
 
         if is_default:
-            # Unset previous default
             CustomerAddress.objects.filter(
                 customer=profile,
                 is_deleted=False,
@@ -65,13 +61,11 @@ class CustomerService:
     def set_default_address(user: User, address_id: int):
         profile = CustomerService.get_or_create_profile(user)
 
-        # 1. Unset all defaults
         CustomerAddress.objects.filter(
             customer=profile,
             is_deleted=False
         ).update(is_default=False)
 
-        # 2. Set new default
         address = get_object_or_404(
             CustomerAddress,
             id=address_id,
@@ -100,5 +94,4 @@ class CustomerService:
         address.is_default = False
         address.save()
         
-        # If we deleted the default, should we auto-promote another?
-        # For now, we leave it to the user to pick a new one, or the frontend to prompt.
+     

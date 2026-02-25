@@ -45,11 +45,9 @@ class OrderService:
         Wrapper for create_order_after_reservation for backward compatibility.
         """
         if address_id is None:
-            # Find or create a default address
             from apps.customers.models import CustomerAddress, CustomerProfile
             address = CustomerAddress.objects.filter(customer__user=user, is_deleted=False).first()
             if not address:
-                # Create a dummy address
                 customer, _ = CustomerProfile.objects.get_or_create(user=user)
                 address = CustomerAddress.objects.create(
                     customer=customer,
@@ -64,7 +62,6 @@ class OrderService:
         if payment_method is None:
             payment_method = "cash"
         
-        # Reserve inventory
         InventoryService.bulk_lock_and_reserve(
             warehouse_id=warehouse.id,
             items_dict={i['sku']: i['quantity'] for i in items},
@@ -87,7 +84,6 @@ class OrderService:
         Creates Order. 
         Validation Order: Abuse -> Ownership -> GeoFence -> Inventory -> Surge -> Save.
         """
-        # 1. Abuse Check (Fail Fast)
         try:
             OrderAbuseService.check(user)
         except ValidationError as e:
@@ -96,13 +92,11 @@ class OrderService:
 
         warehouse = get_object_or_404(Warehouse, id=warehouse_id)
 
-        # 2. Address Ownership
         try:
             address = CustomerAddress.objects.get(id=address_id, customer__user=user, is_deleted=False)
         except CustomerAddress.DoesNotExist:
             raise BusinessLogicException("Invalid delivery address.", code="invalid_address")
 
-        # 3. Geo-Fencing (Final Gatekeeper)
         try:
             address_point = Point(float(address.longitude), float(address.latitude), srid=4326)
         except (ValueError, TypeError):
@@ -118,7 +112,6 @@ class OrderService:
             logger.warning(f"GeoFence Rejection: User={user.id} Addr={address.id} WH={warehouse.code}")
             raise BusinessLogicException("Address outside delivery area.", code="location_out_of_zone")
 
-        # 4. Create Order Object
         address_snapshot = {
             "id": address.id,
             "full_address": address.google_address_text or f"{address.house_no}, {address.apartment_name}",
@@ -133,7 +126,6 @@ class OrderService:
             delivery_address_json=address_snapshot, payment_method=payment_method,
         )
 
-        # 5. Process Items
         total = Decimal("0.00")
         skus = [item["sku"] for item in items_data]
         inventory_map = {inv.sku: inv for inv in InventoryItem.objects.filter(
@@ -153,7 +145,6 @@ class OrderService:
             )
             total += inventory.price * qty
 
-        # 6. Pricing & Save (DYNAMIC FEE LOGIC)
         surge_multiplier = SurgePricingService.calculate(order)
         
         from apps.orders.models import OrderConfiguration
@@ -187,7 +178,6 @@ class OrderService:
 
         order.status = "cancelled"; order.save(update_fields=["status", "updated_at"])
 
-        # Release Inventory
         for order_item in order.items.all():
             inv = InventoryItem.objects.filter(sku=order_item.sku, bin__rack__aisle__zone__warehouse=order.warehouse).first()
             if inv: InventoryService.release_stock(inv.id, order_item.quantity, f"cancel:{order.id}")
@@ -201,7 +191,6 @@ class OrderService:
         transaction.on_commit(lambda: OrderService._broadcast_status(order))
 
 class OrderSimulationService:
-    # (Kept as is - useful for testing/demo)
     @staticmethod
     def _get_or_create_bot_user():
         u, _ = User.objects.get_or_create(email="ops-bot@quickdash.com", defaults={"first_name": "Bot", "is_active": True})

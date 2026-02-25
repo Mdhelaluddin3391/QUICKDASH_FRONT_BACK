@@ -1,4 +1,3 @@
-# apps/audit/services.py
 from django.utils import timezone
 from .models import AuditLog
 
@@ -18,7 +17,6 @@ class AuditService:
             created_at=timezone.now()
         )
 
-    # --- Domain Specific Helpers ---
 
     @staticmethod
     def order_created(order):

@@ -1,4 +1,3 @@
-# apps/payments/views.py
 import logging
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -28,10 +27,8 @@ class CreatePaymentAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, order_id):
-        # 1. Validation: Ensure Order belongs to User and is in valid state
         order = get_object_or_404(Order, id=order_id, user=request.user)
 
-        # Check if order is already paid to prevent double payment
         if order.payment_status == 'PAID':
              return Response(
                  {"error": "Order is already paid"}, 
@@ -44,18 +41,16 @@ class CreatePaymentAPIView(APIView):
                  status=status.HTTP_400_BAD_REQUEST
              )
 
-        # 2. Create Payment Intent via Service
         try:
             payment = PaymentService.create_payment(order)
             
-            # 3. Return Config for Frontend SDK
             return Response({
                 "id": payment.provider_order_id,
                 "amount": int(payment.amount * 100),
                 "currency": "INR",
                 "key": settings.RAZORPAY_KEY_ID,
-                "name": "QuickDash",           # Added for UI
-                "description": f"Order #{order.id}" # Added for UI
+                "name": "QuickDash",           
+                "description": f"Order #{order.id}" 
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
@@ -83,9 +78,7 @@ class RazorpayVerifyAPIView(APIView):
         except Payment.DoesNotExist:
             return Response({"error": "Invalid Order ID"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # [SECURITY LOGIC 3] Signature Verification
-        # Hum frontend ke status par vishwas nahi karte. 
-        # Hum Razorpay ke secret key se signature match karte hain.
+        
         try:
             client.utility.verify_payment_signature({
                 'razorpay_order_id': order_id,
@@ -96,7 +89,6 @@ class RazorpayVerifyAPIView(APIView):
             PaymentService.mark_failed(payment)
             return Response({"error": "Payment Signature Verification Failed! Transaction may be fake."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Mark Success in DB
         PaymentService.mark_paid(
             payment.id,
             provider_payment_id=payment_id,

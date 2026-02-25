@@ -1,4 +1,3 @@
-# apps/notifications/tasks.py
 import requests
 from celery import shared_task
 from celery.utils.log import get_task_logger
@@ -10,7 +9,7 @@ logger = get_task_logger(__name__)
     bind=True, 
     max_retries=3, 
     default_retry_delay=5, 
-    queue='high_priority' # Critical for User Experience
+    queue='high_priority' 
 )
 def send_otp_sms(self, phone, content):
     """
@@ -19,7 +18,6 @@ def send_otp_sms(self, phone, content):
     sms_key = getattr(settings, "SMS_PROVIDER_KEY", None)
     sms_url = getattr(settings, "SMS_PROVIDER_URL", None)
 
-    # 1. Dev Mode Bypass
     if settings.DEBUG:
         
         return "Dev Sent"
@@ -29,7 +27,6 @@ def send_otp_sms(self, phone, content):
         return "Config Missing"
 
     try:
-        # 2. Call Provider
         response = requests.post(
             sms_url,
             json={

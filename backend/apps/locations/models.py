@@ -1,4 +1,3 @@
-# apps/locations/models.py
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -18,10 +17,9 @@ class GeoLocation(models.Model):
         blank=True,
     )
 
-    label = models.CharField(max_length=50, blank=True)  # e.g. "Pinned Location"
+    label = models.CharField(max_length=50, blank=True)  
     address_text = models.TextField()
 
-    # Precision: 6 decimal places (~11cm)
     latitude = models.DecimalField(max_digits=9, decimal_places=6)
     longitude = models.DecimalField(max_digits=9, decimal_places=6)
 

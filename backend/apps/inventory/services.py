@@ -6,11 +6,10 @@ from django.db.models import F
 from django.core.exceptions import ValidationError
 from .models import InventoryItem, InventoryTransaction
 from apps.utils.exceptions import BusinessLogicException
-from django.db import models # Added missing import
+from django.db import models 
 
 logger = logging.getLogger(__name__)
 
-# Initialize Redis connection safely
 try:
     r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
 except Exception as e:
@@ -18,10 +17,9 @@ except Exception as e:
     r = None
 
 class InventoryService:
-    INVENTORY_TTL = 3600  # 1 Hour
-    REDIS_CIRCUIT_TIMEOUT = 30  # seconds
+    INVENTORY_TTL = 3600 
+    REDIS_CIRCUIT_TIMEOUT = 30  
     
-    # Lua Script Return Codes
     LUA_SUCCESS = 1
     LUA_STOCK_OUT = 0
     LUA_MISSING_KEY = -1
@@ -42,7 +40,6 @@ class InventoryService:
         Quick read-only check (Non-locking). 
         Used for UI display (Cart validation).
         """
-        # We sum up available stock across all bins in the warehouse for this product
         inventory = InventoryItem.objects.filter(
             product_id=product_id,
             bin__rack__aisle__zone__warehouse_id=warehouse_id
@@ -63,12 +60,10 @@ class InventoryService:
         3. If Stock Out -> Fast Fail.
         """
         if InventoryService._redis_circuit_open() or not r:
-            # Fallback if Redis is down: Direct DB Lock (slower but safe)
             return InventoryService._reserve_stock_db_fallback(sku, warehouse_id, quantity)
 
         key = InventoryService._get_cache_key(warehouse_id, sku)
         
-        # Atomically check and decrement
         lua_script = """
         if redis.call("exists", KEYS[1]) == 0 then
             return -1 -- Missing Key
@@ -99,11 +94,9 @@ class InventoryService:
             raise BusinessLogicException(f"Out of stock: {sku}", code="stock_out")
 
         if result == InventoryService.LUA_MISSING_KEY:
-            # Cache Miss: Rehydrate from DB
             logger.info(f"Cache Miss: {sku} (WH: {warehouse_id})")
             InventoryService._hydrate_cache(sku, warehouse_id)
             
-            # Retry Recursively (Once)
             return InventoryService.reserve_stock_cached(sku, warehouse_id, quantity)
 
         return False
@@ -115,7 +108,6 @@ class InventoryService:
         """
         from django.db import connection
         with transaction.atomic():
-            # Set lock timeout to prevent indefinite waits
             with connection.cursor() as cursor:
                 cursor.execute("SET LOCAL lock_timeout = '10s'")
             item = InventoryItem.objects.select_for_update().filter(
@@ -151,15 +143,12 @@ class InventoryService:
         for sku, qty_needed in items_dict.items():
             success = InventoryService.reserve_stock_cached(sku, warehouse_id, qty_needed)
             if not success:
-                # Rollback previous reservations
                 for prev_item in reserved_items:
                     InventoryService.rollback_redis_stock(prev_item.sku, warehouse_id, prev_item.qty)
                 raise BusinessLogicException(f"Insufficient stock for {sku}", code="stock_out")
             
-            # Track for rollback if needed
             reserved_items.append(type('obj', (object,), {'sku': sku, 'qty': qty_needed})())
         
-        # If all succeeded, commit to DB
         for sku, qty_needed in items_dict.items():
             item = InventoryItem.objects.select_for_update().filter(
                 sku=sku, 
@@ -167,13 +156,11 @@ class InventoryService:
             ).first()
             
             if not item or item.available_stock < qty_needed:
-                # This shouldn't happen if Redis is consistent, but safety check
                 raise BusinessLogicException(f"DB inconsistency for {sku}", code="stock_out")
             
             item.reserved_stock = F("reserved_stock") + qty_needed
             item.save(update_fields=["reserved_stock"])
             
-            # Audit Log
             InventoryTransaction.objects.create(
                 inventory_item=item,
                 transaction_type="reserve",
@@ -205,7 +192,6 @@ class InventoryService:
         """
         skus = list(items_dict.keys())
         
-        # 1. Fetch IDs for locking
         candidates = InventoryItem.objects.filter(
             bin__rack__aisle__zone__warehouse_id=warehouse_id,
             sku__in=skus
@@ -213,21 +199,17 @@ class InventoryService:
         
         sku_to_id = {item["sku"]: item["id"] for item in candidates}
         
-        # Validate existence
         missing = set(skus) - set(sku_to_id.keys())
         if missing:
             raise BusinessLogicException(f"Items not found: {', '.join(missing)}")
 
-        # 2. Sort IDs to enforce lock ordering (Avoid Deadlocks)
         sorted_ids = sorted(sku_to_id.values())
 
-        # 3. Acquire Pessimistic Locks
         locked_items = list(InventoryItem.objects.select_for_update().filter(id__in=sorted_ids))
         item_map = {item.id: item for item in locked_items}
         
         reserved_items = []
 
-        # 4. Process
         for item_id in sorted_ids:
             item = item_map[item_id]
             qty_needed = items_dict[item.sku]
@@ -238,11 +220,9 @@ class InventoryService:
                     code="stock_out"
                 )
 
-            # DB Update
             item.reserved_stock = F("reserved_stock") + qty_needed
             item.save(update_fields=["reserved_stock"])
             
-            # Audit Log
             InventoryTransaction.objects.create(
                 inventory_item=item,
                 transaction_type="reserve",
@@ -251,7 +231,6 @@ class InventoryService:
             )
             reserved_items.append(item)
 
-        # 5. Sync Redis (Async)
         def _sync_cache():
             for item in reserved_items:
                 InventoryService._sync_redis_stock(item.id)
@@ -280,7 +259,6 @@ class InventoryService:
     @staticmethod
     @transaction.atomic
     def release_stock(item_id: int, quantity: int, reference: str = ""):
-        # Lock required
         item = InventoryItem.objects.select_for_update().get(id=item_id)
         
         release_qty = min(item.reserved_stock, quantity)
@@ -330,7 +308,6 @@ class InventoryService:
         delta = new_total - item.total_stock
         
         item.total_stock = new_total
-        # Safety: Reserved can't exceed Total
         if item.total_stock < item.reserved_stock:
              item.reserved_stock = item.total_stock
 

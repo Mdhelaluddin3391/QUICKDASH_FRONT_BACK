@@ -1,4 +1,3 @@
-# apps/notifications/admin.py
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.timezone import localtime
@@ -37,14 +36,14 @@ class PhoneOTPAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at',)
 
     def otp_masked(self, obj):
-        return "●●●●●●"  # Mask the OTP for security
+        return "●●●●●●" 
     otp_masked.short_description = "OTP"
 
     def is_verified_badge(self, obj):
         if obj.is_verified:
             return format_html('<span style="color: green; font-weight: bold;">✓ Verified</span>')
         else:
-            return format_html('<span style="color: orange;">⏳ Pending</span>')
+            return format_html('<span style="color: orange;"> Pending</span>')
     is_verified_badge.short_description = "Status"
 
     def is_expired_badge(self, obj):
@@ -61,7 +60,6 @@ class PhoneOTPAdmin(admin.ModelAdmin):
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
-    # Admin Actions
     @admin.action(description='Mark selected OTPs as verified')
     def mark_verified(self, request, queryset):
         updated = queryset.filter(is_verified=False).update(is_verified=True)

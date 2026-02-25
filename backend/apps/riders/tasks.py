@@ -5,6 +5,8 @@ from .models import RiderProfile
 from .services import RiderService
 import logging
 
+
+
 logger = logging.getLogger(__name__)
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
@@ -14,7 +16,6 @@ def generate_single_rider_payout(self, rider_id):
     Uses retries for transient database failures.
     """
     try:
-        # Re-fetch inside task
         rider = RiderProfile.objects.get(id=rider_id)
         with transaction.atomic():
             payout = RiderService.generate_payout(rider)
@@ -26,8 +27,6 @@ def generate_single_rider_payout(self, rider_id):
         return False
     except Exception as e:
         logger.error(f"Error generating payout for rider {rider_id}: {e}")
-        # Retry logic: Exponential Backoff likely handled by Celery config, 
-        # but here we ensure transient errors (DB locks) don't just vanish.
         raise self.retry(exc=e)
 
 @shared_task
@@ -38,14 +37,12 @@ def process_daily_payouts():
     """
     logger.info("Starting Daily Payout Processing...")
     
-    # Identify candidates
     riders_ids = RiderProfile.objects.filter(
         earnings__payout__isnull=True
     ).values_list('id', flat=True).distinct()
 
     count = 0
     for rider_id in riders_ids:
-        # Async dispatch
         generate_single_rider_payout.delay(rider_id)
         count += 1
 
@@ -53,13 +50,7 @@ def process_daily_payouts():
     return f"Queued {count} tasks"
 
 
-from celery import shared_task
-from django.db import transaction
-from .models import RiderProfile
-from .services import RiderService
-import logging
 
-logger = logging.getLogger(__name__)
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def generate_single_rider_payout(self, rider_id):
@@ -68,7 +59,6 @@ def generate_single_rider_payout(self, rider_id):
     """
     try:
         rider = RiderProfile.objects.get(id=rider_id)
-        # Using Service to handle locking and aggregation
         payout = RiderService.generate_payout(rider)
         if payout:
             logger.info(f"Generated Payout #{payout.id} for Rider {rider.user.phone} - Amount: {payout.amount}")
@@ -89,7 +79,6 @@ def process_daily_payouts():
     """
     logger.info("Starting Daily Payout Processing...")
     
-    # Identify riders with at least one unpaid earning
     riders_ids = RiderProfile.objects.filter(
         earnings__payout__isnull=True
     ).values_list('id', flat=True).distinct()

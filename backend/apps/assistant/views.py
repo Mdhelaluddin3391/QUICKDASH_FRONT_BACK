@@ -1,4 +1,3 @@
-# apps/assistant/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.throttling import UserRateThrottle
@@ -22,7 +21,6 @@ class AIShoppingAssistantView(APIView):
         if not user_query:
             return Response({"error": "Query required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 1. GREETINGS LOGIC (Basic chat intelligence)
         greetings = ['hi', 'hello', 'hey', 'help', 'namaste']
         if user_query in greetings:
             return Response({
@@ -30,7 +28,6 @@ class AIShoppingAssistantView(APIView):
                 "action": None
             })
 
-        # 2. ORDER TRACKING LOGIC
         if any(word in user_query for word in ['order', 'track', 'status', 'kahan', 'delivery']):
             latest_order = Order.objects.filter(
                 user=request.user
@@ -51,7 +48,6 @@ class AIShoppingAssistantView(APIView):
                     "params": {}
                 })
 
-        # 3. PRODUCT SEARCH LOGIC
         try:
             products = Product.objects.filter(
                 Q(name__icontains=user_query) | 
@@ -68,8 +64,7 @@ class AIShoppingAssistantView(APIView):
                     "params": {"query": user_query}
                 })
             
-            # 4. WHATSAPP FALLBACK LOGIC (Agar AI ko kuch na mile)
-            # User ka message waise ka waisa WhatsApp par bhejne ke liye URL encode karein
+          
             whatsapp_number = "916009282670"
             encoded_query = urllib.parse.quote(f"Hi QuickDash Support, mujhe is baare mein madad chahiye: {user_query}")
             wa_link = f"https://wa.me/{whatsapp_number}?text={encoded_query}"

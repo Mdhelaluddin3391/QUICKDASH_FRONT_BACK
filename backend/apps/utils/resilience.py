@@ -1,4 +1,3 @@
-# apps/utils/resilience.py
 import logging
 from functools import wraps
 from django.core.cache import cache
@@ -22,7 +21,6 @@ class CircuitBreaker:
     def __call__(self, func):
         @wraps(func)
         def wrapper(*args, **kwargs):
-            # 1. Check Circuit State (Fail Open if Redis Error)
             try:
                 if cache.get(self.key_open):
                     logger.warning(f"Circuit OPEN: {self.service_name}. Fast failing.")
@@ -32,12 +30,10 @@ class CircuitBreaker:
                     raise e
                 logger.error(f"CircuitBreaker Redis Check Failed: {e}")
 
-            # 2. Attempt Execution
             try:
                 result = func(*args, **kwargs)
                 return result
             except Exception as e:
-                # 3. Record Failure
                 self._safe_record_failure()
                 raise e
 
@@ -47,11 +43,9 @@ class CircuitBreaker:
         try:
             fails = cache.incr(self.key_failures)
             
-            # Set expiry on first fail
             if fails == 1:
                 cache.expire(self.key_failures, self.recovery_timeout)
 
-            # Trip Circuit
             if fails >= self.failure_threshold:
                 logger.critical(f"Circuit TRIPPED for {self.service_name}!")
                 cache.set(self.key_open, "OPEN", timeout=self.recovery_timeout)

@@ -1,4 +1,3 @@
-# apps/utils/exceptions.py
 from rest_framework.views import exception_handler
 from rest_framework.response import Response
 from rest_framework import status
@@ -18,10 +17,8 @@ def custom_exception_handler(exc, context):
     Custom DRF Exception Handler.
     Maps BusinessLogicException to HTTP 400 with a standard error structure.
     """
-    # Call REST framework's default exception handler first
     response = exception_handler(exc, context)
 
-    # Handle our custom Business Logic errors
     if isinstance(exc, BusinessLogicException):
         return Response(
             {
@@ -34,10 +31,8 @@ def custom_exception_handler(exc, context):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Optional: Normalize standard DRF ValidationErrors
     if response is not None and response.status_code == 400:
         if "error" not in response.data:
-            # Wrap standard DRF dict errors
             response.data = {
                 "error": {
                     "code": "validation_error",

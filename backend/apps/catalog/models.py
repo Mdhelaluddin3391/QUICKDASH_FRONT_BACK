@@ -1,4 +1,3 @@
-# apps/catalog/models.py
 from django.db import models
 
 
@@ -12,7 +11,6 @@ class Brand(models.Model):
         return self.name
     
 class Category(models.Model):
-    # Self-referencing ForeignKey for simple hierarchy
     parent = models.ForeignKey(
         'self', 
         on_delete=models.CASCADE, 
@@ -45,10 +43,8 @@ class Product(models.Model):
     sku = models.CharField(max_length=100, unique=True, db_index=True)
     image = models.URLField(max_length=500, null=True, blank=True)
     
-    # UI Display Unit
     unit = models.CharField(max_length=50, default="1 Unit")
     
-    # Base Price (MRP)
     mrp = models.DecimalField(max_digits=10, decimal_places=2, default="0.00")
     
     is_active = models.BooleanField(default=True)

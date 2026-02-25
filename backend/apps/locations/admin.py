@@ -1,4 +1,3 @@
-# apps/locations/admin.py
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.timezone import localtime
@@ -77,7 +76,6 @@ class GeoLocationAdmin(admin.ModelAdmin):
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
-    # Admin Actions
     @admin.action(description='Activate selected locations')
     def activate_locations(self, request, queryset):
         updated = queryset.update(is_active=True)

@@ -1,4 +1,3 @@
-# apps/riders/serializers.py
 from rest_framework import serializers
 from .models import RiderProfile, RiderEarning
 from apps.warehouse.serializers import WarehouseSerializer

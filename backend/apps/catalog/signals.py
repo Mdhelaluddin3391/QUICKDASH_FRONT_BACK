@@ -1,4 +1,3 @@
-# apps/catalog/signals.py
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.core.cache import cache
@@ -16,5 +15,4 @@ def invalidate_catalog_cache(sender, instance, **kwargs):
     try:
         cache.incr("catalog_version")
     except ValueError:
-        # If key doesn't exist, start at 1
         cache.set("catalog_version", 1, timeout=None)

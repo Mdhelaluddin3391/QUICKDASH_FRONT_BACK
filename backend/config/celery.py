@@ -1,20 +1,18 @@
-# config/celery.py
 import os
 import logging
 from celery import Celery
 from celery.schedules import crontab
 from celery.signals import before_task_publish, task_prerun, task_failure, worker_ready
 from kombu import Queue
+from apps.core.middleware import get_correlation_id, _correlation_id
 
-# Set default settings
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
 app = Celery('config')
 app.config_from_object('django.conf:settings', namespace='CELERY')
 
-# ==============================================================================
-# RELIABILITY: Queue Definitions
-# ==============================================================================
+
 app.conf.task_queues = (
     Queue('default', routing_key='default'),
     Queue('high_priority', routing_key='high_priority'),
@@ -25,59 +23,39 @@ app.conf.task_default_queue = 'default'
 app.conf.task_default_exchange = 'default'
 app.conf.task_default_routing_key = 'default'
 
-# ==============================================================================
-# WORKER RELIABILITY & FAULT TOLERANCE
-# ==============================================================================
-# Acknowledge tasks only after they are successfully completed
+
 app.conf.task_acks_late = True
 
-# Prefetch only one task per worker (prevent slow tasks from blocking others)
 app.conf.worker_prefetch_multiplier = 1
 
-# Reject tasks if worker dies (prevent task loss)
 app.conf.task_reject_on_worker_lost = True
 
-# Retry connecting to broker on startup (critical for Docker/Kubernetes)
 app.conf.broker_connection_retry_on_startup = True
 app.conf.broker_connection_max_retries = 10
 
-# Heartbeat for Redis connections
 app.conf.broker_heartbeat = 60
 app.conf.broker_pool_limit = 10
 
-# ==============================================================================
-# WORKER TIMEOUT & MEMORY
-# ==============================================================================
-# Hard time limit (kill worker if task exceeds this)
-app.conf.task_time_limit = 3600  # 1 hour
 
-# Soft time limit (allow graceful shutdown)
-app.conf.task_soft_time_limit = 3000  # 50 minutes
+app.conf.task_time_limit = 3600 
 
-# Max tasks per worker before recycling (prevent memory leaks)
+app.conf.task_soft_time_limit = 3000  
+
 app.conf.worker_max_tasks_per_child = 100
 
-# ==============================================================================
-# RESULT BACKEND
-# ==============================================================================
-# Store results in Redis for visibility/debugging
+
 if app.conf.get('CELERY_RESULT_BACKEND'):
-    app.conf.result_expires = 3600  # Result expires after 1 hour
+    app.conf.result_expires = 3600  
     app.conf.result_backend_transport_options = {
         'retry_on_timeout': True,
         'socket_connect_timeout': 5,
         'socket_timeout': 5,
     }
 
-# ==============================================================================
-# AUTO-DISCOVERY & TASK REGISTRATION
-# ==============================================================================
+
 app.autodiscover_tasks()
 
-# ==============================================================================
-# TRACING: Propagate Request ID from Web to Worker
-# ==============================================================================
-from apps.core.middleware import get_correlation_id, _correlation_id
+
 
 @before_task_publish.connect
 def transfer_correlation_id(headers=None, **kwargs):
@@ -96,9 +74,7 @@ def restore_correlation_id(task=None, **kwargs):
         if request_id:
             _correlation_id.set(request_id)
 
-# ==============================================================================
-# DATABASE HARDENING
-# ==============================================================================
+
 @task_prerun.connect
 def close_old_connections(**kwargs):
     """
@@ -108,9 +84,6 @@ def close_old_connections(**kwargs):
     from django.db import close_old_connections
     close_old_connections()
 
-# ==============================================================================
-# DEAD LETTER LOGGING
-# ==============================================================================
 logger = logging.getLogger('celery.dlq')
 
 @task_failure.connect
@@ -133,9 +106,7 @@ def worker_ready_handler(sender=None, **kwargs):
     """Log when worker is ready to process tasks."""
     logger.info(f"[CELERY] Worker is ready to process tasks")
 
-# ==============================================================================
-# BEAT SCHEDULE (Periodic Tasks)
-# ==============================================================================
+
 app.conf.beat_schedule = {
     'reconcile-inventory-every-10-mins': {
         'task': 'apps.core.tasks.reconcile_inventory_redis_db',
@@ -164,30 +135,23 @@ app.conf.beat_schedule = {
     },
 }
 
-# ==============================================================================
-# TASK ROUTING (Queue Assignment)
-# ==============================================================================
+
 app.conf.task_routes = {
-    # High priority: critical operations
     'apps.delivery.tasks.retry_auto_assign_rider': {'queue': 'high_priority'},
     'apps.delivery.tasks.assign_rider_to_order': {'queue': 'high_priority'},
     'apps.delivery.tasks.periodic_assign_unassigned_orders': {'queue': 'high_priority'},
     'apps.notifications.tasks.send_otp_sms': {'queue': 'high_priority'},
     'apps.orders.tasks.send_order_confirmation_email': {'queue': 'high_priority'},
     
-    # Default: standard operations
     'apps.core.tasks.*': {'queue': 'default'},
     
-    # Low priority: background tasks
     'apps.assistant.views.*': {'queue': 'low_priority'},
 }
 
-# ==============================================================================
-# PRODUCTION LOGGING
-# ==============================================================================
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-logger.info("✅ Celery configuration loaded")
+logger.info(" Celery configuration loaded")

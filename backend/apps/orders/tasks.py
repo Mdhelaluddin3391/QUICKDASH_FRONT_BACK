@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
     max_retries=5, 
     default_retry_delay=60, 
     autoretry_for=(Exception,), 
-    retry_backoff=True, # Exponential Backoff
-    retry_backoff_max=600 # Cap wait time at 10 mins
+    retry_backoff=True, 
+    retry_backoff_max=600 
 )
 
 def send_order_confirmation_email(self, order_id, user_email):
@@ -45,7 +45,6 @@ def send_order_confirmation_email(self, order_id, user_email):
     
     except Order.DoesNotExist:
         logger.error(f"Order {order_id} not found for email task. Skipping.")
-        # Do not retry, it will never succeed
         return "Order Not Found"
         
     except Exception as e:

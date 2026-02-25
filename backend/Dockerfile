@@ -1,4 +1,3 @@
-# Stage 1: Builder
 FROM python:3.12-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -17,7 +16,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /build/wheels -r requirements.txt
 
-# Stage 2: Runtime
 FROM python:3.12-slim
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -27,7 +25,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 WORKDIR /app
 
-# UPDATE: Added 'gosu' here
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     binutils \
@@ -44,20 +41,16 @@ RUN pip install --no-cache-dir /wheels/* \
     && pip install --no-cache-dir gunicorn uvicorn \
     && rm -rf /wheels
 
-# Copy project code
 COPY . /app/
 
-# Non-root user setup
 RUN groupadd --system --gid 1000 appgroup && \
     useradd --system --uid 1000 --gid 1000 appuser && \
     mkdir -p /app/staticfiles /app/media /app/logs && \
     chown -R appuser:appgroup /app
 
-# Entrypoint setup
 COPY scripts/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 EXPOSE 8000
 
-# UPDATE: Removed 'USER appuser' so we start as root to fix perms in entrypoint
 ENTRYPOINT ["/entrypoint.sh"]

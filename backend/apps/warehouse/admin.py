@@ -1,4 +1,3 @@
-# apps/warehouse/admin.py
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
@@ -52,16 +51,15 @@ class WarehouseAdmin(LeafletGeoAdmin):
 
     readonly_fields = ('created_at',)
 
-    # Leaflet map settings
     settings_overrides = {
-        'DEFAULT_CENTER': (20.5937, 78.9629),  # Center of India
+        'DEFAULT_CENTER': (20.5937, 78.9629), 
         'DEFAULT_ZOOM': 5,
     }
 
     def warehouse_type_display(self, obj):
         type_colors = {
-            'dark_store': '#28a745',    # green
-            'mega': '#007bff',          # blue
+            'dark_store': '#28a745',   
+            'mega': '#007bff',         
         }
         color = type_colors.get(obj.warehouse_type, '#6c757d')
         return format_html(
@@ -85,7 +83,6 @@ class WarehouseAdmin(LeafletGeoAdmin):
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
-    # Admin Actions
     @admin.action(description='Activate selected warehouses')
     def activate_warehouses(self, request, queryset):
         updated = queryset.update(is_active=True)
@@ -200,7 +197,6 @@ class PackingTaskAdmin(admin.ModelAdmin):
         self.message_user(request, f"{updated} packing tasks marked as incomplete.")
 
 
-# Physical Layout
 @admin.register(StorageZone)
 class StorageZoneAdmin(admin.ModelAdmin):
     list_display = ('warehouse_code', 'name')

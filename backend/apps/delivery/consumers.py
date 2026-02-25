@@ -1,4 +1,3 @@
-# apps/delivery/consumers.py
 import json
 from urllib.parse import parse_qs
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -23,7 +22,6 @@ class LiveTrackingConsumer(AsyncWebsocketConsumer):
             await self.close(code=4003)
             return
 
-        # 1. Verify & Burn Ticket (Atomic Lua)
         conn = get_redis_connection("default")
         user_id = await database_sync_to_async(conn.eval)(
             "local v = redis.call('get', KEYS[1]) redis.call('del', KEYS[1]) return v",
@@ -31,15 +29,13 @@ class LiveTrackingConsumer(AsyncWebsocketConsumer):
         )
         
         if not user_id:
-            await self.close(code=4003) # Invalid/Expired Ticket
+            await self.close(code=4003)
             return
 
         try:
-            # 2. Rehydrate User
             user = await database_sync_to_async(User.objects.get)(id=int(user_id))
             self.scope['user'] = user
             
-            # 3. Validate Context
             self.order_id = self.scope['url_route']['kwargs']['order_id']
             self.room_group_name = f"tracking_{self.order_id}"
 
@@ -62,12 +58,10 @@ class LiveTrackingConsumer(AsyncWebsocketConsumer):
             )
 
     async def receive(self, text_data):
-        # Clients don't send data here usually, mostly listen.
-        # Riders push location via HTTP API (RiderLocationPingAPIView) which broadcasts here.
+        
         pass
 
     async def location_broadcast(self, event):
-        # Forward internal Redis message to WebSocket client
         await self.send(text_data=json.dumps({
             "type": "rider_location",
             "lat": event["lat"],
@@ -89,11 +83,9 @@ class LiveTrackingConsumer(AsyncWebsocketConsumer):
         try:
             order = Order.objects.select_related('delivery__rider__user').get(id=order_id)
             
-            # Check 1: Is Customer?
             if order.user == user: 
                 return True
                 
-            # Check 2: Is Assigned Rider?
             if hasattr(order, 'delivery') and order.delivery.rider:
                 return order.delivery.rider.user == user
                 

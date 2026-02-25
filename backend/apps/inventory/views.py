@@ -1,4 +1,3 @@
-# apps/inventory/views.py
 from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -9,14 +8,14 @@ from .serializers import InventoryTransactionSerializer
 from .models import InventoryItem
 from .serializers import InventoryItemSerializer
 from .services import InventoryService
-from rest_framework import generics # <--- Added generics
+from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from .serializers import InventoryTransactionSerializer
-from .models import InventoryItem, InventoryTransaction # <--- Added InventoryTransaction
+from .models import InventoryItem, InventoryTransaction 
 from .serializers import InventoryItemSerializer
 from .services import InventoryService
 
@@ -29,7 +28,6 @@ class InventoryItemListCreateAPIView(APIView):
     permission_classes = [IsAdminUser]
 
     def get(self, request):
-        # Optimization: Prevent N+1 queries when accessing item.warehouse via Bin
         qs = InventoryItem.objects.select_related(
             "bin__rack__aisle__zone__warehouse"
         ).all()
@@ -58,7 +56,6 @@ class AddStockAPIView(APIView):
         except (ValueError, TypeError):
             return Response({"error": "Positive integer quantity required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Service handles DB update + Audit Log + Redis Sync
         InventoryService.add_stock(item, qty, reference="manual_api_add")
         
         return Response({"status": "stock added", "new_total": item.total_stock})
@@ -79,7 +76,6 @@ class CycleCountAPIView(APIView):
         except (ValueError, TypeError):
              return Response({"error": "Valid new_total required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Service handles adjustment logic
         InventoryService.cycle_count_adjust(
             item,
             new_total,

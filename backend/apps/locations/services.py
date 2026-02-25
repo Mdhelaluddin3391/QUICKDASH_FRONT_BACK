@@ -1,4 +1,3 @@
-# apps/locations/services.py
 import math
 from decimal import Decimal
 from .models import GeoLocation
@@ -12,7 +11,6 @@ class LocationService:
         Calculates distance between two points using Haversine formula.
         Returns distance in Kilometers.
         """
-        # Convert to float for math operations
         lat1, lon1, lat2, lon2 = map(float, [lat1, lon1, lat2, lon2])
 
         dlat = math.radians(lat2 - lat1)

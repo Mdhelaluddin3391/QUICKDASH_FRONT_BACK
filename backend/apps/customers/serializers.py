@@ -1,4 +1,3 @@
-# apps/customers/serializers.py
 from rest_framework import serializers
 from .models import CustomerProfile, CustomerAddress, SupportTicket
 from rest_framework import serializers
@@ -27,13 +26,11 @@ class CustomerAddressSerializer(serializers.ModelSerializer):
         lat = data.get('latitude')
         lng = data.get('longitude')
 
-        # 1. Coordinate Check
         if not lat or not lng:
             raise serializers.ValidationError(
                 "Precise location is required. Please select your location on the map."
             )
 
-        # 2. Range Check
         try:
             if not (-90 <= float(lat) <= 90) or not (-180 <= float(lng) <= 180):
                 raise serializers.ValidationError("Invalid coordinates.")
@@ -49,11 +46,10 @@ class CustomerAddressSerializer(serializers.ModelSerializer):
         Editing coordinates of an existing address causes order history inconsistencies.
         """
         if 'latitude' in validated_data or 'longitude' in validated_data:
-            # Check if they actually changed significantly
             old_lat = float(instance.latitude)
             new_lat = float(validated_data.get('latitude', old_lat))
             
-            if abs(old_lat - new_lat) > 0.0001: # approx 11 meters
+            if abs(old_lat - new_lat) > 0.0001: 
                 raise serializers.ValidationError(
                     "You cannot move the pin of a saved address. Please delete and create a new one."
                 )

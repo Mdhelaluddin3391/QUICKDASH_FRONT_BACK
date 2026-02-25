@@ -1,4 +1,3 @@
-# apps/notifications/models.py
 from django.db import models
 from django.utils import timezone
 from django.conf import settings
@@ -18,7 +17,6 @@ class PhoneOTP(models.Model):
         ]
 
     def is_expired(self):
-        # 5 minutes TTL
         return (timezone.now() - self.created_at).total_seconds() > 300
 
 

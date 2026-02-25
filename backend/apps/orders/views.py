@@ -3,7 +3,6 @@ from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions, generics
-# ✅ यह लाइन जोड़ी गई है
 from rest_framework.pagination import PageNumberPagination 
 from django.conf import settings
 
@@ -30,7 +29,6 @@ class ValidateCartAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
-        # request.warehouse is injected by Middleware
         current_warehouse = request.warehouse
 
         if not current_warehouse:
@@ -43,7 +41,6 @@ class ValidateCartAPIView(APIView):
         if not cart or not cart.items.exists():
             return Response({"valid": True, "warehouse_id": current_warehouse.id})
 
-        # 1. Detect Location Drift (Cart bound to WH-A, User now in WH-B)
         if cart.warehouse_id != current_warehouse.id:
             return Response({
                 "is_valid": False,
@@ -53,11 +50,9 @@ class ValidateCartAPIView(APIView):
                 "action_required": "clear_cart"
             }, status=status.HTTP_409_CONFLICT)
 
-        # 2. Validate Stock Availability
         unavailable_items = []
         for item in cart.items.select_related('sku').all():
-            # Check LIVE stock in the current warehouse
-            # (Note: item.sku is an InventoryItem object)
+           
             if item.sku.available_stock < item.quantity:
                 unavailable_items.append({
                     "sku": item.sku.sku,
@@ -93,13 +88,11 @@ class CreateOrderAPIView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         
-        # 1. Resolve Address & Warehouse (Securely)
         try:
             address = CustomerAddress.objects.get(id=data['delivery_address_id'], customer__user=request.user)
         except CustomerAddress.DoesNotExist:
             return Response({"error": "Invalid Delivery Address"}, status=400)
 
-        # Recalculate Warehouse from Address Coordinates (Single Source of Truth)
         warehouse = WarehouseService.find_nearest_serviceable_warehouse(
             address.latitude, address.longitude
         )
@@ -110,7 +103,6 @@ class CreateOrderAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # 2. Cart Validation (Double Check)
         cart = get_object_or_404(Cart, user=request.user)
         if not cart.items.exists():
             return Response({"error": "Cart is empty"}, status=400)
@@ -121,7 +113,6 @@ class CreateOrderAPIView(APIView):
                 status=status.HTTP_409_CONFLICT
             )
 
-        # 3. Prepare Items Data
         items_data = []
         for item in cart.items.select_related('sku').all():
             items_data.append({
@@ -130,7 +121,6 @@ class CreateOrderAPIView(APIView):
             })
 
         try:
-            # 4. Lock Inventory & Create Order
             InventoryService.bulk_lock_and_reserve(
                 warehouse_id=warehouse.id,
                 items_dict={i['sku']: i['quantity'] for i in items_data},
@@ -139,18 +129,15 @@ class CreateOrderAPIView(APIView):
             
             order = OrderService.create_order_after_reservation(
                 user=request.user,
-                warehouse_id=warehouse.id, # Trusted ID
+                warehouse_id=warehouse.id, 
                 items_data=items_data,
                 delivery_type=data['delivery_type'],
                 address_id=address.id,
                 payment_method=data['payment_method']
             )
 
-            # 5. Clear Cart
             cart.items.all().delete()
-            # Don't delete cart, just items. Keep warehouse binding until next add.
 
-            # 6. Payment Init
             razorpay_order = None
             if data['payment_method'] == 'RAZORPAY':
                 payment = PaymentService.create_payment(order)
@@ -167,14 +154,13 @@ class CreateOrderAPIView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            # Log error and return user friendly message
             return Response({"error": str(e)}, status=400)
 
 
 class MyOrdersAPIView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = OrderListSerializer
-    pagination_class = StandardResultsSetPagination # यह अच्छा अभ्यास है कि pagination क्लास का उपयोग किया जाए
+    pagination_class = StandardResultsSetPagination 
 
     def get_queryset(self):
         return Order.objects.filter(user=self.request.user).order_by("-created_at")
@@ -208,7 +194,6 @@ class AddToCartAPIView(APIView):
     def post(self, request):
         sku_code = request.data.get('sku')
         qty = int(request.data.get('quantity', 1))
-        # Trust middleware derived warehouse primarily, fall back to body if specific override needed (rare)
         warehouse = request.warehouse 
         force_clear = request.data.get('force_clear', False)
 
@@ -232,7 +217,6 @@ class AddToCartAPIView(APIView):
 
         cart, _ = Cart.objects.get_or_create(user=request.user)
 
-        # Check Conflict
         if cart.warehouse and cart.warehouse != warehouse:
             if force_clear:
                 cart.items.all().delete()
@@ -245,7 +229,6 @@ class AddToCartAPIView(APIView):
                     "message": "Cart contains items from another store. Clear cart?",
                 }, status=status.HTTP_409_CONFLICT)
         
-        # First item binds the cart
         if not cart.warehouse:
             cart.warehouse = warehouse
             cart.save()
@@ -262,7 +245,6 @@ class AddToCartAPIView(APIView):
         return Response(CartSerializer(cart).data)
 
 class OrderSimulationAPIView(APIView):
-    # ✅ FIX: IsAdminUser -> permissions.IsAdminUser (Already fixed in your code, keeping strictly correct)
     permission_classes = [permissions.IsAdminUser]
 
     def post(self, request, order_id):
@@ -272,7 +254,6 @@ class OrderSimulationAPIView(APIView):
         try:
             msg = ""
             if target_status == 'packed':
-                # ✅ अब यह लाइन बिना एरर के चलेगी क्योंकि हमने ऊपर import कर लिया है
                 msg = OrderSimulationService.advance_to_packed(order)
             elif target_status == 'out_for_delivery':
                 msg = OrderSimulationService.advance_to_out_for_delivery(order)

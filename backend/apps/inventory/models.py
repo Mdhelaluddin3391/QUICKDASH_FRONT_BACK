@@ -1,4 +1,3 @@
-# apps/inventory/models.py
 from django.db import models
 from django.utils import timezone
 from django.core.exceptions import ValidationError
@@ -23,7 +22,6 @@ class InventoryItem(models.Model):
 
     sku = models.CharField(max_length=100, db_index=True)
     
-    # Denormalized fields for performance (Warehouse Ops don't query Catalog Join constantly)
     product_name = models.CharField(max_length=255)
     price = models.DecimalField(max_digits=10, decimal_places=2, default="0.00")
 
@@ -60,27 +58,20 @@ class InventoryItem(models.Model):
             raise ValidationError("Total stock cannot be less than reserved stock.")
 
     def save(self, *args, **kwargs):
-        # Product details fetch karne ke liye import kiya
         from apps.catalog.models import Product
         
-        # Pehle hum SKU ke base par related product fetch karenge
         product = Product.objects.filter(sku=self.sku).first()
         
         if product:
-            # Sync product name if missing
             if not self.product_name:
                 self.product_name = product.name
                 
-            # Agar price 0 ya negative hai, toh seedha MRP laga do
             if self.price <= 0:
                 self.price = product.mrp
-            # AUTO-CORRECTION LOGIC: 
-            # Agar inventory ki selling price product ke MRP se zyada hai,
-            # toh usko automatically reduce karke MRP ke barabar kar do.
+
             elif self.price > product.mrp:
                 self.price = product.mrp
 
-        # Baaki ka default save behavior run karega
         super().save(*args, **kwargs)
 
     def __str__(self):

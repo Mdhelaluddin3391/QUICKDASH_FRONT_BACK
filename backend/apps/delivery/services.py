@@ -1,8 +1,7 @@
-# apps/delivery/services.py
 import secrets
 import logging
 import boto3
-import magic  # Requires: pip install python-magic
+import magic  
 from botocore.exceptions import ClientError
 from django.db import transaction, models
 from django.core.exceptions import ValidationError
@@ -35,17 +34,14 @@ class StorageService:
         if not bucket_name:
              raise BusinessLogicException("Storage configuration missing")
 
-        # 1. Whitelist MIME types
         ALLOWED_TYPES = {'image/jpeg', 'image/png', 'image/webp', 'application/pdf'}
         if file_type not in ALLOWED_TYPES:
             raise BusinessLogicException("Unsupported file type")
 
         s3_client = boto3.client('s3')
-        # Generate a random suffix to prevent guessing/overwriting
         object_name = f"proofs/order_{order_id}_{secrets.token_hex(4)}"
         
         try:
-            # AWS S3 Presigned POST
             response = s3_client.generate_presigned_post(
                 Bucket=bucket_name,
                 Key=object_name,
@@ -53,10 +49,10 @@ class StorageService:
                     'Content-Type': file_type,
                 },
                 Conditions=[
-                    ['content-length-range', 100, 5242880], # Min 100B, Max 5MB
+                    ['content-length-range', 100, 5242880],
                     {'Content-Type': file_type}
                 ],
-                ExpiresIn=300 # 5 Minutes
+                ExpiresIn=300 
             )
             return {"post_data": response, "key": object_name}
         except ClientError as e:
@@ -71,30 +67,25 @@ class StorageService:
         """
         bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
         if not bucket_name:
-             # Fail safe in Prod, but allow in Debug if configured to skip
              if settings.DEBUG: return
              raise BusinessLogicException("Storage configuration missing")
 
         s3_client = boto3.client('s3')
         try:
-            # 1. Metadata Check (Fast)
             head_response = s3_client.head_object(Bucket=bucket_name, Key=key)
             
             if head_response['ContentLength'] < 100:
                 raise BusinessLogicException("File too small or empty")
             
-            # 2. Magic Byte Check (Deep Inspection)
-            # Download only the first 2KB (header) to identify file type
+            
             response = s3_client.get_object(Bucket=bucket_name, Key=key, Range='bytes=0-2048')
             file_header = response['Body'].read()
             
-            # Identify MIME type from actual bytes
             mime_type = magic.from_buffer(file_header, mime=True)
             allowed_types = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
             
             if mime_type not in allowed_types:
                 logger.critical(f"Security Alert: Malicious file upload attempt. Detected: {mime_type}, Key: {key}")
-                # Delete the malicious file immediately
                 s3_client.delete_object(Bucket=bucket_name, Key=key)
                 raise BusinessLogicException(f"Invalid file content. Detected {mime_type}, expected image/pdf.")
 
@@ -110,7 +101,6 @@ class DeliveryService:
     
     @staticmethod
     def generate_otp():
-        # Cryptographically secure 6-digit OTP
         return str(secrets.randbelow(900000) + 100000)
 
     @staticmethod
@@ -123,12 +113,11 @@ class DeliveryService:
 
         delivery = Delivery.objects.create(
             order=order,
-            status="assigned", # Initial state for UI
+            status="assigned",
             job_status="searching",
             otp=DeliveryService.generate_otp(),
         )
 
-        # Trigger Celery Task
         from apps.delivery.tasks import retry_auto_assign_rider
         retry_auto_assign_rider.delay(order.id)
         
@@ -141,7 +130,6 @@ class DeliveryService:
         Assigns a specific rider to an order.
         Used by: Auto-Assigner (System) and Admin (Manual).
         """
-        # Ensure delivery record exists
         delivery, created = Delivery.objects.get_or_create(
             order=order, 
             defaults={
@@ -154,19 +142,17 @@ class DeliveryService:
         delivery.status = "assigned" 
         delivery.save()
 
-        # Notify Rider
         transaction.on_commit(lambda: NotificationService.send_push(
             rider.user,
             "New Delivery Assigned",
             f"Order #{order.id} is assigned to you."
         ))
 
-        # Audit
         action_type = "manual_assignment" if actor else "auto_assignment"
         AuditService.log(
             action=action_type,
             reference_id=str(order.id),
-            user=actor, # None if system
+            user=actor, 
             metadata={
                 "rider_id": rider.id,
                 "rider_phone": rider.user.phone,
@@ -192,7 +178,6 @@ class DeliveryService:
         from apps.riders.models import RiderProfile
         warehouse = order.warehouse
 
-        # Lock candidate row to prevent double assignment
         candidate = RiderProfile.objects.select_for_update(skip_locked=True).filter(
             current_warehouse=warehouse,
             is_active=True,
@@ -217,11 +202,9 @@ class DeliveryService:
 
         delivery = order.delivery
         
-        # Update Order State
         order.status = "packed"
         order.save(update_fields=["status"])
 
-        # Update Delivery Location
         delivery.dispatch_location = dispatch_bin_code
         delivery.save(update_fields=["dispatch_location"])
 
@@ -247,20 +230,17 @@ class DeliveryService:
         if not rider_profile or not rider_profile.is_available:
             raise BusinessLogicException("Rider not available")
         
-        # State Check
         if order.status != "packed":
              raise BusinessLogicException(f"Order not ready (Status: {order.status})")
 
-        # Bin Validation
         if delivery.dispatch_location != scanned_bin_code:
             raise BusinessLogicException(f"Wrong Bin! Item is in {delivery.dispatch_location}")
 
-        # Transition
         order.status = "out_for_delivery"
         order.save(update_fields=["status"])
 
         delivery.status = "out_for_delivery"
-        delivery.rider = rider_profile # Ensure binding
+        delivery.rider = rider_profile
         delivery.save(update_fields=["status", "rider"])
 
         return {"status": "success"}
@@ -275,13 +255,11 @@ class DeliveryService:
         if delivery.status == "delivered":
             return
 
-        # 1. OTP Check
-        # Compare strings to handle leading zeros safely
+
         if str(delivery.otp) != str(otp):
             raise ValidationError("Invalid OTP")
 
-        # 2. Validation & Update Delivery
-        # Validate proof exists in S3 and check magic bytes before committing state
+     
         if proof_image_key:
             StorageService.validate_upload(proof_image_key)
             delivery.proof_image = proof_image_key
@@ -289,17 +267,14 @@ class DeliveryService:
         delivery.status = "delivered"
         delivery.save()
 
-        # 3. Update Order
         order = delivery.order
         order.status = "delivered"
         order.save(update_fields=["status"])
 
-        # 4. Inventory Commit (Critical)
-        # Convert "Reserved" stock to "Sold" (Deducted)
+     
         for item in order.items.all():
             from apps.inventory.models import InventoryItem
-            # Find the source inventory item (Logic simplified for MVP)
-            # In complex systems, we track exactly which batch was picked.
+         
             inv_item = InventoryItem.objects.filter(
                 sku=item.sku, 
                 bin__rack__aisle__zone__warehouse=order.warehouse
@@ -312,7 +287,6 @@ class DeliveryService:
                     reference=f"sold_order_{order.id}"
                 )
 
-        # 5. Rider Earning
         from apps.riders.services import RiderService
         RiderService.add_earning(
             delivery.rider, 
@@ -340,7 +314,6 @@ class DeliveryService:
             order.status = "cancelled"
             order.save(update_fields=["status"])
             
-            # Auto-Refund Logic
             if hasattr(order, 'payment') and order.payment.status == 'paid':
                 from apps.payments.refund_services import RefundService
                 RefundService.initiate_refund(order.payment)

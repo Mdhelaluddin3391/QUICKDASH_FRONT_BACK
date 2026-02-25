@@ -1,4 +1,3 @@
-# apps/riders/models.py
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -26,7 +25,6 @@ class RiderProfile(models.Model):
 
     class Meta:
         indexes = [
-            # Critical Index for Auto-Assignment Service
             models.Index(
                 fields=['current_warehouse', 'is_active', 'is_available'],
                 name='rider_assign_idx'
@@ -35,7 +33,6 @@ class RiderProfile(models.Model):
 
     @property
     def is_kyc_verified(self):
-        # MVP Rule: Must have verified License + RC
         required = {'license', 'rc'}
         verified_docs = set(
             self.documents.filter(status='verified').values_list('doc_type', flat=True)
@@ -87,7 +84,7 @@ class RiderPayout(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="processing")
     
-    transaction_ref = models.CharField(max_length=100, blank=True) # Bank Transaction ID
+    transaction_ref = models.CharField(max_length=100, blank=True) 
     
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
@@ -107,7 +104,7 @@ class RiderEarning(models.Model):
     )
 
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    reference = models.CharField(max_length=100) # e.g. "Order #123"
+    reference = models.CharField(max_length=100) 
     
     payout = models.ForeignKey(
         RiderPayout, 

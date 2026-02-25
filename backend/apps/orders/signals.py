@@ -13,11 +13,9 @@ def auto_assign_rider_on_status_change(sender, instance, created, **kwargs):
     Triggers rider assignment when order status changes to 'packed'.
     """
     if created:
-        return  # Skip for new orders
+        return 
 
-    # Check if status changed to 'packed'
     if instance.status == "packed":
-        # Run the task after transaction commits
         transaction.on_commit(lambda: assign_rider_to_order.delay(instance.id))
 
 
@@ -25,14 +23,13 @@ def auto_assign_rider_on_status_change(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=Order)
 def notify_admin_on_new_order(sender, instance, created, **kwargs):
-    if created: # Sirf naya order banne par
+    if created:
         channel_layer = get_channel_layer()
         
-        # 'admin_notifications_group' me message bhej rahe hain
         async_to_sync(channel_layer.group_send)(
             "admin_notifications_group",
             {
-                "type": "send_notification", # Yeh Consumer ka function name hoga
+                "type": "send_notification", 
                 "message": "new_order",
                 "order_id": instance.id
             }

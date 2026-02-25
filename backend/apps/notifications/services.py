@@ -1,4 +1,3 @@
-# apps/notifications/services.py
 import secrets
 import logging
 from datetime import timedelta
@@ -6,7 +5,7 @@ from django.conf import settings
 from django.utils import timezone
 from django.db import transaction
 from django.core.cache import cache
-from django.conf import settings  # Ensure settings is imported
+from django.conf import settings  
 from apps.utils.exceptions import BusinessLogicException
 from .models import OTPAbuseLog, PhoneOTP, Notification
 from .tasks import send_otp_sms
@@ -43,7 +42,6 @@ class NotificationService:
             title=title,
             message=message,
         )
-        # Placeholder: Call actual Push Provider or enqueue task
         logger.info(f"[PUSH] Sent to {user.phone}: {title} - {message}")
 
 
@@ -54,7 +52,6 @@ class OTPService:
 
     @staticmethod
     def generate_otp():
-        # Cryptographically secure RNG (6 digits)
         return str(secrets.randbelow(900000) + 100000)
 
     @staticmethod
@@ -62,7 +59,6 @@ class OTPService:
         """
         Generates OTP, handles security checks, and queues SMS.
         """
-        # 1. Input Validation
         allowed_prefixes = getattr(settings, "ALLOWED_COUNTRY_CODES", ["+91"])
         if not any(phone.startswith(prefix) for prefix in allowed_prefixes):
              raise BusinessLogicException("Phone number country code not supported", code="invalid_country")
@@ -70,23 +66,19 @@ class OTPService:
         if len(phone) < 10 or len(phone) > 15:
              raise BusinessLogicException("Invalid phone number format", code="invalid_format")
 
-        # 2. Per-Phone Rate Limiting (5 OTPs/hour)
         rate_key = f"otp_rate:{phone}"
         attempts = cache.get(rate_key, 0)
         if attempts >= 5:
             raise BusinessLogicException("Too many OTP requests. Try again later.", code="rate_limited")
         cache.set(rate_key, attempts + 1, timeout=3600)
 
-        # 3. Resend Cooldown (Redis)
         cooldown_key = f"otp_cooldown:{phone}"
         if cache.get(cooldown_key):
              ttl = cache.ttl(cooldown_key)
              raise BusinessLogicException(f"Please wait {ttl} seconds before retrying", code="rate_limit")
 
-        # 4. Abuse & Security Checks
         OTPAbuseService.check(phone, ip_address)
 
-        # 4. Generate & Save (Atomic)
         with transaction.atomic():
             otp = OTPService.generate_otp()
 
@@ -102,14 +94,11 @@ class OTPService:
                 logger.info(f" [DEV OTP] Code : {otp}")
                 logger.info("" + "="*40 + "\n")
                 
-            # Invalidate old OTPs
             PhoneOTP.objects.filter(phone=phone, is_verified=False).delete()
             PhoneOTP.objects.create(phone=phone, otp=otp)
 
-            # Set Cooldown
             cache.set(cooldown_key, "1", timeout=OTPService.RESEND_COOLDOWN_SECONDS)
 
-            # 5. Queue Async Task
             minutes = max(1, OTPService.EXPIRY_SECONDS // 60)
             msg = f"Your login code is {otp}. Valid for {minutes} minute(s)."
             transaction.on_commit(lambda: send_otp_sms.delay(phone, msg))
@@ -126,21 +115,18 @@ class OTPService:
         except PhoneOTP.DoesNotExist:
              raise BusinessLogicException("OTP not found or expired", code="otp_invalid")
 
-        # Checks
         if record.is_expired():
              raise BusinessLogicException("OTP expired", code="otp_expired")
 
         if record.attempts >= OTPService.MAX_ATTEMPTS:
              raise BusinessLogicException("Too many attempts. Request a new OTP.", code="otp_limit")
 
-        # Constant-time comparison to prevent timing attacks
         if not secrets.compare_digest(record.otp, otp):
             record.attempts += 1
             record.save(update_fields=["attempts"])
             OTPAbuseService.record_failure(phone)
             raise BusinessLogicException("Invalid OTP", code="otp_invalid")
 
-        # Success
         record.is_verified = True
         record.save(update_fields=["is_verified"])
         OTPAbuseService.reset(phone)
@@ -154,7 +140,6 @@ class OTPAbuseService:
 
     @staticmethod
     def check(phone, ip_address=None):
-        # 1. Phone Blocking Check
         log, _ = OTPAbuseLog.objects.get_or_create(phone=phone)
         if log.is_blocked():
              raise BusinessLogicException(
@@ -162,11 +147,9 @@ class OTPAbuseService:
                  code="otp_blocked"
              )
 
-        # 2. IP Rate Limiting (Anti-Bot)
         if ip_address:
             ip_key = f"otp_ip_limit:{ip_address}"
             try:
-                # Safe increment
                 count = cache.incr(ip_key)
             except ValueError:
                 cache.set(ip_key, 1, timeout=3600)

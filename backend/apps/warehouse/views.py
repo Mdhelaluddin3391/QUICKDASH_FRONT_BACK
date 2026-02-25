@@ -1,4 +1,3 @@
-# apps/warehouse/views.py
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser, AllowAny
@@ -10,7 +9,7 @@ from .serializers import WarehouseSerializer
 from .services import WarehouseService, WarehouseOperationsService
 from apps.orders.models import Order
 from apps.delivery.services import DeliveryService
-from apps.accounts.permissions import IsWarehouseManager # Assuming this exists or using IsAdminUser
+from apps.accounts.permissions import IsWarehouseManager 
 
 class WarehouseListCreateAPIView(APIView):
     """
@@ -38,14 +37,11 @@ class ServiceableWarehouseAPIView(APIView):
     def post(self, request):
         lat = request.data.get("latitude")
         lon = request.data.get("longitude")
-        city = request.data.get("city") # अगर नहीं आया तो यह None होगा, जो सही है।
+        city = request.data.get("city") 
 
-        # 1. Validation: सिर्फ Lat/Long चेक करें (City की चिंता न करें)
         if not lat or not lon:
             return Response({"error": "Latitude and Longitude are required"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 2. Call Service directly
-        # अगर city None है, तो सर्विस कोड उसे इग्नोर कर देगा और सिर्फ Lat/Long से ढूंढेगा।
         warehouse = WarehouseService.find_nearest_serviceable_warehouse(lat, lon, city)
 
         if not warehouse:
@@ -70,10 +66,7 @@ class PickerTaskListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # 1. Identify Context
         if not hasattr(request.user, 'rider_profile') or not request.user.rider_profile.current_warehouse:
-            # Assuming Pickers are modeled similar to Riders or have an EmployeeProfile.
-            # Adjust based on exact auth model. For now, checking rider_profile/warehouse linkage.
             return Response(
                 {"error": "User not linked to a warehouse."}, 
                 status=status.HTTP_403_FORBIDDEN
@@ -81,7 +74,6 @@ class PickerTaskListView(APIView):
 
         warehouse = request.user.rider_profile.current_warehouse
 
-        # 2. Optimized Query
         tasks = PickingTask.objects.filter(
             status="pending",
             target_bin__bin__rack__aisle__zone__warehouse=warehouse
@@ -120,7 +112,6 @@ class ScanPickAPIView(APIView):
         if not all([task_id, scanned_bin, scanned_sku]):
             return Response({"error": "Scan data missing"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Delegate to Service
         message = WarehouseOperationsService.scan_pick(
             task_id=task_id,
             picker_user=request.user,
@@ -152,7 +143,7 @@ class InwardStockAPIView(APIView):
     """
     Manager App: Add stock to a bin.
     """
-    permission_classes = [IsAuthenticated] # Should ideally be IsWarehouseManager
+    permission_classes = [IsAuthenticated, IsWarehouseManager]
 
     def post(self, request):
         barcode = request.data.get("barcode")
@@ -187,7 +178,6 @@ class PickerActiveOrdersAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Determine Warehouse
         warehouse = None
         if hasattr(request.user, 'rider_profile') and request.user.rider_profile.current_warehouse:
              warehouse = request.user.rider_profile.current_warehouse
@@ -225,14 +215,13 @@ class WarehouseManagerStatsAPIView(APIView):
     """
     Dashboard: Stats for Warehouse Manager.
     """
-    permission_classes = [IsAuthenticated] # Should be IsWarehouseManager
+    permission_classes = [IsAuthenticated] 
 
     def get(self, request):
         warehouse_id = request.query_params.get("warehouse_id")
         if not warehouse_id:
              return Response({"error": "warehouse_id required"}, status=status.HTTP_400_BAD_REQUEST)
              
-        # Basic Counts
         pending_picks = PickingTask.objects.filter(
             order__warehouse_id=warehouse_id, status="pending"
         ).count()
@@ -251,16 +240,14 @@ class BinListCreateAPIView(APIView):
     """
     Manager: List or Create Bins dynamically.
     """
-    permission_classes = [IsAuthenticated] # Should be IsWarehouseManager
+    permission_classes = [IsAuthenticated] 
 
     def get(self, request):
-        # Filter by warehouse if needed, for now listing all
         bins = Bin.objects.select_related('rack__aisle__zone').all()[:100]
         data = [{"id": b.id, "code": b.bin_code, "capacity": b.capacity_units} for b in bins]
         return Response(data)
 
     def post(self, request):
-        # Simple Bin Creation
         rack_id = request.data.get("rack_id")
         code = request.data.get("bin_code")
         

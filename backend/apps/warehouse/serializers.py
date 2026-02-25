@@ -1,4 +1,3 @@
-# apps/warehouse/serializers.py
 from rest_framework import serializers
 from .models import Warehouse, PickingTask
 
@@ -12,7 +11,7 @@ class WarehouseSerializer(serializers.ModelSerializer):
             "warehouse_type",
             "city",
             "state",
-            "location", # PostGIS Point field serializes to GeoJSON or text usually
+            "location",
             "is_active",
         )
 

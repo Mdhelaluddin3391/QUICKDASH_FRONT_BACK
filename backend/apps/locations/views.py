@@ -1,4 +1,3 @@
-# apps/locations/views.py
 import requests
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -23,19 +22,16 @@ class GeocodeAPIView(APIView):
         except (TypeError, ValueError):
             return Response({"error": "Invalid coordinates"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 1. Round coordinates to 4 decimals (~11m precision) for better cache hits
-        # This prevents 12.123456 and 12.123457 from triggering two separate API calls
+       
         lat_r = round(lat, 4)
         lon_r = round(lon, 4)
         
         cache_key = f"geocode:{lat_r}:{lon_r}"
         cached_data = cache.get(cache_key)
 
-        # 2. Return Cached Data if available (Fast Path)
         if cached_data:
             return Response(cached_data)
 
-        # 3. Call External API (Slow Path)
         headers = {
             'User-Agent': 'QuickDash-App/1.0 (contact@quickdash.com)',
             'Referer': 'https://quickdash.com' 
@@ -43,19 +39,17 @@ class GeocodeAPIView(APIView):
         
         try:
             url = f"https://nominatim.openstreetmap.org/reverse?format=json&lat={lat}&lon={lon}"
-            resp = requests.get(url, headers=headers, timeout=3) # Strict 3s timeout
+            resp = requests.get(url, headers=headers, timeout=3) 
             
             if resp.status_code == 200:
                 data = resp.json()
                 
-                # Normalize payload for frontend
                 result = {
                     "display_name": data.get("display_name"),
                     "address": data.get("address", {}),
                     "place_id": data.get("place_id")
                 }
                 
-                # Cache for 24 Hours (Addresses rarely change)
                 cache.set(cache_key, result, timeout=86400)
                 return Response(result)
             else:

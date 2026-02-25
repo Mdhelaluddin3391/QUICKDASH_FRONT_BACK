@@ -1,9 +1,8 @@
-# apps/orders/abuse_services.py
 from django.utils import timezone
 from datetime import timedelta
 from django.db.models import F
 from .models import OrderAbuseLog
-from apps.utils.exceptions import BusinessLogicException  # Use Custom Exception
+from apps.utils.exceptions import BusinessLogicException 
 
 class OrderAbuseService:
     MAX_CANCELS = 3
@@ -13,7 +12,6 @@ class OrderAbuseService:
     def check(user):
         log, _ = OrderAbuseLog.objects.get_or_create(user=user)
         if log.is_blocked():
-            # Calculate remaining time for better UX
             remaining = log.blocked_until - timezone.now()
             hours = int(remaining.total_seconds() // 3600)
             minutes = int((remaining.total_seconds() % 3600) // 60)

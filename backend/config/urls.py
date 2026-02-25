@@ -14,7 +14,6 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-# config/urls.py
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
@@ -31,17 +30,13 @@ admin.site.index_title = "Welcome to QuickDash Management"
 
 
 urlpatterns = [
-    # Monitoring
     path('', include('django_prometheus.urls')),
     path('health/', health_check),
     
-    # Admin
     path('admin/', admin.site.urls),
     
-    # Core Config
     path('api/config/', AppConfigAPIView.as_view()),
 
-    # API V1 Routes
     path('api/v1/customers/', include('apps.customers.urls')),
     path('api/v1/auth/', include('apps.accounts.urls')),
     path('api/v1/auth/customer/', include('apps.customers.urls')), 
@@ -65,7 +60,6 @@ urlpatterns = [
 
     
 
-    # API Documentation
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 ]

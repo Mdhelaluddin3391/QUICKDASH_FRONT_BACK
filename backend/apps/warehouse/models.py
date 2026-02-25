@@ -1,4 +1,3 @@
-# apps/warehouse/models.py
 from django.contrib.gis.db import models
 from django.utils import timezone
 from django.conf import settings
@@ -18,7 +17,6 @@ class Warehouse(models.Model):
     city = models.CharField(max_length=50)
     state = models.CharField(max_length=50)
 
-    # Spatial Fields
     location = models.PointField(srid=4326, help_text="Exact GPS coordinates")
     delivery_zone = models.PolygonField(srid=4326, null=True, blank=True, help_text="Serviceable Area")
 
@@ -28,7 +26,6 @@ class Warehouse(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["city", "is_active"]),
-            # GIST Index for spatial queries
             models.Index(fields=['location'], name='warehouse_loc_gist_idx', opclasses=['gist_geometry_ops_2d']),
             models.Index(fields=['delivery_zone'], name='wh_del_zone_gist_idx', opclasses=['gist_geometry_ops_2d']),
         ]
@@ -37,7 +34,6 @@ class Warehouse(models.Model):
         return f"{self.name} ({self.code})"
 
 
-# --- Physical Layout Models ---
 
 class StorageZone(models.Model):
     """ E.g., Cold Storage, Frozen, Dry, Secure """
@@ -61,14 +57,13 @@ class Rack(models.Model):
 class Bin(models.Model):
     """ Specific Bin location: Smallest unit """
     rack = models.ForeignKey(Rack, on_delete=models.CASCADE, related_name="bins")
-    bin_code = models.CharField(max_length=20, unique=True) # E.g., "MUM01-Z1-A1-R1-B04"
+    bin_code = models.CharField(max_length=20, unique=True) 
     capacity_units = models.IntegerField(default=100)
 
     def __str__(self):
         return self.bin_code
 
 
-# --- Workflow Tasks ---
 
 class PickingTask(models.Model):
     STATUS_CHOICES = (
@@ -84,7 +79,6 @@ class PickingTask(models.Model):
     item_sku = models.CharField(max_length=100)
     quantity_to_pick = models.PositiveIntegerField()
     
-    # Target specific physical location
     target_bin = models.ForeignKey("inventory.InventoryItem", on_delete=models.PROTECT)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")

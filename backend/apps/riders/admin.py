@@ -75,7 +75,6 @@ class RiderProfileAdmin(admin.ModelAdmin):
     availability_status.short_description = "Status"
 
     def wallet_balance(self, obj):
-        # Calculate total earnings minus total payouts
         total_earnings = obj.earnings.aggregate(total=Sum('amount'))['total'] or 0
         total_payouts = obj.payouts.filter(status='completed').aggregate(total=Sum('amount'))['total'] or 0
         balance = total_earnings - total_payouts
@@ -99,10 +98,8 @@ class RiderProfileAdmin(admin.ModelAdmin):
     created_at_date.short_description = "Joined"
     created_at_date.admin_order_field = 'created_at'
 
-    # Admin Actions
     @admin.action(description='Approve selected riders')
     def approve_riders(self, request, queryset):
-        # Assuming we add an is_approved field; for now, just activate
         updated = queryset.update(is_active=True)
         self.message_user(request, f"{updated} riders approved and activated.")
 

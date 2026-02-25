@@ -6,7 +6,7 @@ from django.db.models import Prefetch, OuterRef, Subquery, DecimalField, Q, Sum,
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiTypes
-from django.core.paginator import Paginator  # Added for Infinite Scroll
+from django.core.paginator import Paginator
 import re
 from django.db.models import Case, When, Value, IntegerField
 from .models import Category, Product, Banner, Brand, FlashSale
@@ -21,10 +21,7 @@ from apps.warehouse.services import WarehouseService
 from apps.inventory.models import InventoryItem
 from rest_framework.pagination import PageNumberPagination
 
-# ==============================================================================
-# PUBLIC CATALOG APIS
-# Authentication classes empty to allow Guest Browsing
-# ==============================================================================
+
 class SkuPagination(PageNumberPagination):
     page_size = 12
 
@@ -72,7 +69,6 @@ class SkuListAPIView(generics.ListAPIView):
     pagination_class = SkuPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     
-    # YAHAN SE 'category__slug' KO REMOVE KAR DIYA HAI
     filterset_fields = ['is_active'] 
     
     search_fields = ['name', 'sku', 'description', 'category__name', 'category__parent__name']
@@ -81,7 +77,6 @@ class SkuListAPIView(generics.ListAPIView):
     def get_queryset(self):
         qs = Product.objects.filter(is_active=True).select_related('category')
         
-        # Custom Filters (Yahan category aur sub-category dono filter ho jayenge)
         category_slug = self.request.query_params.get('category__slug')
         if category_slug:
             qs = qs.filter(
@@ -95,7 +90,6 @@ class SkuListAPIView(generics.ListAPIView):
             if brand_ids:
                 qs = qs.filter(brand_id__in=brand_ids)
 
-        # Sorting Logic
         ordering = self.request.query_params.get('ordering')
         warehouse = getattr(self.request, 'warehouse', None)
 
@@ -170,7 +164,6 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
     """
     Product Detail Page.
     Injects Available Stock for the detected Warehouse.
-    Fixed: Supports numeric SKUs correctly.
     """
     permission_classes = [AllowAny]
     authentication_classes = [] 
@@ -181,21 +174,16 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
         return Product.objects.filter(is_active=True)
 
     def get_object(self):
-        # Support lookup by ID or SKU
         lookup_val = self.kwargs.get('id')
         queryset = self.get_queryset()
         
-        # FIX: Check for numeric SKU vs ID ambiguity
-        # Pehle SKU match karein, phir ID match karein
+    
         
         obj = None
         
-        # 1. Try finding by SKU (Priority for Barcodes)
         obj = queryset.filter(sku=lookup_val).first()
         
-        # 2. If not found and value is numeric, try finding by Database ID
         if not obj and lookup_val.isdigit():
-            # Use Q object to be safe or explicit ID check
             obj = queryset.filter(id=int(lookup_val)).first()
 
         if not obj:
@@ -208,25 +196,19 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
         warehouse = getattr(request, 'warehouse', None)
         
         available_stock = 0
-        # FIX: Product model has 'mrp', not 'price'. 
-        # Using getattr to be safe, defaulting to mrp.
         sale_price = getattr(instance, 'mrp', 0) 
 
         if warehouse:
-            # 1. Get Stock
             stock_data = InventoryItem.objects.filter(
                 sku=instance.sku, 
                 bin__rack__aisle__zone__warehouse=warehouse
             ).aggregate(total_stock=Sum('total_stock'), reserved=Sum('reserved_stock'))
             
             t_stock = stock_data.get('total_stock') or 0
-            r_stock = stock_data.get('reserved') or 0 # Fix: aggregate key might be 'reserved' or 'reserved_stock' based on your query
+            r_stock = stock_data.get('reserved') or 0
             
-            # Agar upar Sum('reserved_stock') use kiya hai bina keyword ke to key 'reserved_stock__sum' hogi
-            # Safety ke liye hum direct keys use kar rahe hain jo aggregate mein define ki hain
             available_stock = t_stock - (stock_data.get('reserved') or 0)
 
-            # 2. Get Price from Inventory (Store specific price)
             inv_item = InventoryItem.objects.filter(
                 sku=instance.sku,
                 bin__rack__aisle__zone__warehouse=warehouse
@@ -237,11 +219,9 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
         serializer = self.get_serializer(instance)
         data = serializer.data
         
-        # Inject dynamic fields
         data['available_stock'] = available_stock
         data['sale_price'] = sale_price
         
-        # Ensure effective_price is set for frontend consistency
         if data.get('effective_price') is None:
             data['effective_price'] = sale_price
 
@@ -267,10 +247,8 @@ class StorefrontCatalogAPIView(APIView):
         ],
     )
     def get(self, request):
-        # 1. Resolve Warehouse (Middleware Priority)
         warehouse = getattr(request, 'warehouse', None)
         
-        # Fallback if Middleware didn't find it
         if not warehouse:
             lat = request.query_params.get("lat")
             lon = request.query_params.get("lon")
@@ -280,25 +258,22 @@ class StorefrontCatalogAPIView(APIView):
         if not warehouse:
             return Response({"serviceable": False, "message": "Location not serviceable"}, status=200)
 
-        # 2. Get Products (SKUs) In Stock
         skus_in_stock = InventoryItem.objects.filter(
             bin__rack__aisle__zone__warehouse=warehouse,
             total_stock__gt=F('reserved_stock')
         ).values_list('sku', flat=True).distinct()
 
-        # 3. Build Categories Feed (Infinite Scroll Logic)
-        # Fetch all parent categories ordered by ID to ensure consistent pagination
+    
         all_categories = Category.objects.filter(is_active=True, parent__isnull=True).order_by('id')
         
         page_number = request.query_params.get('page', 1)
-        page_size = 4  # Load 4 categories per scroll
+        page_size = 4 
         
         paginator = Paginator(all_categories, page_size)
         
         try:
             page_obj = paginator.page(page_number)
         except Exception:
-            # If page is out of range, return empty result
             return Response({
                 "serviceable": True,
                 "warehouse_id": warehouse.id,
@@ -309,13 +284,11 @@ class StorefrontCatalogAPIView(APIView):
 
         feed = []
         for cat in page_obj:
-            # --- Price Subquery Setup ---
             price_subquery = InventoryItem.objects.filter(
                 sku=OuterRef('sku'),
                 bin__rack__aisle__zone__warehouse=warehouse
             ).values('price')[:1]
 
-            # Fetch products (Keep limit 6 per category as requested)
             products = Product.objects.filter(
                 Q(category=cat) | Q(category__parent=cat),
                 sku__in=skus_in_stock,
@@ -330,7 +303,6 @@ class StorefrontCatalogAPIView(APIView):
             if products.exists():
                 p_data = ProductSerializer(products, many=True, context={'request': request}).data
                 
-                # NAYA CODE: Products ka real stock nikalne ke liye
                 product_skus = [p['sku'] for p in p_data]
                 inventory_qs = InventoryItem.objects.filter(
                     sku__in=product_skus,
@@ -343,16 +315,13 @@ class StorefrontCatalogAPIView(APIView):
                         stock_map[inv.sku] = 0
                     stock_map[inv.sku] += (inv.total_stock - inv.reserved_stock)
                 
-                # Consistency Injection
                 for p in p_data: 
-                    # NAYA CODE: Hardcoded 10 ki jagah database se actual stock value pass karein
                     p['available_stock'] = stock_map.get(p['sku'], 0) 
                     
                     if p.get('effective_price') is None:
                         p['effective_price'] = p.get('mrp')
                         p['sale_price'] = p.get('mrp')
 
-                # ✅ FIXED ICON URL LOGIC
                 icon_url = None
                 if cat.icon:
                     if cat.icon.startswith('http'):
@@ -364,7 +333,7 @@ class StorefrontCatalogAPIView(APIView):
                     "id": cat.id,
                     "name": cat.name,
                     "slug": cat.slug,
-                    "icon": icon_url, # Ab ye safe hai
+                    "icon": icon_url,
                     "products": p_data
                 })
 
@@ -393,7 +362,6 @@ class GlobalSearchAPIView(APIView):
             products = products.filter(brand_id=brand_id)
         
         if query:
-            # ADVANCED: Multi-word search (Tokenization)
             words = re.findall(r'\w+', query)
             for word in words:
                 products = products.filter(
@@ -404,7 +372,6 @@ class GlobalSearchAPIView(APIView):
                     Q(category__parent__name__icontains=word)
                 )
             
-            # ADVANCED: Relevance Ranking (Exact match ko top par rakhega)
             products = products.annotate(
                 relevance=Case(
                     When(name__iexact=query, then=Value(1)),
@@ -414,7 +381,7 @@ class GlobalSearchAPIView(APIView):
                     When(description__icontains=query, then=Value(5)),
                     When(category__name__icontains=query, then=Value(6)),
                     When(category__parent__name__icontains=query, then=Value(7)),
-                    default=Value(8), # FIXED: Default value ko 8 kiya taaki upar ki priority clash na ho
+                    default=Value(8),
                     output_field=IntegerField()
                 )
             ).order_by('relevance', '-created_at')
@@ -430,14 +397,12 @@ class SearchSuggestAPIView(APIView):
         query = request.query_params.get('q', '').strip()
         if len(query) < 2: return Response([])
         
-        # ADVANCED: Multi-word search
         words = re.findall(r'\w+', query)
         
         product_results = Product.objects.filter(is_active=True).select_related('category')
         brand_results = Brand.objects.filter(is_active=True)
         
         for word in words:
-            # ADDED: Q(description__icontains=word) jisse description se bhi search ho
             product_results = product_results.filter(
                 Q(name__icontains=word) | 
                 Q(description__icontains=word) | 
@@ -447,7 +412,6 @@ class SearchSuggestAPIView(APIView):
             )
             brand_results = brand_results.filter(name__icontains=word)
             
-        # ADDED: Relevance Ranking for top results (Description priority added)
         product_results = product_results.annotate(
             relevance=Case(
                 When(name__istartswith=query, then=Value(1)), 
@@ -462,7 +426,6 @@ class SearchSuggestAPIView(APIView):
         
         data = []
         
-        # ADVANCED: Brands Rich Data
         for b in brand_results:
             logo_url = request.build_absolute_uri(b.logo.url) if b.logo else None
             data.append({
@@ -472,9 +435,7 @@ class SearchSuggestAPIView(APIView):
                 "url": f"/search_results.html?brand={b.id}"
             })
             
-        # ADVANCED: Products Rich Data (Prices & Images included)
         for p in product_results:
-            # Safe Image Fetching (Adapts to your model structure)
             image_url = None
             if hasattr(p, 'image') and p.image:
                 image_url = request.build_absolute_uri(p.image.url)
@@ -484,7 +445,7 @@ class SearchSuggestAPIView(APIView):
             data.append({
                 "text": p.name, 
                 "type": p.category.name if p.category else "Product", 
-                "price": getattr(p, 'mrp', None), # Adds Price for frontend
+                "price": getattr(p, 'mrp', None), 
                 "image": image_url,
                 "url": f"/product.html?code={p.sku}"
             })

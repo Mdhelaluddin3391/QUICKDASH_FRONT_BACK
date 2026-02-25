@@ -15,4 +15,4 @@ class PaymentSerializer(serializers.ModelSerializer):
             "provider_payment_id",
             "created_at"
         )
-        read_only_fields = fields # Payment history is read-only
+        read_only_fields = fields 

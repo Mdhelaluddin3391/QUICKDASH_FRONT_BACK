@@ -6,30 +6,26 @@ from .models import Order, OrderItem
 from .models import OrderConfiguration
 from apps.catalog.models import Product
 from apps.delivery.tasks import retry_auto_assign_rider
-from apps.customers.models import CustomerAddress # NEW IMPORT ADDED
+from apps.customers.models import CustomerAddress 
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
-    # 3. 'product_image' ko readonly_fields aur fields mein add karein
     readonly_fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal')
     can_delete = False
     fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal')
     show_change_link = False
 
-    # 4. Image dikhane ke liye custom function banayein
     def product_image(self, obj):
         if obj.sku:
-            # SKU ke basis par Product find karein
             product = Product.objects.filter(sku=obj.sku).first()
             if product and product.image:
-                # Agar product aur image mil jaye, toh HTML <img> tag return karein
                 return format_html(
                     '<img src="{}" width="50" height="50" style="object-fit: cover; border-radius: 4px; box-shadow: 0 0 2px rgba(0,0,0,0.3);" />', 
                     product.image
                 )
         return "No Image"
-    product_image.short_description = "Image" # Column ka naam
+    product_image.short_description = "Image" 
 
     def subtotal(self, obj):
         if obj.price is None or obj.quantity is None:
@@ -144,12 +140,10 @@ class OrderAdmin(admin.ModelAdmin):
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
-    # --- Delivery address helpers (SUPER SMART FIX) ---
     def delivery_name(self, obj):
         addr = obj.delivery_address_json or {}
         name = addr.get('receiver_name') or addr.get('name')
         
-        # 1. Agar JSON me name nahi hai, toh Database se real address nikal kar check karo
         if not name and addr.get('id'):
             try:
                 real_addr = CustomerAddress.objects.get(id=addr.get('id'))
@@ -157,7 +151,6 @@ class OrderAdmin(admin.ModelAdmin):
             except Exception:
                 pass
                 
-        # 2. Agar phir bhi naam nahi mila, toh User Profile se lo
         if not name and obj.user:
             name = f"{obj.user.first_name} {obj.user.last_name}".strip()
             
@@ -168,7 +161,6 @@ class OrderAdmin(admin.ModelAdmin):
         addr = obj.delivery_address_json or {}
         phone = addr.get('receiver_phone') or addr.get('phone')
         
-        # 1. Agar JSON me phone nahi hai, toh Database se original address nikal kar check karo
         if not phone and addr.get('id'):
             try:
                 real_addr = CustomerAddress.objects.get(id=addr.get('id'))
@@ -176,7 +168,6 @@ class OrderAdmin(admin.ModelAdmin):
             except Exception:
                 pass
                 
-        # 2. Agar phir bhi phone nahi mila, toh User Profile se lo
         if not phone and obj.user:
             phone = getattr(obj.user, 'phone', None)
             
@@ -190,7 +181,6 @@ class OrderAdmin(admin.ModelAdmin):
             
         details = []
         
-        # SUPER SMART ADDRESS FETCHER: ID use karke original Address Model dhundo
         real_addr = None
         if addr_json.get('id'):
             try:
@@ -198,7 +188,6 @@ class OrderAdmin(admin.ModelAdmin):
             except Exception:
                 pass
 
-        # Agar real address database me mil gaya, toh saari details proper dikhao
         if real_addr:
             if real_addr.house_no: details.append(f"<b>House/Flat:</b> {real_addr.house_no}")
             if real_addr.floor_no: details.append(f"<b>Floor:</b> {real_addr.floor_no}")
@@ -212,7 +201,6 @@ class OrderAdmin(admin.ModelAdmin):
             if real_addr.google_address_text: 
                 details.append(f"<b>Map Address:</b> {real_addr.google_address_text}")
         else:
-            # Fallback (Agar database se wo address delete ho gaya ho)
             if addr_json.get('full_address'): 
                 details.append(f"<b>Full Address:</b> {addr_json.get('full_address')}")
             if addr_json.get('city'):
@@ -239,7 +227,6 @@ class OrderAdmin(admin.ModelAdmin):
         )
     Maps_link.short_description = "Customer Map Location"
 
-    # --- Admin Actions Updates ---
 
     def mark_as_confirmed(self, request, queryset):
         updated = queryset.filter(status='created').update(status='confirmed')
@@ -251,7 +238,6 @@ class OrderAdmin(admin.ModelAdmin):
         self.message_user(request, f"{updated} orders marked as picking.")
     mark_as_picking.short_description = "Mark selected orders as Picking"
 
-    # 2. Logic Update: Update status AND Trigger Rider Search
     def mark_as_packed(self, request, queryset):
         orders_to_update = list(queryset.filter(status__in=['created', 'confirmed', 'picking']).values_list('id', flat=True))
         

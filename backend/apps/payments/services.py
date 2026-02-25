@@ -1,4 +1,3 @@
-# apps/payments/services.py
 import razorpay
 import logging
 import hmac
@@ -16,7 +15,6 @@ from apps.delivery.auto_assign import AutoRiderAssignmentService
 from apps.utils.resilience import CircuitBreaker, CircuitBreakerOpenException
 from apps.utils.exceptions import BusinessLogicException
 
-# Initialize Client safely
 try:
     client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET))
 except Exception:
@@ -33,18 +31,15 @@ class PaymentService:
         Creates a payment intent on the Gateway.
         Idempotent: Returns existing payment if order is already linked.
         """
-        # Lock Order to prevent concurrent clicks
         from apps.orders.models import Order
         order = Order.objects.select_for_update().get(id=order.id)
 
-        # 1. Idempotency Check
         if hasattr(order, "payment"):
             return order.payment
 
         if not client:
             raise BusinessLogicException("Payment Gateway not configured", code="config_error")
 
-        # 2. Circuit Breaker Protection
         @CircuitBreaker(service_name="razorpay", failure_threshold=5, recovery_timeout=30)
         def _call_gateway():
             amount_paise = int(order.total_amount * 100)
@@ -63,7 +58,6 @@ class PaymentService:
             logger.error(f"Razorpay Create Error: {e}")
             raise BusinessLogicException("Payment Gateway Error", code="gateway_error")
 
-        # 3. Create Local Record
         return Payment.objects.create(
             order=order,
             amount=order.total_amount,
@@ -79,37 +73,29 @@ class PaymentService:
         Secure against Replay Attacks.
         """
         try:
-            # PESSIMISTIC LOCK
             payment = Payment.objects.select_for_update().get(id=payment_id)
         except Payment.DoesNotExist:
             raise BusinessLogicException("Payment not found", code="not_found")
 
-        # 1. Idempotency & Replay Guard
         if payment.status == "paid":
             if payment.provider_payment_id != provider_payment_id:
                 logger.critical(f"Security Alert: Payment {payment.id} ID Mismatch! Stored: {payment.provider_payment_id}, New: {provider_payment_id}")
-                # We return success to Gateway to stop retries, but log critical error
             return payment
 
-        # 2. Validation
         if payment.provider_order_id and payment.provider_order_id != provider_order_id:
              raise BusinessLogicException("Order ID Mismatch - Potential Fraud", code="fraud_check")
 
-        # 3. Update State
         payment.provider_payment_id = provider_payment_id
         payment.status = "paid"
         payment.save()
 
-        # 4. Update Order
         order = payment.order
         if order.status == "cancelled":
              logger.warning(f"Payment received for cancelled order {order.id}. Auto-refund logic required.")
-             # Trigger auto-refund here if needed
         else:
             order.status = "confirmed"
             order.save(update_fields=["status"])
 
-        # 5. Side Effects (Async)
         transaction.on_commit(lambda: AuditService.payment_success(payment))
         transaction.on_commit(lambda: PaymentService._trigger_delivery(order.id))
         
@@ -124,11 +110,9 @@ class PaymentService:
             from apps.orders.models import Order
             order = Order.objects.get(id=order_id)
             
-            # Attempt Immediate Assignment
             delivery = AutoRiderAssignmentService.assign(order)
             
             if not delivery:
-                # If immediate fail, queue retry
                 retry_auto_assign_rider.delay(order.id)
         except Exception as e:
             logger.error(f"Delivery trigger failed for {order_id}: {e}")
@@ -178,7 +162,6 @@ class PaymentService:
         payment.status = "failed"
         payment.save()
 
-        # Release reserved inventory immediately
         InventoryService.release_stock_for_order(payment.order)
         
         AuditService.payment_failed(payment)
@@ -204,7 +187,6 @@ class ReconciliationService:
                 
                 if provider_data.get('status') == 'paid':
                     logger.info(f"Reconciling stuck payment {payment.id}")
-                    # Use the first attempt ID if available
                     attempts = provider_data.get('attempts', [])
                     attempt_id = attempts[0]['id'] if attempts else "reconciled_no_id"
                     
