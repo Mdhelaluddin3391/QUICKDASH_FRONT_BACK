@@ -140,52 +140,72 @@
     font-weight: 600;
 }
 
-.category-scroll {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-    gap: 20px;
+
+.category-scroll-section {
+    margin-bottom: 40px;
 }
 
-.cat-card {
+.section-head {
     display: flex;
-    flex-direction: column;
+    justify-content: space-between;
     align-items: center;
+    margin-bottom: 15px;
+    padding: 0 5px;
+}
+
+.section-head h3 {
+    font-size: 1.3rem;
+    font-weight: 700;
+}
+
+.section-head a {
+    color: var(--primary);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+/* SAME GRID AS CATEGORY PAGE */
+.category-scroll {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+}
+
+/* CARD STYLE SAME AS CATEGORY PAGE */
+.cat-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 12px;
     text-align: center;
+    border: 1px solid #eee;
     cursor: pointer;
-    transition: 0.3s;
+}
+
+/* NO HOVER EFFECT */
+.cat-card:hover {
+    transform: none;
+    box-shadow: none;
 }
 
 .cat-img-box {
-    width: 90px;
-    height: 90px;
-    background: #fff;
-    border-radius: 25px;
+    width: 100%;
+    height: 80px;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 10px;
-    box-shadow: var(--shadow-sm);
-    border: 1px solid var(--border-color);
-    transition: 0.3s;
-}
-
-.cat-card:hover .cat-img-box {
-    background: var(--primary-light);
-    border-color: var(--primary);
-    transform: translateY(-5px);
-    box-shadow: var(--shadow-md);
+    margin-bottom: 8px;
 }
 
 .cat-img-box img {
-    width: 50px;
-    height: 50px;
+    width: 55px;
+    height: 55px;
     object-fit: contain;
 }
 
 .cat-name {
+    font-size: 13px;
     font-weight: 600;
-    font-size: 0.9rem;
-    color: var(--text-main);
+    color: #333;
 }
 
 /* =========================================
@@ -388,5 +408,19 @@
 
     .cat-name {
         font-size: 0.75rem;
+    }
+}
+
+
+/* Responsive */
+@media(max-width:768px){
+    .category-scroll{
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media(max-width:480px){
+    .category-scroll{
+        grid-template-columns: repeat(2, 1fr);
     }
 }
