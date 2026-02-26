@@ -110,6 +110,7 @@ INSTALLED_APPS = [
     "storages",
     "django_celery_beat",
     "leaflet",
+    'import_export',
 
     # Local apps
     "apps.accounts",
