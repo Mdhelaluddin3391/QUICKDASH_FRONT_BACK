@@ -220,3 +220,86 @@ async function loadRelatedProducts(mainProduct) {
         console.warn("Silent Fail: Related products could not be loaded", error);
     }
 }
+
+
+
+async function loadRelatedProducts(mainProduct) {
+    try {
+        const endpoint = `/catalog/skus/?limit=10`;
+        const response = await window.ApiService.get(endpoint);
+        let allProducts = response.results ? response.results : response;
+
+        if (!Array.isArray(allProducts)) return;
+
+        let filteredProducts = allProducts.filter(p => p.sku !== mainProduct.sku && p.id !== mainProduct.id);
+        const productsToShow = filteredProducts.slice(0, 5); // 5 items
+
+        const section = document.getElementById('related-products-section');
+        const grid = document.getElementById('related-products-grid');
+
+        if (productsToShow.length > 0 && section && grid) {
+            section.classList.remove('d-none');
+            
+            // Render Standardized Cards
+            grid.innerHTML = productsToShow.map(p => {
+                const finalPrice = p.sale_price || p.selling_price || p.price;
+                const imageSrc = p.image || p.image_url || 'https://via.placeholder.com/200';
+                const formattedPrice = window.Formatters ? window.Formatters.currency(finalPrice) : '₹' + finalPrice;
+                const isOOS = p.available_stock <= 0;
+
+                // Standardized Delivery Badge
+                let deliveryBadge = '';
+                if (p.delivery_eta) {
+                    let badgeClass = p.delivery_type === 'dark_store' ? 'badge-instant' : 'badge-mega';
+                    let icon = p.delivery_type === 'dark_store' ? '⚡' : '📦';
+                    deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:8px; right:8px; color:white; padding:3px 6px; border-radius:6px; font-size:0.65rem; font-weight:bold; z-index:2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${icon} ${p.delivery_eta}</div>`;
+                }
+
+                return `
+                    <div class="card product-card">
+                        ${deliveryBadge}
+                        <a href="./product.html?code=${p.sku || p.id}" style="text-decoration:none; color:inherit;">
+                            <img src="${imageSrc}" style="opacity: ${isOOS ? 0.5 : 1};">
+                            <div class="item-name">${p.name}</div>
+                            <div class="item-unit text-muted small mb-2" style="font-size:0.8rem;">${p.unit || '1 Unit'}</div>
+                        </a>
+                        <div class="d-flex justify-between align-center mt-auto">
+                            <div style="font-weight:700; font-size:1.05rem;">${formattedPrice}</div>
+                            ${isOOS ? 
+                                `<button class="btn btn-sm btn-secondary" style="border-radius:6px; padding: 6px 16px;" disabled>OOS</button>` : 
+                                `<button class="btn btn-sm btn-outline-primary" style="border-radius:6px; padding: 6px 16px;" onclick="addSuggestionToCart('${p.sku || p.id}', this)">ADD</button>`
+                            }
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    } catch (error) {
+        console.warn("Silent Fail: Related products could not be loaded", error);
+    }
+}
+
+// Global Suggestion Add to Cart logic specially for Product page
+window.addSuggestionToCart = async function(skuCode, btn) {
+    if (!localStorage.getItem(window.APP_CONFIG.STORAGE_KEYS.TOKEN)) {
+        window.Toast.warning("Login required");
+        setTimeout(() => window.location.href = window.APP_CONFIG.ROUTES.LOGIN, 1500);
+        return;
+    }
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '...';
+    try {
+        await window.CartService.addItem(skuCode, 1);
+        window.Toast.success("Added");
+        btn.innerHTML = '✔';
+    } catch (e) {
+        window.Toast.error(e.message || "Failed");
+        btn.innerHTML = originalText;
+    } finally {
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = "ADD";
+        }, 2000);
+    }
+};

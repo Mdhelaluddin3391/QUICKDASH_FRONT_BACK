@@ -29,12 +29,13 @@
 }
 .card:hover { box-shadow: var(--shadow-md); }
 
+/* Cards & Product Cards - UPDATED */
 .product-card {
     position: relative;
     display: flex; flex-direction: column;
     height: 100%; text-decoration: none; color: inherit;
-    background: #fff; border: 1px solid transparent;
-    border-radius: 16px; padding: 15px;
+    background: #fff; border: 1px solid #eee; /* Added visible border */
+    border-radius: 12px; padding: 10px; /* Slimmer: Changed radius to 12px, padding to 10px */
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 .product-card:hover {
@@ -43,10 +44,20 @@
     transform: translateY(-5px);
 }
 .product-card img {
-    width: 100%; height: 140px; object-fit: contain;
-    margin-bottom: 15px; transition: transform 0.3s;
+    width: 100%; height: 110px; object-fit: contain; /* Slimmer: Height reduced from 140px to 110px */
+    margin-bottom: 10px; transition: transform 0.3s;
 }
 .product-card:hover img { transform: scale(1.05); }
+
+/* Common Item Name Styling for consistency */
+.product-card .item-name {
+    font-weight: 600; 
+    font-size: 0.95rem; 
+    height: 40px; /* Fix height for 2 lines */
+    overflow: hidden; 
+    line-height: 1.4;
+    margin-bottom: 4px;
+}
 
 /* Forms */
 .form-group { margin-bottom: 20px; }

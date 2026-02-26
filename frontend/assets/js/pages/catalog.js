@@ -260,43 +260,42 @@ async function loadProducts(reset = false) {
 
 function renderProductCards(products, container) {
     const html = products.map(p => {
-        const imgUrl = p.image_url || 'https://via.placeholder.com/150?text=No+Image';
+        const imageSrc = p.image_url || p.image || 'https://via.placeholder.com/150?text=No+Image';
+        const finalPrice = p.sale_price || p.price || 0;
+        const isOOS = p.available_stock <= 0;
         
         let discountBadge = '';
         if (p.mrp && p.sale_price && p.mrp > p.sale_price) {
             const off = Math.round(((p.mrp - p.sale_price) / p.mrp) * 100);
-            discountBadge = `<div class="badge-off" style="position:absolute; top:10px; left:10px; background:#ef4444; color:white; padding:2px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold; z-index:2;">${off}% OFF</div>`;
+            discountBadge = `<div class="badge-off" style="position:absolute; top:8px; left:8px; background:#ef4444; color:white; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold; z-index:2;">${off}% OFF</div>`;
         }
 
-        // ETA / Delivery Badge logic
+        // ETA / Delivery Badge logic (Standardized)
         let deliveryBadge = '';
         if (p.delivery_eta) {
             let badgeClass = p.delivery_type === 'dark_store' ? 'badge-instant' : 'badge-mega';
             let icon = p.delivery_type === 'dark_store' ? '⚡' : '📦';
-            // Tag ko top right mein place kar rahe hain
-            deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:10px; right:10px; color:white; padding:3px 8px; border-radius:6px; font-size:0.65rem; font-weight:bold; z-index:2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${icon} ${p.delivery_eta}</div>`;
+            deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:8px; right:8px; color:white; padding:3px 6px; border-radius:6px; font-size:0.65rem; font-weight:bold; z-index:2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${icon} ${p.delivery_eta}</div>`;
         }
 
-        const isOOS = p.available_stock <= 0;
-
         return `
-        <div class="card product-card" style="position:relative; padding:15px; border:1px solid #eee; transition:0.3s;">
+        <div class="card product-card">
             ${discountBadge}
             ${deliveryBadge}
             <a href="./product.html?code=${p.sku}" style="text-decoration:none; color:inherit;">
-                <img src="${imgUrl}" style="width:100%; height:140px; object-fit:contain; margin-bottom:15px; opacity: ${isOOS ? 0.5 : 1};" loading="lazy">
-                <div class="item-name" style="font-weight:600; font-size:0.95rem; height:44px; overflow:hidden; line-height:1.4;">${p.name}</div>
+                <img src="${imageSrc}" style="opacity: ${isOOS ? 0.5 : 1};" loading="lazy">
+                <div class="item-name">${p.name}</div>
+                <div class="item-unit text-muted small mb-2" style="font-size:0.8rem;">${p.unit || '1 Unit'}</div>
             </a>
-            <div class="item-unit text-muted small mb-2">${p.unit || '1 Unit'}</div>
             
-            <div class="d-flex justify-between align-center mt-2">
-                <div class="price-section">
-                    <span class="font-bold" style="font-size:1.1rem;">${Formatters.currency(p.sale_price || p.price)}</span>
-                    ${p.mrp > (p.sale_price || p.price) ? `<span class="text-muted small ml-1" style="text-decoration: line-through; font-size:0.85rem;">${Formatters.currency(p.mrp)}</span>` : ''}
+            <div class="d-flex justify-between align-center mt-auto">
+                <div class="price-section d-flex flex-column">
+                    <span class="font-bold" style="font-size:1.05rem; line-height:1;">${Formatters.currency(finalPrice)}</span>
+                    ${p.mrp > finalPrice ? `<span class="text-muted small" style="text-decoration: line-through; font-size:0.75rem; margin-top:2px;">${Formatters.currency(p.mrp)}</span>` : ''}
                 </div>
                 ${isOOS ? 
-                    `<button class="btn btn-sm btn-secondary" style="border-radius:6px; padding: 6px 20px;" disabled>OOS</button>` : 
-                    `<button class="btn btn-sm btn-outline-primary" style="border-radius:6px; padding: 6px 20px;" onclick="addToCart('${p.sku}', this)">ADD</button>`
+                    `<button class="btn btn-sm btn-secondary" style="border-radius:6px; padding: 6px 16px;" disabled>OOS</button>` : 
+                    `<button class="btn btn-sm btn-outline-primary" style="border-radius:6px; padding: 6px 16px;" onclick="window.addToCart('${p.sku}', this)">ADD</button>`
                 }
             </div>
         </div>

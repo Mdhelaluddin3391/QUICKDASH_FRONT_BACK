@@ -432,31 +432,29 @@ function createProductCard(p) {
     const imageSrc = p.image_url || p.image || 'https://via.placeholder.com/150?text=No+Image';
     const price = p.sale_price || p.selling_price || p.price || 0;
     const sku = p.sku || p.id;
+    const isOOS = p.available_stock <= 0;
     
-    // ETA / Delivery Badge logic
+    // ETA / Delivery Badge logic (Standardized)
     let deliveryBadge = '';
     if (p.delivery_eta) {
         let badgeClass = p.delivery_type === 'dark_store' ? 'badge-instant' : 'badge-mega';
         let icon = p.delivery_type === 'dark_store' ? '⚡' : '📦';
-        deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:8px; right:8px; color:white; padding:3px 6px; border-radius:4px; font-size:0.65rem; font-weight:bold; z-index:2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${icon} ${p.delivery_eta}</div>`;
+        deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:8px; right:8px; color:white; padding:3px 6px; border-radius:6px; font-size:0.65rem; font-weight:bold; z-index:2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${icon} ${p.delivery_eta}</div>`;
     }
 
-    const isOOS = p.available_stock <= 0;
-
     return `
-        <div class="card product-card" style="padding:10px; border:1px solid #eee; box-shadow:none; position:relative;">
+        <div class="card product-card">
             ${deliveryBadge}
-            <a href="./product.html?code=${sku}">
-                <img src="${imageSrc}" style="width:100%; height:120px; object-fit:contain; margin-bottom:8px; opacity: ${isOOS ? 0.5 : 1}">
-                <div style="font-size:0.9rem; font-weight:600; height:40px; overflow:hidden; margin-bottom:5px;">
-                    ${p.name}
-                </div>
+            <a href="./product.html?code=${sku}" style="text-decoration:none; color:inherit;">
+                <img src="${imageSrc}" style="opacity: ${isOOS ? 0.5 : 1}">
+                <div class="item-name">${p.name}</div>
+                <div class="item-unit text-muted small mb-2" style="font-size:0.8rem;">${p.unit || '1 Unit'}</div>
             </a>
-            <div class="d-flex justify-between align-center mt-2">
-                <div style="font-weight:700;">${Formatters.currency(price)}</div>
+            <div class="d-flex justify-between align-center mt-auto">
+                <div style="font-weight:700; font-size:1.05rem;">${Formatters.currency(price)}</div>
                 ${isOOS ? 
-                    '<button class="btn btn-sm btn-secondary" disabled>OOS</button>' : 
-                    `<button class="btn btn-sm btn-outline-primary" onclick="addToCart('${sku}', this)">ADD</button>`
+                    '<button class="btn btn-sm btn-secondary" style="border-radius:6px; padding: 6px 16px;" disabled>OOS</button>' : 
+                    `<button class="btn btn-sm btn-outline-primary" style="border-radius:6px; padding: 6px 16px;" onclick="window.addToCart('${sku}', this)">ADD</button>`
                 }
             </div>
         </div>
