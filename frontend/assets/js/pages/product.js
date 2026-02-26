@@ -251,8 +251,9 @@ async function loadRelatedProducts(mainProduct) {
                 let deliveryBadge = '';
                 if (p.delivery_eta) {
                     let badgeClass = p.delivery_type === 'dark_store' ? 'badge-instant' : 'badge-mega';
-                    let icon = p.delivery_type === 'dark_store' ? '⚡' : '📦';
-                    deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:8px; right:8px; color:white; padding:3px 6px; border-radius:6px; font-size:0.65rem; font-weight:bold; z-index:2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${icon} ${p.delivery_eta}</div>`;
+// icon wali line yahan se hata di gayi hai
+deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:8px; right:8px; color:white; padding:3px 6px; border-radius:6px; font-size:0.65rem; font-weight:bold; z-index:2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${p.delivery_eta}</div>`; 
+// Upar HTML mein se ${icon} ko bhi hata diya gaya hai
                 }
 
                 return `
