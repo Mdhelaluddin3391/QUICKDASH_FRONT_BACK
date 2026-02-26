@@ -142,7 +142,7 @@
 
 
 .category-scroll-section {
-    margin-bottom: 40px;
+    margin-bottom: 30px; /* Thoda space adjust kiya */
 }
 
 .section-head {
@@ -150,64 +150,82 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 15px;
-    padding: 0 5px;
+    padding: 0 10px; /* Side padding for alignment */
 }
 
 .section-head h3 {
-    font-size: 1.3rem;
+    font-size: 1.2rem; /* Thoda sleek font size */
     font-weight: 700;
+    color: var(--text-main);
+    margin: 0;
 }
 
 .section-head a {
     color: var(--primary);
     font-weight: 600;
     text-decoration: none;
+    font-size: 0.9rem;
 }
 
-/* SAME GRID AS CATEGORY PAGE */
 .category-scroll {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 10px;
+    /* Desktop default, mobile mein overide hoga */
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); 
+    gap: 15px 10px; /* Row gap 15px, Column gap 10px */
+    padding: 0 10px; /* Container ko align rakhne ke liye */
 }
 
-/* CARD STYLE SAME AS CATEGORY PAGE */
+/* CARDS KI STYLING - NO BORDERS */
 .cat-card {
-    background: #fff;
-    border-radius: 12px;
-    padding: 12px;
+    background: transparent; /* Safed dibba hata diya */
+    border: none; /* Border hata diya */
+    padding: 0;
     text-align: center;
-    border: 1px solid #eee;
     cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px; /* Image aur text ke beech ka space */
 }
 
-/* NO HOVER EFFECT */
-.cat-card:hover {
-    transform: none;
-    box-shadow: none;
-}
-
+/* IMAGE CONTAINER - BLINKIT STYLE SOFT BG */
 .cat-img-box {
     width: 100%;
-    height: 80px;
+    aspect-ratio: 1 / 1; /* Isko perfect chokor (square) banayega */
+    background-color: #f3f4f6; /* Blinkit jaisa bahut light grey background */
+    border-radius: 16px; /* Modern rounded corners */
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 8px;
+    transition: transform 0.2s ease;
+}
+
+/* Tap karne par halka sa dabega (Blinkit feel) */
+.cat-card:active .cat-img-box {
+    transform: scale(0.95);
 }
 
 .cat-img-box img {
-    width: 55px;
-    height: 55px;
+    width: 75%; /* Image ab container ka zyada hissa legi */
+    height: 75%;
     object-fit: contain;
+    /* Agar aapki images ka background white hai, toh 'multiply' use transparent bana dega */
+    mix-blend-mode: multiply; 
 }
 
+/* TEXT STYLING */
 .cat-name {
-    font-size: 13px;
-    font-weight: 600;
-    color: #333;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #4b5563; /* Thoda soft black/grey */
+    line-height: 1.2;
+    /* Agar naam lamba ho toh max 2 line me dikhaye, aage '...' laga de */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    width: 95%;
 }
-
 /* =========================================
    FLASH SALE
 ========================================= */
@@ -411,9 +429,17 @@
     }
 }
 
-@media(max-width:480px){
-    .category-scroll{
-        /* Mobile me 4 hi items rakhe hai taaki 8 items 2 rows me perfect fit hon */
-        grid-template-columns: repeat(4, 1fr); 
+
+
+
+@media(max-width: 768px) {
+    .category-scroll {
+        /* Mobile par exactly 4 column, jaisa aap chahte the */
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px 8px; /* Neeche thoda zyada space (16px), aaju-baju kam (8px) */
+    }
+
+    .cat-name {
+        font-size: 0.75rem; /* Mobile par text thoda chota taaki clean lage */
     }
 }
