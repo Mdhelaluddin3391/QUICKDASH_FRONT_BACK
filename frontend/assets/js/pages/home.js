@@ -397,8 +397,6 @@ async function loadFlashSales() {
     
     try {
         const response = await ApiService.get('/catalog/flash-sales/');
-        
-        // FIX: Paginated response ko handle karna
         const sales = response.results ? response.results : response;
 
         if (!Array.isArray(sales) || sales.length === 0) {
@@ -407,22 +405,37 @@ async function loadFlashSales() {
         }
         
         section.style.display = 'block';
-        grid.innerHTML = sales.map(item => `
-            <div class="flash-card">
+        grid.innerHTML = sales.map(item => {
+            
+            // ETA / Delivery Badge logic for Flash Sales
+            let deliveryBadge = '';
+            if (item.delivery_eta) {
+                let badgeClass = item.delivery_type === 'dark_store' ? 'badge-instant' : 'badge-mega';
+                // Emojis hata diye gaye hain
+                deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:8px; right:8px; color:white; padding:3px 6px; border-radius:6px; font-size:0.65rem; font-weight:bold; z-index:2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${item.delivery_eta}</div>`;
+            }
+
+            return `
+            <div class="flash-card" style="position: relative; display: flex; flex-direction: column;">
+                ${deliveryBadge}
                 <div class="badge-off">${item.discount_percent}% OFF</div>
-                <a href="./product.html?code=${item.sku_id || item.sku}">
-                    <img src="${item.sku_image}" style="width:100%; height:100px; object-fit:contain; margin-bottom:5px;" onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
-                    <div style="font-size:0.85rem; font-weight:600; height:36px; overflow:hidden;">${item.sku_name}</div>
+                
+                <a href="./product.html?code=${item.sku_id || item.sku}" style="text-decoration:none; color:inherit;">
+                    <img src="${item.sku_image}" style="width:100%; height:110px; object-fit:contain; margin-bottom:10px;" onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
+                    <div style="font-size:0.95rem; font-weight:600; height:40px; overflow:hidden; line-height:1.4; margin-bottom:4px;">${item.sku_name}</div>
                 </a>
-                <div class="f-price-box">
-                    <span>${Formatters.currency(item.discounted_price)}</span>
-                    <span class="f-mrp">${Formatters.currency(item.original_price)}</span>
+                
+                <div class="f-price-box mt-auto d-flex justify-between align-center">
+                    <div>
+                        <span style="font-weight:700; font-size:1.05rem; color:#111;">${Formatters.currency(item.discounted_price)}</span>
+                        <span class="f-mrp text-muted small" style="text-decoration:line-through; font-size:0.75rem;">${Formatters.currency(item.original_price)}</span>
+                    </div>
                 </div>
-                <button onclick="addToCart('${item.sku}', this)" class="btn btn-sm btn-primary w-100 mt-2">ADD</button>
+                
+                <button onclick="window.addToCart('${item.sku || item.sku_id}', this)" class="btn btn-sm btn-primary w-100 mt-2" style="border-radius:6px; padding:8px;">ADD</button>
             </div>
-        `).join('');
+        `}).join('');
     } catch (e) { 
-        // FIX: Error ko console mein dikhayein taaki debugging mein aasaani ho
         console.error("Flash Sales load error:", e);
         section.style.display = 'none'; 
     }
