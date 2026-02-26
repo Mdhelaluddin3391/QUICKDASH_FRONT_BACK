@@ -20,6 +20,10 @@ from django.db.models import Q
 from apps.warehouse.services import WarehouseService
 from apps.inventory.models import InventoryItem
 from rest_framework.pagination import PageNumberPagination
+from django.contrib.gis.geos import Point
+from apps.warehouse.models import Warehouse
+
+
 
 
 class SkuPagination(PageNumberPagination):
@@ -91,13 +95,20 @@ class SkuListAPIView(generics.ListAPIView):
                 qs = qs.filter(brand_id__in=brand_ids)
 
         ordering = self.request.query_params.get('ordering')
-        warehouse = getattr(self.request, 'warehouse', None)
+        
+        lat = self.request.headers.get('X-Location-Lat') or self.request.query_params.get('lat')
+        lng = self.request.headers.get('X-Location-Lng') or self.request.query_params.get('lon')
+        
+        serviceable_warehouses = None
+        if lat and lng:
+            user_location = Point(float(lng), float(lat), srid=4326)
+            serviceable_warehouses = Warehouse.objects.filter(is_active=True, delivery_zone__contains=user_location)
 
         if ordering in ['price_asc', 'price_desc', 'effective_price', '-effective_price']:
-            if warehouse:
+            if serviceable_warehouses and serviceable_warehouses.exists():
                 price_subquery = InventoryItem.objects.filter(
                     sku=OuterRef('sku'),
-                    bin__rack__aisle__zone__warehouse=warehouse
+                    bin__rack__aisle__zone__warehouse__in=serviceable_warehouses
                 ).values('price')[:1]
             else:
                 price_subquery = InventoryItem.objects.filter(
@@ -128,37 +139,57 @@ class SkuListAPIView(generics.ListAPIView):
         return response
 
     def _inject_warehouse_prices(self, data, request):
-        warehouse = getattr(request, 'warehouse', None)
         results = data.get('results') if isinstance(data, dict) else data
         if not results: return
-
-        if not warehouse: 
-            for item in results:
-                item['available_stock'] = 0
-            return
 
         skus = [item.get('sku') for item in results]
         if not skus: return
 
+        lat = request.headers.get('X-Location-Lat') or request.query_params.get('lat')
+        lng = request.headers.get('X-Location-Lng') or request.query_params.get('lon')
+
+        if lat and lng:
+            user_location = Point(float(lng), float(lat), srid=4326)
+            serviceable_warehouses = Warehouse.objects.filter(is_active=True, delivery_zone__contains=user_location)
+        else:
+            warehouse = getattr(request, 'warehouse', None)
+            serviceable_warehouses = Warehouse.objects.filter(id=warehouse.id) if warehouse else Warehouse.objects.none()
+
+        if not serviceable_warehouses.exists():
+            for item in results:
+                item['available_stock'] = 0
+                item['delivery_eta'] = 'Unavailable'
+            return
+
         inventory_items = InventoryItem.objects.filter(
             sku__in=skus,
-            bin__rack__aisle__zone__warehouse=warehouse
-        )
+            bin__rack__aisle__zone__warehouse__in=serviceable_warehouses
+        ).select_related('bin__rack__aisle__zone__warehouse')
         
         inv_map = {}
         for inv in inventory_items:
-            if inv.sku not in inv_map:
-                inv_map[inv.sku] = {'price': inv.price, 'stock': 0}
+            wh_type = inv.warehouse.warehouse_type
+            stock = inv.total_stock - inv.reserved_stock
             
-            inv_map[inv.sku]['stock'] += (inv.total_stock - inv.reserved_stock)
+            if inv.sku not in inv_map:
+                inv_map[inv.sku] = {'price': inv.price, 'stock': stock, 'type': wh_type}
+            else:
+                inv_map[inv.sku]['stock'] += stock
+                if wh_type == 'dark_store':
+                    inv_map[inv.sku]['type'] = 'dark_store'
+                    inv_map[inv.sku]['price'] = inv.price
 
         for item in results:
             sku = item.get('sku')
             if sku in inv_map:
                 item['sale_price'] = inv_map[sku]['price']
                 item['available_stock'] = inv_map[sku]['stock']
+                w_type = inv_map[sku]['type']
+                item['delivery_type'] = w_type
+                item['delivery_eta'] = '10 Mins' if w_type == 'dark_store' else '1-2 Days'
             else:
                 item['available_stock'] = 0
+                item['delivery_eta'] = 'Unavailable'
 
 class SkuDetailAPIView(generics.RetrieveAPIView):
     """
@@ -247,37 +278,33 @@ class StorefrontCatalogAPIView(APIView):
         ],
     )
     def get(self, request):
-        warehouse = getattr(request, 'warehouse', None)
-        
-        if not warehouse:
-            lat = request.query_params.get("lat")
-            lon = request.query_params.get("lon")
-            if lat and lon:
-                warehouse = WarehouseService.get_nearest_warehouse(lat, lon)
+        lat = request.headers.get('X-Location-Lat') or request.query_params.get("lat")
+        lon = request.headers.get('X-Location-Lng') or request.query_params.get("lon")
+        city = request.query_params.get("city", "")
 
-        if not warehouse:
+        serviceable_warehouses = Warehouse.objects.none()
+        if lat and lon:
+            user_location = Point(float(lon), float(lat), srid=4326)
+            serviceable_warehouses = Warehouse.objects.filter(is_active=True, delivery_zone__contains=user_location)
+
+        if not serviceable_warehouses.exists():
             return Response({"serviceable": False, "message": "Location not serviceable"}, status=200)
 
         skus_in_stock = InventoryItem.objects.filter(
-            bin__rack__aisle__zone__warehouse=warehouse,
+            bin__rack__aisle__zone__warehouse__in=serviceable_warehouses,
             total_stock__gt=F('reserved_stock')
         ).values_list('sku', flat=True).distinct()
 
-    
         all_categories = Category.objects.filter(is_active=True, parent__isnull=True).order_by('id')
         
         page_number = request.query_params.get('page', 1)
-        page_size = 4 
-        
-        paginator = Paginator(all_categories, page_size)
+        paginator = Paginator(all_categories, 4)
         
         try:
             page_obj = paginator.page(page_number)
         except Exception:
             return Response({
                 "serviceable": True,
-                "warehouse_id": warehouse.id,
-                "warehouse_name": warehouse.name,
                 "categories": [],
                 "has_next": False
             })
@@ -286,7 +313,7 @@ class StorefrontCatalogAPIView(APIView):
         for cat in page_obj:
             price_subquery = InventoryItem.objects.filter(
                 sku=OuterRef('sku'),
-                bin__rack__aisle__zone__warehouse=warehouse
+                bin__rack__aisle__zone__warehouse__in=serviceable_warehouses
             ).values('price')[:1]
 
             products = Product.objects.filter(
@@ -303,44 +330,41 @@ class StorefrontCatalogAPIView(APIView):
             if products.exists():
                 p_data = ProductSerializer(products, many=True, context={'request': request}).data
                 
-                product_skus = [p['sku'] for p in p_data]
                 inventory_qs = InventoryItem.objects.filter(
-                    sku__in=product_skus,
-                    bin__rack__aisle__zone__warehouse=warehouse
-                )
+                    sku__in=[p['sku'] for p in p_data],
+                    bin__rack__aisle__zone__warehouse__in=serviceable_warehouses
+                ).select_related('bin__rack__aisle__zone__warehouse')
                 
                 stock_map = {}
                 for inv in inventory_qs:
+                    wh_type = inv.warehouse.warehouse_type
                     if inv.sku not in stock_map:
-                        stock_map[inv.sku] = 0
-                    stock_map[inv.sku] += (inv.total_stock - inv.reserved_stock)
+                        stock_map[inv.sku] = {'stock': 0, 'type': wh_type}
+                    stock_map[inv.sku]['stock'] += (inv.total_stock - inv.reserved_stock)
+                    if wh_type == 'dark_store':
+                        stock_map[inv.sku]['type'] = 'dark_store'
                 
                 for p in p_data: 
-                    p['available_stock'] = stock_map.get(p['sku'], 0) 
+                    sku_info = stock_map.get(p['sku'], {})
+                    p['available_stock'] = sku_info.get('stock', 0) 
+                    w_type = sku_info.get('type', 'mega')
+                    p['delivery_type'] = w_type
+                    p['delivery_eta'] = '10 Mins' if w_type == 'dark_store' else '1-2 Days'
                     
                     if p.get('effective_price') is None:
                         p['effective_price'] = p.get('mrp')
                         p['sale_price'] = p.get('mrp')
 
-                icon_url = None
-                if cat.icon:
-                    if cat.icon.startswith('http'):
-                        icon_url = cat.icon
-                    else:
-                        icon_url = request.build_absolute_uri(cat.icon)
-
                 feed.append({
                     "id": cat.id,
                     "name": cat.name,
                     "slug": cat.slug,
-                    "icon": icon_url,
+                    "icon": request.build_absolute_uri(cat.icon) if cat.icon and not str(cat.icon).startswith('http') else cat.icon,
                     "products": p_data
                 })
 
         return Response({
             "serviceable": True,
-            "warehouse_id": warehouse.id,
-            "warehouse_name": warehouse.name,
             "categories": feed,
             "has_next": page_obj.has_next()
         })

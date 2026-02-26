@@ -407,3 +407,14 @@
     from { transform: translateY(-100%); opacity: 0; }
     to { transform: translateY(0); opacity: 1; }
 }
+
+
+
+/* Delivery ETA Badges */
+.badge-instant {
+    background: linear-gradient(135deg, #e21b70, #ff4d94); /* Dark store pink/red style */
+}
+
+.badge-mega {
+    background: linear-gradient(135deg, #0066ff, #3385ff); /* Mega store blue style */
+}

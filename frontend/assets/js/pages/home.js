@@ -430,14 +430,22 @@ async function loadFlashSales() {
 
 function createProductCard(p) {
     const imageSrc = p.image_url || p.image || 'https://via.placeholder.com/150?text=No+Image';
-    // Handle varying price fields from different APIs (feed vs storefront)
     const price = p.sale_price || p.selling_price || p.price || 0;
     const sku = p.sku || p.id;
     
+    // ETA / Delivery Badge logic
+    let deliveryBadge = '';
+    if (p.delivery_eta) {
+        let badgeClass = p.delivery_type === 'dark_store' ? 'badge-instant' : 'badge-mega';
+        let icon = p.delivery_type === 'dark_store' ? '⚡' : '📦';
+        deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:8px; right:8px; color:white; padding:3px 6px; border-radius:4px; font-size:0.65rem; font-weight:bold; z-index:2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${icon} ${p.delivery_eta}</div>`;
+    }
+
     const isOOS = p.available_stock <= 0;
 
     return `
         <div class="card product-card" style="padding:10px; border:1px solid #eee; box-shadow:none; position:relative;">
+            ${deliveryBadge}
             <a href="./product.html?code=${sku}">
                 <img src="${imageSrc}" style="width:100%; height:120px; object-fit:contain; margin-bottom:8px; opacity: ${isOOS ? 0.5 : 1}">
                 <div style="font-size:0.9rem; font-weight:600; height:40px; overflow:hidden; margin-bottom:5px;">

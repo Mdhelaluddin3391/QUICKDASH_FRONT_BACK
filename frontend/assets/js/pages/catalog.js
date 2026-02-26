@@ -258,8 +258,6 @@ async function loadProducts(reset = false) {
     }
 }
 
-// --- 4. Render Logic ---
-// --- 4. Render Logic ---
 function renderProductCards(products, container) {
     const html = products.map(p => {
         const imgUrl = p.image_url || 'https://via.placeholder.com/150?text=No+Image';
@@ -270,12 +268,21 @@ function renderProductCards(products, container) {
             discountBadge = `<div class="badge-off" style="position:absolute; top:10px; left:10px; background:#ef4444; color:white; padding:2px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold; z-index:2;">${off}% OFF</div>`;
         }
 
-        // NAYA CODE: Check karein ki product out of stock hai ya nahi
+        // ETA / Delivery Badge logic
+        let deliveryBadge = '';
+        if (p.delivery_eta) {
+            let badgeClass = p.delivery_type === 'dark_store' ? 'badge-instant' : 'badge-mega';
+            let icon = p.delivery_type === 'dark_store' ? '⚡' : '📦';
+            // Tag ko top right mein place kar rahe hain
+            deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:10px; right:10px; color:white; padding:3px 8px; border-radius:6px; font-size:0.65rem; font-weight:bold; z-index:2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${icon} ${p.delivery_eta}</div>`;
+        }
+
         const isOOS = p.available_stock <= 0;
 
         return `
         <div class="card product-card" style="position:relative; padding:15px; border:1px solid #eee; transition:0.3s;">
             ${discountBadge}
+            ${deliveryBadge}
             <a href="./product.html?code=${p.sku}" style="text-decoration:none; color:inherit;">
                 <img src="${imgUrl}" style="width:100%; height:140px; object-fit:contain; margin-bottom:15px; opacity: ${isOOS ? 0.5 : 1};" loading="lazy">
                 <div class="item-name" style="font-weight:600; font-size:0.95rem; height:44px; overflow:hidden; line-height:1.4;">${p.name}</div>
