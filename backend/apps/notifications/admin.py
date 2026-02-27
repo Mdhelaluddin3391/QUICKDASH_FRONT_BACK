@@ -2,11 +2,29 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin
 from .models import PhoneOTP, Notification, OTPAbuseLog
 
 
+class PhoneOTPResource(resources.ModelResource):
+    class Meta:
+        model = PhoneOTP
+
+
+class NotificationResource(resources.ModelResource):
+    class Meta:
+        model = Notification
+
+
+class OTPAbuseLogResource(resources.ModelResource):
+    class Meta:
+        model = OTPAbuseLog
+
+
 @admin.register(PhoneOTP)
-class PhoneOTPAdmin(admin.ModelAdmin):
+class PhoneOTPAdmin(ImportExportModelAdmin):
+    resource_class = PhoneOTPResource
     list_display = (
         'phone',
         'otp_masked',
@@ -72,7 +90,8 @@ class PhoneOTPAdmin(admin.ModelAdmin):
 
 
 @admin.register(Notification)
-class NotificationAdmin(admin.ModelAdmin):
+class NotificationAdmin(ImportExportModelAdmin):
+    resource_class = NotificationResource
     list_display = (
         'user_phone',
         'type_badge',
@@ -140,7 +159,8 @@ class NotificationAdmin(admin.ModelAdmin):
 
 
 @admin.register(OTPAbuseLog)
-class OTPAbuseLogAdmin(admin.ModelAdmin):
+class OTPAbuseLogAdmin(ImportExportModelAdmin):
+    resource_class = OTPAbuseLogResource
     list_display = (
         'phone',
         'failed_attempts',
@@ -183,7 +203,6 @@ class OTPAbuseLogAdmin(admin.ModelAdmin):
     last_attempt_date.short_description = "Last Attempt"
     last_attempt_date.admin_order_field = 'last_attempt'
 
-    # Admin Actions
     @admin.action(description='Unblock selected phone numbers')
     def unblock_numbers(self, request, queryset):
         updated = queryset.update(blocked_until=None, failed_attempts=0)

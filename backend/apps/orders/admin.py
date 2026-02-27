@@ -2,11 +2,24 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import localtime
-from .models import Order, OrderItem
-from .models import OrderConfiguration
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin
+from .models import Order, OrderItem, OrderConfiguration
 from apps.catalog.models import Product
 from apps.delivery.tasks import retry_auto_assign_rider
 from apps.customers.models import CustomerAddress 
+
+class OrderResource(resources.ModelResource):
+    class Meta:
+        model = Order
+
+class OrderItemResource(resources.ModelResource):
+    class Meta:
+        model = OrderItem
+
+class OrderConfigurationResource(resources.ModelResource):
+    class Meta:
+        model = OrderConfiguration
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
@@ -35,7 +48,8 @@ class OrderItemInline(admin.TabularInline):
 
 
 @admin.register(Order)
-class OrderAdmin(admin.ModelAdmin):
+class OrderAdmin(ImportExportModelAdmin):
+    resource_class = OrderResource
     list_display = (
         'id',
         'customer_phone',
@@ -271,5 +285,10 @@ class OrderAdmin(admin.ModelAdmin):
 
 
 @admin.register(OrderConfiguration)
-class OrderConfigurationAdmin(admin.ModelAdmin):
+class OrderConfigurationAdmin(ImportExportModelAdmin):
+    resource_class = OrderConfigurationResource
     list_display = ['delivery_fee', 'free_delivery_threshold']
+    list_filter = ['delivery_fee', 'free_delivery_threshold']
+    search_fields = ['delivery_fee', 'free_delivery_threshold']
+    list_per_page = 25
+    readonly_fields = ['delivery_fee', 'free_delivery_threshold']

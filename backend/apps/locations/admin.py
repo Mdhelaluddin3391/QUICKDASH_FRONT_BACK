@@ -2,11 +2,19 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin
 from .models import GeoLocation
 
 
+class GeoLocationResource(resources.ModelResource):
+    class Meta:
+        model = GeoLocation
+
+
 @admin.register(GeoLocation)
-class GeoLocationAdmin(admin.ModelAdmin):
+class GeoLocationAdmin(ImportExportModelAdmin):
+    resource_class = GeoLocationResource
     list_display = (
         'id',
         'user_phone',

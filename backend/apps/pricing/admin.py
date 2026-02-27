@@ -2,11 +2,19 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin
 from .models import SurgeRule
 
 
+class SurgeRuleResource(resources.ModelResource):
+    class Meta:
+        model = SurgeRule
+
+
 @admin.register(SurgeRule)
-class SurgeRuleAdmin(admin.ModelAdmin):
+class SurgeRuleAdmin(ImportExportModelAdmin):
+    resource_class = SurgeRuleResource
     list_display = (
         'warehouse_info',
         'max_multiplier_display',
@@ -55,7 +63,6 @@ class SurgeRuleAdmin(admin.ModelAdmin):
     base_factor_display.admin_order_field = 'base_factor'
 
     def current_surge_status(self, obj):
-      
         return format_html('<span style="color: green;">Normal (1.0x)</span>')
     current_surge_status.short_description = "Current Surge"
 

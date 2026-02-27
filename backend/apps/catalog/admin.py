@@ -8,9 +8,10 @@ from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Sum
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin
 from .models import Product, Category, Brand, Banner, FlashSale
 import requests
-
 
 class ProductImageInline(admin.TabularInline):
     model = None  
@@ -25,8 +26,34 @@ class ProductImageInline(admin.TabularInline):
         return False
 
 
+class ProductResource(resources.ModelResource):
+    class Meta:
+        model = Product
+
+
+class CategoryResource(resources.ModelResource):
+    class Meta:
+        model = Category
+
+
+class BrandResource(resources.ModelResource):
+    class Meta:
+        model = Brand
+
+
+class BannerResource(resources.ModelResource):
+    class Meta:
+        model = Banner
+
+
+class FlashSaleResource(resources.ModelResource):
+    class Meta:
+        model = FlashSale
+
+
 @admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
+class ProductAdmin(ImportExportModelAdmin):
+    resource_class = ProductResource
     change_list_template = "admin/catalog/product/change_list.html"
 
     list_display = (
@@ -89,7 +116,6 @@ class ProductAdmin(admin.ModelAdmin):
         ]
         return new_urls + urls
 
-  
     def import_csv(self, request):
         if request.method == "POST":
             csv_file = request.FILES["csv_file"]
@@ -183,7 +209,6 @@ class ProductAdmin(admin.ModelAdmin):
         payload = {"form": form}
         return render(request, "admin/csv_form.html", payload)
 
-
     def image_preview(self, obj):
         if obj.image:
             return format_html('<img src="{}" style="max-height: 50px; max-width: 50px; border-radius: 5px; object-fit: cover;" />', obj.image)
@@ -262,7 +287,8 @@ class ProductAdmin(admin.ModelAdmin):
 
 
 @admin.register(Category)
-class CategoryAdmin(admin.ModelAdmin):
+class CategoryAdmin(ImportExportModelAdmin):
+    resource_class = CategoryResource
     list_display = ('name', 'icon_preview', 'icon', 'parent_name', 'is_active', 'product_count')
     list_filter = ('is_active', 'parent')
     search_fields = ('name', 'parent__name')
@@ -329,7 +355,8 @@ class CategoryAdmin(admin.ModelAdmin):
 
 
 @admin.register(Brand)
-class BrandAdmin(admin.ModelAdmin):
+class BrandAdmin(ImportExportModelAdmin):
+    resource_class = BrandResource
     list_display = ('name', 'logo_preview', 'logo', 'is_active', 'product_count')
     list_filter = ('is_active',)
     search_fields = ('name',)
@@ -389,7 +416,8 @@ class BrandAdmin(admin.ModelAdmin):
 
 
 @admin.register(Banner)
-class BannerAdmin(admin.ModelAdmin):
+class BannerAdmin(ImportExportModelAdmin):
+    resource_class = BannerResource
     list_display = ('title', 'image_preview', 'position', 'is_active')
     list_filter = ('position', 'is_active')
     search_fields = ('title', 'target_url')
@@ -428,7 +456,8 @@ class BannerAdmin(admin.ModelAdmin):
 
 
 @admin.register(FlashSale)
-class FlashSaleAdmin(admin.ModelAdmin):
+class FlashSaleAdmin(ImportExportModelAdmin):
+    resource_class = FlashSaleResource
     list_display = ('product_name', 'discount_percentage_display', 'end_time', 'is_active')
     list_filter = ('is_active', 'end_time')
     search_fields = ('product__name', 'product__sku')

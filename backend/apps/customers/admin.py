@@ -2,9 +2,26 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import localtime
-from .models import CustomerProfile, CustomerAddress, SupportTicket
 from django.db import models
 from django.urls import reverse
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin
+from .models import CustomerProfile, CustomerAddress, SupportTicket
+
+
+class CustomerProfileResource(resources.ModelResource):
+    class Meta:
+        model = CustomerProfile
+
+
+class CustomerAddressResource(resources.ModelResource):
+    class Meta:
+        model = CustomerAddress
+
+
+class SupportTicketResource(resources.ModelResource):
+    class Meta:
+        model = SupportTicket
 
 
 class CustomerAddressInline(admin.StackedInline):
@@ -20,9 +37,9 @@ class CustomerAddressInline(admin.StackedInline):
     address_summary_view.short_description = "Full Address"
 
 
-
 @admin.register(CustomerProfile)
-class CustomerProfileAdmin(admin.ModelAdmin):
+class CustomerProfileAdmin(ImportExportModelAdmin):
+    resource_class = CustomerProfileResource
     list_display = (
         'user_phone',
         'user_name',
@@ -65,7 +82,6 @@ class CustomerProfileAdmin(admin.ModelAdmin):
         'total_orders', 'total_spent', 'support_tickets_count'
     )
 
-
     def user_phone(self, obj):
         return obj.user.phone
     user_phone.short_description = "Phone"
@@ -106,8 +122,10 @@ class CustomerProfileAdmin(admin.ModelAdmin):
     created_at_date.short_description = "Joined Date"
     created_at_date.admin_order_field = 'created_at'
 
+
 @admin.register(CustomerAddress)
-class CustomerAddressAdmin(admin.ModelAdmin):
+class CustomerAddressAdmin(ImportExportModelAdmin):
+    resource_class = CustomerAddressResource
     list_display = (
         'customer_phone',
         'label_badge',
@@ -228,7 +246,8 @@ class CustomerAddressAdmin(admin.ModelAdmin):
 
 
 @admin.register(SupportTicket)
-class SupportTicketAdmin(admin.ModelAdmin):
+class SupportTicketAdmin(ImportExportModelAdmin):
+    resource_class = SupportTicketResource
     list_display = (
         'id',
         'customer_phone',

@@ -2,7 +2,24 @@ from django.contrib import admin
 from django.db.models import Sum, Q
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin
 from .models import RiderProfile, RiderDocument, RiderPayout
+
+
+class RiderProfileResource(resources.ModelResource):
+    class Meta:
+        model = RiderProfile
+
+
+class RiderDocumentResource(resources.ModelResource):
+    class Meta:
+        model = RiderDocument
+
+
+class RiderPayoutResource(resources.ModelResource):
+    class Meta:
+        model = RiderPayout
 
 
 class RiderDocumentInline(admin.TabularInline):
@@ -15,7 +32,8 @@ class RiderDocumentInline(admin.TabularInline):
 
 
 @admin.register(RiderProfile)
-class RiderProfileAdmin(admin.ModelAdmin):
+class RiderProfileAdmin(ImportExportModelAdmin):
+    resource_class = RiderProfileResource
     list_display = (
         'rider_name',
         'phone',
@@ -58,7 +76,8 @@ class RiderProfileAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at',)
 
     def rider_name(self, obj):
-        return f"{obj.user.first_name} {obj.user.last_name}".strip() or "N/A"
+        name = f"{obj.user.first_name} {obj.user.last_name}".strip()
+        return name or "N/A"
     rider_name.short_description = "Name"
     rider_name.admin_order_field = 'user__first_name'
 
@@ -94,7 +113,9 @@ class RiderProfileAdmin(admin.ModelAdmin):
     kyc_status.short_description = "KYC Status"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y')
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return obj.created_at.strftime('%d/%m/%Y')
+        return "N/A"
     created_at_date.short_description = "Joined"
     created_at_date.admin_order_field = 'created_at'
 
@@ -120,7 +141,8 @@ class RiderProfileAdmin(admin.ModelAdmin):
 
 
 @admin.register(RiderPayout)
-class RiderPayoutAdmin(admin.ModelAdmin):
+class RiderPayoutAdmin(ImportExportModelAdmin):
+    resource_class = RiderPayoutResource
     list_display = ('rider_info', 'amount_display', 'status_badge', 'created_at_date', 'completed_at')
     list_filter = ('status', 'created_at', 'completed_at')
     search_fields = ('rider__user__phone', 'rider__user__first_name', 'transaction_ref')
@@ -155,6 +177,8 @@ class RiderPayoutAdmin(admin.ModelAdmin):
     status_badge.short_description = "Status"
 
     def created_at_date(self, obj):
-        return obj.created_at.strftime('%d/%m/%Y %H:%M')
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return obj.created_at.strftime('%d/%m/%Y %H:%M')
+        return "N/A"
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'

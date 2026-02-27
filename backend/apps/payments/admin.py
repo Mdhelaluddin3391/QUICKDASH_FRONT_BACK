@@ -2,11 +2,24 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin
 from .models import Payment, Refund
 
 
+class PaymentResource(resources.ModelResource):
+    class Meta:
+        model = Payment
+
+
+class RefundResource(resources.ModelResource):
+    class Meta:
+        model = Refund
+
+
 @admin.register(Payment)
-class PaymentAdmin(admin.ModelAdmin):
+class PaymentAdmin(ImportExportModelAdmin):
+    resource_class = PaymentResource
     list_display = (
         'id',
         'order_info',
@@ -103,7 +116,8 @@ class PaymentAdmin(admin.ModelAdmin):
 
 
 @admin.register(Refund)
-class RefundAdmin(admin.ModelAdmin):
+class RefundAdmin(ImportExportModelAdmin):
+    resource_class = RefundResource
     list_display = (
         'id',
         'payment_info',

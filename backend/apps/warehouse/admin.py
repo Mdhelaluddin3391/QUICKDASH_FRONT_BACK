@@ -3,11 +3,49 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import localtime
 from leaflet.admin import LeafletGeoAdmin
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin
 from .models import Warehouse, PickingTask, PackingTask, StorageZone, Aisle, Rack, Bin
 
 
+class WarehouseResource(resources.ModelResource):
+    class Meta:
+        model = Warehouse
+
+
+class PickingTaskResource(resources.ModelResource):
+    class Meta:
+        model = PickingTask
+
+
+class PackingTaskResource(resources.ModelResource):
+    class Meta:
+        model = PackingTask
+
+
+class StorageZoneResource(resources.ModelResource):
+    class Meta:
+        model = StorageZone
+
+
+class AisleResource(resources.ModelResource):
+    class Meta:
+        model = Aisle
+
+
+class RackResource(resources.ModelResource):
+    class Meta:
+        model = Rack
+
+
+class BinResource(resources.ModelResource):
+    class Meta:
+        model = Bin
+
+
 @admin.register(Warehouse)
-class WarehouseAdmin(LeafletGeoAdmin):
+class WarehouseAdmin(ImportExportModelAdmin, LeafletGeoAdmin):
+    resource_class = WarehouseResource
     list_display = (
         'name',
         'code',
@@ -95,7 +133,8 @@ class WarehouseAdmin(LeafletGeoAdmin):
 
 
 @admin.register(PickingTask)
-class PickingTaskAdmin(admin.ModelAdmin):
+class PickingTaskAdmin(ImportExportModelAdmin):
+    resource_class = PickingTaskResource
     list_display = ("order_id", "item_sku", "status_badge", "picker_info", "picked_at", "target_bin")
     list_filter = ("status", "picked_at")
     search_fields = ("order__id", "item_sku", "picker__user__phone", "picker__user__first_name")
@@ -149,7 +188,8 @@ class PickingTaskAdmin(admin.ModelAdmin):
 
 
 @admin.register(PackingTask)
-class PackingTaskAdmin(admin.ModelAdmin):
+class PackingTaskAdmin(ImportExportModelAdmin):
+    resource_class = PackingTaskResource
     list_display = ("order_id", "is_completed_badge", "packer_info", "created_at_date")
     list_filter = ("is_completed", "created_at")
     search_fields = ("order__id", "packer__user__phone", "packer__user__first_name")
@@ -198,7 +238,8 @@ class PackingTaskAdmin(admin.ModelAdmin):
 
 
 @admin.register(StorageZone)
-class StorageZoneAdmin(admin.ModelAdmin):
+class StorageZoneAdmin(ImportExportModelAdmin):
+    resource_class = StorageZoneResource
     list_display = ('warehouse_code', 'name')
     list_filter = ('warehouse',)
     search_fields = ('warehouse__name', 'warehouse__code', 'name')
@@ -210,13 +251,20 @@ class StorageZoneAdmin(admin.ModelAdmin):
     warehouse_code.admin_order_field = 'warehouse__code'
 
 
-admin.site.register(Aisle)
-admin.site.register(Rack)
+@admin.register(Aisle)
+class AisleAdmin(ImportExportModelAdmin):
+    resource_class = AisleResource
+
+
+@admin.register(Rack)
+class RackAdmin(ImportExportModelAdmin):
+    resource_class = RackResource
 
 
 @admin.register(Bin)
-class BinAdmin(admin.ModelAdmin):
-    list_display = ('bin_code', 'capacity_units')
+class BinAdmin(ImportExportModelAdmin):
+    resource_class = BinResource
+    list_display = ('bin_code', 'rack', 'capacity_units')
     list_filter = ('rack__aisle__zone__warehouse',)
     search_fields = ('bin_code',)
     list_select_related = ('rack__aisle__zone__warehouse',)
@@ -224,5 +272,3 @@ class BinAdmin(admin.ModelAdmin):
     def rack_info(self, obj):
         return f"{obj.rack.aisle.zone.warehouse.code} - {obj.rack.aisle.zone.name} - A{obj.rack.aisle.aisle_number} - R{obj.rack.rack_number}"
     rack_info.short_description = "Location"
-    list_display = ("bin_code", "rack", "capacity_units")
-    search_fields = ("bin_code",)

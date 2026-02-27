@@ -4,6 +4,8 @@ from django.contrib.auth.admin import UserAdmin
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin, ImportExportMixin
 from .models import User, UserRole, Address
 
 class CustomUserCreationForm(forms.ModelForm):
@@ -27,8 +29,24 @@ class UserRoleInline(admin.TabularInline):
     show_change_link = False
 
 
+class UserResource(resources.ModelResource):
+    class Meta:
+        model = User
+
+
+class UserRoleResource(resources.ModelResource):
+    class Meta:
+        model = UserRole
+
+
+class AddressResource(resources.ModelResource):
+    class Meta:
+        model = Address
+
+
 @admin.register(User)
-class CustomUserAdmin(UserAdmin):
+class CustomUserAdmin(ImportExportMixin, UserAdmin):
+    resource_class = UserResource
     add_form = CustomUserCreationForm
 
     list_display = (
@@ -147,7 +165,8 @@ class CustomUserAdmin(UserAdmin):
 
 
 @admin.register(UserRole)
-class UserRoleAdmin(admin.ModelAdmin):
+class UserRoleAdmin(ImportExportModelAdmin):
+    resource_class = UserRoleResource
     list_display = ('user_phone', 'user_name', 'role_badge')
     list_filter = ('role',)
     search_fields = ('user__phone', 'user__first_name', 'user__last_name')
@@ -188,7 +207,8 @@ class UserRoleAdmin(admin.ModelAdmin):
 
 
 @admin.register(Address)
-class AddressAdmin(admin.ModelAdmin):
+class AddressAdmin(ImportExportModelAdmin):
+    resource_class = AddressResource
     list_display = ('user_phone', 'address_type', 'city', 'pincode', 'is_default_badge', 'created_at_date')
     list_filter = ('address_type', 'city', 'is_default', 'created_at')
     search_fields = ('user__phone', 'street_address', 'city', 'pincode')

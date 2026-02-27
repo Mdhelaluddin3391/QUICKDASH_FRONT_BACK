@@ -16,28 +16,22 @@ from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from django.conf import settings
 
-# --- 🔥 FIREBASE SETUP START 🔥 ---
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import auth as firebase_auth
 import json
-# Ye tumhari firebase-key.json file ko backend folder me dhundhega
 if not firebase_admin._apps:
     
-    # 1. Pehle hum Environment Variable check karenge (Railway / Docker ke liye best)
     firebase_creds_env = os.getenv('FIREBASE_JSON_CREDENTIALS')
     
     if firebase_creds_env:
-        # Agar ENV variable mila, toh string ko wapas JSON (dictionary) mein convert karke load karenge
         cred_dict = json.loads(firebase_creds_env)
         cred = credentials.Certificate(cred_dict)
     else:
-        # 2. Agar ENV variable nahi mila, toh purana tareeqa use karenge (Local PC ke liye)
         firebase_key_path = os.path.join(settings.BASE_DIR, 'firebase-key.json')
         cred = credentials.Certificate(firebase_key_path)
         
     firebase_admin.initialize_app(cred)
-# --- 🔥 FIREBASE SETUP END 🔥 ---
 
 from .serializers import (
     UserSerializer, 
@@ -68,22 +62,19 @@ class CustomerRegisterAPIView(APIView):
     throttle_classes = [RegistrationThrottle]
 
     def post(self, request):
-        login_type = request.data.get("login_type", "local") # Frontend se check aayega
+        login_type = request.data.get("login_type", "local") 
         phone = request.data.get("phone")
 
-        # 🔥 PLAN A: Firebase verification
         if login_type == "firebase":
             firebase_token = request.data.get("token")
             if not firebase_token:
                 return Response({"error": "Firebase token missing"}, status=status.HTTP_400_BAD_REQUEST)
             try:
-                # Token verify karo aur phone number nikalo (Highly Secure)
                 decoded_token = firebase_auth.verify_id_token(firebase_token)
                 phone = decoded_token.get('phone_number') 
             except Exception as e:
                 return Response({"error": f"Firebase Verification Failed: {str(e)}"}, status=status.HTTP_401_UNAUTHORIZED)
         
-        # 🛠️ PLAN B: Local Custom OTP verification (Tumhara purana code)
         else:
             otp = request.data.get("otp")
             if not phone or not otp:
@@ -93,7 +84,6 @@ class CustomerRegisterAPIView(APIView):
             except Exception as e:
                 return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        # -- Common Logic for both flows: Account Creation & Token Gen --
         if not phone:
              return Response({"error": "Invalid phone number"}, status=status.HTTP_400_BAD_REQUEST)
 

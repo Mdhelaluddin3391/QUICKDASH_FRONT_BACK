@@ -1,11 +1,19 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin
 from .models import Delivery
 
 
+class DeliveryResource(resources.ModelResource):
+    class Meta:
+        model = Delivery
+
+
 @admin.register(Delivery)
-class DeliveryAdmin(admin.ModelAdmin):
+class DeliveryAdmin(ImportExportModelAdmin):
+    resource_class = DeliveryResource
     list_display = (
         'order_id_display',
         'rider_info',

@@ -5,12 +5,25 @@ from django.utils.timezone import localtime
 from django.db import models
 from django.urls import path            
 from django.http import JsonResponse    
+from import_export import resources
+from import_export.admin import ImportExportModelAdmin
 from .models import InventoryItem, InventoryTransaction
 from apps.catalog.models import Product 
 
 
+class InventoryItemResource(resources.ModelResource):
+    class Meta:
+        model = InventoryItem
+
+
+class InventoryTransactionResource(resources.ModelResource):
+    class Meta:
+        model = InventoryTransaction
+
+
 @admin.register(InventoryItem)
-class InventoryItemAdmin(admin.ModelAdmin):
+class InventoryItemAdmin(ImportExportModelAdmin):
+    resource_class = InventoryItemResource
     class Media:
         js = ('inventory/js/sku_lookup.js',)
 
@@ -165,7 +178,8 @@ class InventoryItemAdmin(admin.ModelAdmin):
 
 
 @admin.register(InventoryTransaction)
-class InventoryTransactionAdmin(admin.ModelAdmin):
+class InventoryTransactionAdmin(ImportExportModelAdmin):
+    resource_class = InventoryTransactionResource
     list_display = (
         'inventory_item_info',
         'transaction_type_badge',
