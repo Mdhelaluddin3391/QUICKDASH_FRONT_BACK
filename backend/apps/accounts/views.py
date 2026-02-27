@@ -20,13 +20,22 @@ from django.conf import settings
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import auth as firebase_auth
-
+import json
 # Ye tumhari firebase-key.json file ko backend folder me dhundhega
-firebase_key_path = os.path.join(settings.BASE_DIR, 'firebase-key.json')
-
-# Check karte hain ki Firebase pehle se initialize toh nahi hai (Error se bachne ke liye)
 if not firebase_admin._apps:
-    cred = credentials.Certificate(firebase_key_path)
+    
+    # 1. Pehle hum Environment Variable check karenge (Railway / Docker ke liye best)
+    firebase_creds_env = os.getenv('FIREBASE_JSON_CREDENTIALS')
+    
+    if firebase_creds_env:
+        # Agar ENV variable mila, toh string ko wapas JSON (dictionary) mein convert karke load karenge
+        cred_dict = json.loads(firebase_creds_env)
+        cred = credentials.Certificate(cred_dict)
+    else:
+        # 2. Agar ENV variable nahi mila, toh purana tareeqa use karenge (Local PC ke liye)
+        firebase_key_path = os.path.join(settings.BASE_DIR, 'firebase-key.json')
+        cred = credentials.Certificate(firebase_key_path)
+        
     firebase_admin.initialize_app(cred)
 # --- 🔥 FIREBASE SETUP END 🔥 ---
 
