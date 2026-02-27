@@ -4,10 +4,7 @@ from django.contrib import admin
 from import_export.admin import ImportExportModelAdmin
 from .models import StoreSettings
 
-# ==========================================
-# 1. Global CSV Export Action 
-# (Yeh project ke sabhi tables par automatically apply hoga)
-# ==========================================
+
 def export_as_csv(modeladmin, request, queryset):
     """
     Yeh function selected rows ko CSV format mein export karega.
@@ -37,20 +34,13 @@ def export_as_csv(modeladmin, request, queryset):
 
 export_as_csv.short_description = "Export Selected to CSV"
 
-# Is line se yeh action project ke sabhi admin pages par add ho jayega
 admin.site.add_action(export_as_csv, "export_as_csv")
 
-
-# ==========================================
-# 2. StoreSettingsAdmin Code (Import/Export Library ke sath)
-# ==========================================
-# Dhyan dein: Yahan 'admin.ModelAdmin' ki jagah 'ImportExportModelAdmin' use kiya gaya hai
 @admin.register(StoreSettings)
 class StoreSettingsAdmin(ImportExportModelAdmin):
     list_display = ['is_store_open', 'store_closed_message']
     
     def has_add_permission(self, request):
-        # Yeh ensure karta hai ki admin mein sirf ek hi settings ki row ban sake
         if self.model.objects.exists():
             return False
         return super().has_add_permission(request)
