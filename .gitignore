@@ -57,3 +57,5 @@ celerybeat-schedule
 backend/celerybeat-schedule
 rider_app/node_modules/
 .env    
+
+firebase-key.json

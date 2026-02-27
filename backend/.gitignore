@@ -47,3 +47,5 @@ Thumbs.db
 celerybeat.pid
 celerybeat-schedule
 backend/celerybeat-schedule
+
+firebase-key.json

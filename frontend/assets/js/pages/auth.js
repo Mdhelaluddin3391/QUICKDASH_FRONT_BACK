@@ -1,5 +1,8 @@
 // assets/js/pages/auth.js
 
+
+let isUsingFirebase = false; 
+let confirmationResult = null;
 const stepPhone = document.getElementById('step-phone');
 const stepOtp = document.getElementById('step-otp');
 let phoneNumber = '';
@@ -61,43 +64,65 @@ async function handleSendOtp(e) {
     btn.disabled = true;
     btn.innerHTML = 'Sending...';
 
+    phoneNumber = `+91${rawInput}`;
+
     try {
-        phoneNumber = `+91${rawInput}`;
-        
-        const res = await ApiService.post('/notifications/send-otp/', { phone: phoneNumber });
-        
-        stepPhone.style.display = 'none';
-        stepOtp.style.display = 'block';
-        document.getElementById('display-phone').innerText = phoneNumber;
-        
-        if (res.debug_otp) {
-            Toast.devOTP(res.debug_otp); 
-            
-            // 🔥 NEW: Dev mode mein automatically 6 boxes fill ho jayenge!
-            const debugOtpStr = String(res.debug_otp);
-            const otpInputs = document.querySelectorAll('.otp-input');
-            otpInputs.forEach((inp, i) => {
-                if (debugOtpStr[i]) inp.value = debugOtpStr[i];
+        // 🔥 PLAN A: Firebase SMS Attempt (Latest Modular Syntax)
+        if (!window.recaptchaVerifier) {
+            // Invisible reCAPTCHA (Button click par background mein verify hoga)
+            window.recaptchaVerifier = new window.RecaptchaVerifier(window.firebaseAuth, 'get-otp-btn', {
+                'size': 'invisible'
             });
-
-        } else {
-            Toast.success("OTP Sent successfully");
         }
-
-        startTimerLocal();
         
-        setTimeout(() => {
-            const firstInput = document.querySelector('.otp-input');
-            if(firstInput) firstInput.focus();
-        }, 100);
+        console.log("Attempting Firebase SMS...");
+        window.confirmationResult = await window.signInWithPhoneNumber(window.firebaseAuth, phoneNumber, window.recaptchaVerifier);
+        isUsingFirebase = true; // Firebase pass ho gaya
+        
+        showOtpScreen(phoneNumber);
+        Toast.success("OTP Sent successfully via SMS");
 
-    } catch (err) { 
-        console.error(err);
-        Toast.error(err.message || "Failed to send OTP"); 
+    } catch (firebaseErr) { 
+        console.warn("Firebase SMS Failed. Switching to Local Fallback...", firebaseErr);
+        isUsingFirebase = false; // Firebase fail, ab local system use karenge
+        
+        // 🛠️ PLAN B: Tumhara Local Backend / Render API Fallback
+        try {
+            const res = await ApiService.post('/notifications/send-otp/', { phone: phoneNumber });
+            showOtpScreen(phoneNumber);
+            
+            if (res.debug_otp) {
+                Toast.devOTP(res.debug_otp); 
+                const debugOtpStr = String(res.debug_otp);
+                const otpInputs = document.querySelectorAll('.otp-input');
+                otpInputs.forEach((inp, i) => {
+                    if (debugOtpStr[i]) inp.value = debugOtpStr[i];
+                });
+            } else {
+                Toast.success("OTP Sent successfully (Fallback Mode)");
+            }
+        } catch (localErr) {
+            console.error(localErr);
+            Toast.error(localErr.message || "Failed to send OTP completely");
+        }
     } finally {
         btn.innerHTML = originalHtml;
         btn.disabled = false;
     }
+}
+
+
+
+
+function showOtpScreen(phone) {
+    stepPhone.style.display = 'none';
+    stepOtp.style.display = 'block';
+    document.getElementById('display-phone').innerText = phone;
+    startTimerLocal();
+    setTimeout(() => {
+        const firstInput = document.querySelector('.otp-input');
+        if(firstInput) firstInput.focus();
+    }, 100);
 }
 
 async function handleVerifyAndLogin(e) {
@@ -113,10 +138,20 @@ async function handleVerifyAndLogin(e) {
     btn.innerText = "Verifying...";
     
     try {
-        const res = await ApiService.post('/auth/register/customer/', { 
-            phone: phoneNumber, 
-            otp: otp 
-        });
+        let requestPayload = {};
+
+        if (isUsingFirebase) {
+            // Firebase OTP Verify
+            const result = await window.confirmationResult.confirm(otp);
+            const idToken = await result.user.getIdToken();
+            requestPayload = { login_type: 'firebase', token: idToken }; // Send Firebase Token
+        } else {
+            // Local OTP Verify
+            requestPayload = { login_type: 'local', phone: phoneNumber, otp: otp }; // Send Local OTP
+        }
+
+        // Call Tumhari Existing Backend API (Render)
+        const res = await ApiService.post('/auth/register/customer/', requestPayload);
 
         if (res.access) {
             localStorage.setItem(APP_CONFIG.STORAGE_KEYS.TOKEN, res.access);
@@ -128,7 +163,7 @@ async function handleVerifyAndLogin(e) {
             } catch(e) { console.warn("Profile fetch failed", e); }
             
             Toast.success("Login Successful");
-                ApiService.clearCache();
+            ApiService.clearCache();
             window.location.href = APP_CONFIG.ROUTES.HOME;
         } else {
             throw new Error("No access token received");
@@ -136,7 +171,15 @@ async function handleVerifyAndLogin(e) {
 
     } catch (err) {
         console.error(err);
-        Toast.error(err.message || "Verification Failed");
+        Toast.error(err.message || "Verification Failed! Wrong OTP.");
+        
+        // Agar Firebase se fail hua toh reCAPTCHA reset karna padta hai
+        if (isUsingFirebase && window.recaptchaVerifier) {
+            // Clear recaptcha taaki user firse try kar sake
+            window.recaptchaVerifier.clear();
+            window.recaptchaVerifier = null;
+        }
+    } finally {
         btn.disabled = false;
         btn.innerText = originalText;
     }

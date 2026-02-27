@@ -1,5 +1,6 @@
 import uuid
 import time
+import os
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -14,6 +15,20 @@ from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from django.conf import settings
+
+# --- 🔥 FIREBASE SETUP START 🔥 ---
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import auth as firebase_auth
+
+# Ye tumhari firebase-key.json file ko backend folder me dhundhega
+firebase_key_path = os.path.join(settings.BASE_DIR, 'firebase-key.json')
+
+# Check karte hain ki Firebase pehle se initialize toh nahi hai (Error se bachne ke liye)
+if not firebase_admin._apps:
+    cred = credentials.Certificate(firebase_key_path)
+    firebase_admin.initialize_app(cred)
+# --- 🔥 FIREBASE SETUP END 🔥 ---
 
 from .serializers import (
     UserSerializer, 
@@ -38,26 +53,42 @@ class MeAPIView(APIView):
 class CustomerRegisterAPIView(APIView):
     """
     Combines OTP Verification AND Registration/Login.
-    Secure Flow: Payload must include 'otp' to prove ownership.
+    Supports both Firebase Token Verification and Local OTP Fallback.
     """
     permission_classes = [AllowAny]
     throttle_classes = [RegistrationThrottle]
 
     def post(self, request):
+        login_type = request.data.get("login_type", "local") # Frontend se check aayega
         phone = request.data.get("phone")
-        otp = request.data.get("otp")
 
-        if not phone or not otp:
-            return Response({"error": "Phone and OTP required"}, status=status.HTTP_400_BAD_REQUEST)
+        # 🔥 PLAN A: Firebase verification
+        if login_type == "firebase":
+            firebase_token = request.data.get("token")
+            if not firebase_token:
+                return Response({"error": "Firebase token missing"}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                # Token verify karo aur phone number nikalo (Highly Secure)
+                decoded_token = firebase_auth.verify_id_token(firebase_token)
+                phone = decoded_token.get('phone_number') 
+            except Exception as e:
+                return Response({"error": f"Firebase Verification Failed: {str(e)}"}, status=status.HTTP_401_UNAUTHORIZED)
+        
+        # 🛠️ PLAN B: Local Custom OTP verification (Tumhara purana code)
+        else:
+            otp = request.data.get("otp")
+            if not phone or not otp:
+                return Response({"error": "Phone and OTP required"}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                OTPService.verify(phone, otp)
+            except Exception as e:
+                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-       
-        try:
-            OTPService.verify(phone, otp)
-        except Exception as e:
-            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        # -- Common Logic for both flows: Account Creation & Token Gen --
+        if not phone:
+             return Response({"error": "Invalid phone number"}, status=status.HTTP_400_BAD_REQUEST)
 
         user = AccountService.create_customer(phone)
-        
         refresh = RefreshToken.for_user(user)
         
         return Response({
@@ -66,7 +97,6 @@ class CustomerRegisterAPIView(APIView):
             "access": str(refresh.access_token),
             "refresh": str(refresh)
         }, status=status.HTTP_200_OK)
-
 
 class WebSocketTicketAPIView(APIView):
     permission_classes = [IsAuthenticated]
