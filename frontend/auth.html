@@ -61,6 +61,25 @@
 
     <div id="footer-placeholder"></div>
 
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBLN2izNbTgaG6K-9zblxVIx70TL8QzVbo",
+            authDomain: "quickdash-2dd12.firebaseapp.com",
+            projectId: "quickdash-2dd12",
+            storageBucket: "quickdash-2dd12.firebasestorage.app",
+            messagingSenderId: "808946416778",
+            appId: "1:808946416778:web:c59376f6d73b3937bf4173",
+            measurementId: "G-JFB92V2QG3"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        window.firebaseAuth = firebase.auth();
+    </script>
+
     <script src="./assets/js/config.js?v=1.0.0" defer></script>
     <script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
     <script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
