@@ -1,6 +1,5 @@
 // assets/js/pages/auth.js
 
-
 let isUsingFirebase = false; 
 let confirmationResult = null;
 const stepPhone = document.getElementById('step-phone');
@@ -19,25 +18,22 @@ document.addEventListener('DOMContentLoaded', () => {
     const otpForm = document.getElementById('step-otp');
     if (otpForm) otpForm.addEventListener('submit', handleVerifyAndLogin);
 
-    // 🔥 NEW: Advanced & Smooth OTP Input Logic
+    // 🔥 Advanced & Smooth OTP Input Logic
     const otpInputs = document.querySelectorAll('.otp-input');
     otpInputs.forEach((input, index) => {
-        // Typing handler
         input.addEventListener('input', (e) => {
-            input.value = input.value.replace(/[^0-9]/g, ''); // Sirf numbers allow
+            input.value = input.value.replace(/[^0-9]/g, ''); 
             if (input.value && index < otpInputs.length - 1) {
-                otpInputs[index + 1].focus(); // Next box me jao
+                otpInputs[index + 1].focus(); 
             }
         });
 
-        // Backspace (Delete) handler
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Backspace' && !input.value && index > 0) {
-                otpInputs[index - 1].focus(); // Pichle box me jao
+                otpInputs[index - 1].focus(); 
             }
         });
 
-        // Copy-Paste handler
         input.addEventListener('paste', (e) => {
             e.preventDefault();
             const pasteData = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6);
@@ -67,16 +63,18 @@ async function handleSendOtp(e) {
     phoneNumber = `+91${rawInput}`;
 
     try {
-        // 🔥 PLAN A: Firebase SMS Attempt (Latest Modular Syntax)
+        // 🔥 PLAN A: Firebase SMS Attempt (Fixed for Compat API)
         if (!window.recaptchaVerifier) {
-            // Invisible reCAPTCHA (Button click par background mein verify hoga)
-            window.recaptchaVerifier = new window.RecaptchaVerifier(window.firebaseAuth, 'get-otp-btn', {
-                'size': 'invisible'
+            window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('get-otp-btn', {
+                'size': 'invisible',
+                'callback': (response) => {
+                    console.log("reCAPTCHA verified");
+                }
             });
         }
         
         console.log("Attempting Firebase SMS...");
-        window.confirmationResult = await window.signInWithPhoneNumber(window.firebaseAuth, phoneNumber, window.recaptchaVerifier);
+        window.confirmationResult = await window.firebaseAuth.signInWithPhoneNumber(phoneNumber, window.recaptchaVerifier);
         isUsingFirebase = true; // Firebase pass ho gaya
         
         showOtpScreen(phoneNumber);
@@ -110,9 +108,6 @@ async function handleSendOtp(e) {
         btn.disabled = false;
     }
 }
-
-
-
 
 function showOtpScreen(phone) {
     stepPhone.style.display = 'none';
@@ -175,7 +170,6 @@ async function handleVerifyAndLogin(e) {
         
         // Agar Firebase se fail hua toh reCAPTCHA reset karna padta hai
         if (isUsingFirebase && window.recaptchaVerifier) {
-            // Clear recaptcha taaki user firse try kar sake
             window.recaptchaVerifier.clear();
             window.recaptchaVerifier = null;
         }
@@ -199,6 +193,5 @@ window.resetForm = function() {
     stepOtp.style.display = 'none';
     stepPhone.style.display = 'block';
     document.getElementById('get-otp-btn').disabled = false;
-    // OTP boxes clear kar do jab form reset ho
     document.querySelectorAll('.otp-input').forEach(i => i.value = '');
 }
