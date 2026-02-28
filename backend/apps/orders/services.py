@@ -280,21 +280,33 @@ class OrderSimulationService:
     
 
 
-
 def cancel_order_item(order_item, reason):
+    # 1. Pehle check karein ki item already cancel toh nahi hai
     if order_item.status == 'cancelled':
         return False, "Item pehle se hi cancel ho chuka hai."
 
+    order = order_item.order
+
+    # 2. YAHAN NEW LOGIC ADD KIYA HAIN: 
+    # Check karein ki order sirf 'created' ya 'packing' stage me hi hona chahiye
+    allowed_cancel_statuses = ['created', 'packing']
+    if order.status not in allowed_cancel_statuses:
+        # Agar order packed ya delivered hai, toh cancel process yahi rok do
+        return False, f"Yeh item ab cancel nahi ho sakta kyunki order already '{order.get_status_display()}' ho chuka hai."
+
+    # 3. Agar status valid hai, toh cancellation proceed karein
     order_item.status = 'cancelled'
     order_item.cancel_reason = reason
     order_item.save()
 
-    order = order_item.order
+    # Amount deduct karne ka logic
     item_total = order_item.price * order_item.quantity
     order.total_amount -= item_total
     order.save()
 
+    # Agar online payment thi, toh refund initiate karein
     if order.payment_method == 'online':
+        # Yahan ensure karein ki initiate_partial_refund function import ho gaya ho top par
         initiate_partial_refund(
             order=order, 
             amount=item_total, 
