@@ -131,3 +131,21 @@ body.store-closed-mode .main-content-wrapper{
     font-size: 16px;
     line-height: 1.5;
 }
+
+
+
+
+/* Location Pin Animation */
+@keyframes pinBounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-4px); /* Upar jayega thoda sa */
+    }
+}
+
+.modern-location-icon {
+    animation: pinBounce 2.5s infinite ease-in-out;
+    flex-shrink: 0; /* Align bigadne se rokne ke liye */
+}

@@ -141,17 +141,17 @@
             </div>
         `;
 
-        // Render Icon / Color Status
-        const icon = box.querySelector('i.fas.fa-map-marker-alt') || box.querySelector('i.fas.fa-map-pin');
+        // 👉 YAHAN UPDATE KIYA GAYA HAI: SVG icon select aur set karne ka code
+        const icon = box.querySelector('.modern-location-icon');
 
         if (display.type === 'DELIVERY') {
             box.classList.add("active-delivery");
-            if (icon) icon.className = 'fas fa-map-marker-alt text-primary';
+            if (icon) icon.setAttribute('class', 'modern-location-icon text-primary');
         } else if (display.type === 'SERVICE') {
             box.classList.add("active-service");
-            if (icon) icon.className = 'fas fa-map-pin text-danger';
+            if (icon) icon.setAttribute('class', 'modern-location-icon text-danger');
         } else {
-            if (icon) icon.className = 'fas fa-search-location text-muted';
+            if (icon) icon.setAttribute('class', 'modern-location-icon text-muted');
         }
     }
 
