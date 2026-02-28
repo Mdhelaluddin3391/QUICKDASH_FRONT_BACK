@@ -7,7 +7,8 @@ from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
 
-from .models import Order, OrderItem, OrderConfiguration
+# IMPORT NEW MODEL
+from .models import Order, OrderItem, OrderConfiguration, OrderItemFulfillment
 from apps.catalog.models import Product
 from apps.warehouse.models import Warehouse
 from apps.delivery.tasks import retry_auto_assign_rider
@@ -71,27 +72,37 @@ class OrderConfigurationResource(resources.ModelResource):
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
-    readonly_fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal')
+    # ADDED fulfillment_details HERE
+    readonly_fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal', 'fulfillment_details')
     can_delete = False
-    fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal')
+    fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal', 'fulfillment_details')
     show_change_link = False
 
     def product_image(self, obj):
         if obj.sku:
             product = Product.objects.filter(sku=obj.sku).first()
             if product and product.image:
-                return format_html(
-                    '<img src="{}" width="50" height="50" style="object-fit: cover; border-radius: 4px; box-shadow: 0 0 2px rgba(0,0,0,0.3);" />', 
-                    product.image
-                )
+                return format_html('<img src="{}" width="50" height="50" style="object-fit: cover; border-radius: 4px; box-shadow: 0 0 2px rgba(0,0,0,0.3);" />', product.image)
         return "No Image"
     product_image.short_description = "Image" 
 
     def subtotal(self, obj):
-        if obj.price is None or obj.quantity is None:
-            return "₹0.00"
+        if obj.price is None or obj.quantity is None: return "₹0.00"
         return f"₹{obj.price * obj.quantity:.2f}"
     subtotal.short_description = "Subtotal"
+
+    # --- NEW METHOD: Shows Vendor details inline in Order Details ---
+    def fulfillment_details(self, obj):
+        if not obj.pk: return "-"
+        fulfillments = obj.fulfillments.select_related('inventory_batch', 'inventory_batch__owner').all()
+        if not fulfillments: return format_html('<span style="color:red;">Pending/No Batch</span>')
+        
+        details = []
+        for f in fulfillments:
+            owner = f.inventory_batch.owner.phone if f.inventory_batch.owner else "Company"
+            details.append(f"<b>{f.quantity_allocated}x</b> (Batch {f.inventory_batch.id} - {owner})")
+        return format_html("<br>".join(details))
+    fulfillment_details.short_description = "Stock Source"
 
 
 @admin.register(Order)
@@ -329,6 +340,34 @@ class OrderAdmin(ImportExportModelAdmin):
         updated = queryset.exclude(status__in=['delivered', 'cancelled']).update(status='cancelled')
         self.message_user(request, f"{updated} orders cancelled.")
     cancel_orders.short_description = "Cancel selected orders"
+
+
+@admin.register(OrderItemFulfillment)
+class OrderItemFulfillmentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'order_id_link', 'sku_link', 'batch_id', 'vendor_phone', 'quantity_allocated', 'vendor_payable_amount', 'created_at')
+    list_filter = ('inventory_batch__owner', 'created_at')
+    search_fields = ('order_item__order__id', 'inventory_batch__owner__phone', 'order_item__sku')
+    list_select_related = ('order_item', 'order_item__order', 'inventory_batch', 'inventory_batch__owner')
+    readonly_fields = ('order_item', 'inventory_batch', 'quantity_allocated', 'vendor_payable_amount')
+    list_per_page = 50
+
+    def order_id_link(self, obj):
+        return f"Order #{obj.order_item.order.id}"
+    order_id_link.short_description = "Order ID"
+
+    def sku_link(self, obj):
+        return obj.order_item.sku
+    sku_link.short_description = "SKU"
+
+    def batch_id(self, obj):
+        return f"Batch #{obj.inventory_batch.id}"
+    batch_id.short_description = "Batch ID"
+
+    def vendor_phone(self, obj):
+        if obj.inventory_batch.owner:
+            return format_html('<span style="color: blue; font-weight: bold;">{}</span>', obj.inventory_batch.owner.phone)
+        return format_html('<span style="color: green; font-weight: bold;">Company</span>')
+    vendor_phone.short_description = "Vendor"
 
 
 @admin.register(OrderConfiguration)

@@ -133,3 +133,20 @@ class OrderConfiguration(models.Model):
     class Meta:
         verbose_name = "Order Configuration"
         verbose_name_plural = "Order Configurations"
+
+
+
+class OrderItemFulfillment(models.Model):
+    """
+    Kiska Item Bika? Ye model uski transparent mapping karega.
+    """
+    order_item = models.ForeignKey(OrderItem, on_delete=models.CASCADE, related_name="fulfillments")
+    inventory_batch = models.ForeignKey('inventory.InventoryItem', on_delete=models.PROTECT, related_name="order_fulfillments")
+    
+    quantity_allocated = models.PositiveIntegerField()
+    vendor_payable_amount = models.DecimalField(max_digits=10, decimal_places=2, default="0.00", help_text="Total amount to pay the vendor for this allocation")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.quantity_allocated}x {self.order_item.sku} from Batch #{self.inventory_batch.id}"

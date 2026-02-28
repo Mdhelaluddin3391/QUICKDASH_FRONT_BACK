@@ -4,7 +4,7 @@ from django.utils.translation import gettext_lazy as _
 from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
-
+from apps.riders.models import Rider
 from .models import Delivery
 from apps.orders.models import Order
 from apps.riders.models import Rider

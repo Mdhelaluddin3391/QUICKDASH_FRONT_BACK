@@ -8,18 +8,27 @@ from django.http import JsonResponse
 from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
+from django.contrib.auth import get_user_model
 
 from .models import InventoryItem, InventoryTransaction
 from apps.catalog.models import Product 
 from apps.warehouse.models import Bin
 
+User = get_user_model()
 
 class InventoryItemResource(resources.ModelResource):
-    # Linking Bin by its unique bin_code
+    # Linking Bin by its unique bin_code (Existing)
     bin = fields.Field(
         column_name='bin_code',
         attribute='bin',
         widget=ForeignKeyWidget(Bin, 'bin_code')
+    )
+    
+    # NEW: Linking Owner by Phone Number for Safe Import/Export
+    owner = fields.Field(
+        column_name='owner_phone',
+        attribute='owner',
+        widget=ForeignKeyWidget(User, 'phone')
     )
 
     class Meta:
@@ -30,10 +39,13 @@ class InventoryItemResource(resources.ModelResource):
             'sku', 
             'product_name', 
             'price', 
+            'owner',          # Naya Add Hua
+            'cost_price',     # Naya Add Hua
             'total_stock', 
             'reserved_stock', 
             'mode', 
             'lead_time_hours', 
+            'created_at',     # Naya Add Hua
             'updated_at'
         )
         export_order = fields
@@ -67,8 +79,11 @@ class InventoryItemAdmin(ImportExportModelAdmin):
         js = ('inventory/js/sku_lookup.js',)
 
     list_display = (
+        'id',
         'sku',
         'product_name',
+        'owner_status', # New Custom Field
+        'cost_price',   # New Field
         'price', 
         'warehouse_name',
         'bin_location',
@@ -81,42 +96,52 @@ class InventoryItemAdmin(ImportExportModelAdmin):
     )
     list_filter = (
         'mode',
+        'owner', # New Field
         'bin__rack__aisle__zone__warehouse',
         'updated_at'
     )
     search_fields = (
         'sku',
         'product_name',
+        'owner__phone', # Search item by Vendor Phone
         'bin__bin_code',
         'bin__rack__number'
     )
     list_select_related = (
-        'bin', 
-        'bin__rack', 
-        'bin__rack__aisle', 
-        'bin__rack__aisle__zone', 
-        'bin__rack__aisle__zone__warehouse'
+        'bin', 'owner', 'bin__rack', 'bin__rack__aisle', 
+        'bin__rack__aisle__zone', 'bin__rack__aisle__zone__warehouse'
     )
-    raw_id_fields = ('bin',)
+    raw_id_fields = ('bin', 'owner')
     list_per_page = 25
     
-    list_editable = ('total_stock', 'reserved_stock', 'price')
+    list_editable = ('total_stock', 'reserved_stock', 'price', 'cost_price')
     actions = ['mark_low_stock', 'clear_reservations', 'update_from_catalog']
 
     fieldsets = (
         ('Product Information', {
             'fields': ('bin', 'sku', 'product_name', 'product_mrp_display', 'price')
         }),
+        ('Ownership & Costing (NEW)', {
+            'fields': ('owner', 'cost_price', 'mode')
+        }),
         ('Stock Levels', {
-            'fields': ('total_stock', 'reserved_stock', 'mode', 'lead_time_hours')
+            'fields': ('total_stock', 'reserved_stock', 'lead_time_hours')
         }),
         ('Timestamps', {
-            'fields': ('updated_at',),
+            'fields': ('created_at', 'updated_at',),
             'classes': ('collapse',)
         }),
     )
 
-    readonly_fields = ('updated_at', 'product_mrp_display')
+    readonly_fields = ('created_at', 'updated_at', 'product_mrp_display')
+
+    # --- NEW METHOD ADDED FOR UI ---
+    def owner_status(self, obj):
+        if hasattr(obj, 'owner') and obj.owner:
+            return format_html('<span style="color: blue; font-weight: bold;">Vendor: {}</span>', obj.owner.phone)
+        return format_html('<span style="color: green; font-weight: bold;">Company Owned</span>')
+    owner_status.short_description = "Owner"
+    # -------------------------------
 
     def get_urls(self):
         urls = super().get_urls()

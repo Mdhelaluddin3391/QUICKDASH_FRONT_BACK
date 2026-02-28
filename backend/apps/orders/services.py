@@ -21,6 +21,12 @@ from apps.riders.models import RiderProfile
 from apps.utils.exceptions import BusinessLogicException
 from .models import Order, OrderItem
 from .abuse_services import OrderAbuseService
+from .models import Order, OrderItem, OrderItemFulfillment  
+from .abuse_services import OrderAbuseService
+from apps.catalog.models import Product
+
+
+
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -127,23 +133,58 @@ class OrderService:
         )
 
         total = Decimal("0.00")
-        skus = [item["sku"] for item in items_data]
-        inventory_map = {inv.sku: inv for inv in InventoryItem.objects.filter(
-            bin__rack__aisle__zone__warehouse=warehouse, sku__in=skus
-        )}
-
+        
+        # --- NEW FIFO LOGIC ADDED HERE (Purana loop replace kiya hai) ---
         for item in items_data:
-            sku = item["sku"]; qty = int(item["quantity"])
+            sku = item["sku"]
+            qty = int(item["quantity"])
             if qty <= 0: raise BusinessLogicException(f"Invalid quantity: {sku}")
             
-            inventory = inventory_map.get(sku)
-            if not inventory: raise BusinessLogicException(f"Item {sku} unavailable")
+            # 1. Available Batches nikalo (Oldest First for FIFO)
+            available_batches = InventoryItem.objects.filter(
+                sku=sku,
+                bin__rack__aisle__zone__warehouse=warehouse,
+                total_stock__gt=0
+            ).order_by('created_at')
 
-            OrderItem.objects.create(
-                order=order, sku=sku, product_name=inventory.product_name,
-                quantity=qty, price=inventory.price
+            if not available_batches.exists():
+                raise BusinessLogicException(f"Item {sku} unavailable")
+            
+            # Product Details (Pehle batch se le lo)
+            primary_batch = available_batches.first()
+
+            order_item = OrderItem.objects.create(
+                order=order, sku=sku, product_name=primary_batch.product_name,
+                quantity=qty, price=primary_batch.price
             )
-            total += inventory.price * qty
+            total += primary_batch.price * qty
+
+            # 2. FIFO Allocation - Distribute quantity across batches
+            qty_remaining = qty
+            for batch in available_batches:
+                if qty_remaining <= 0:
+                    break
+                
+                # Check kitna stock is batch se le sakte hain
+                # Note: Aapka bulk_reserve pehle chal chuka hoga isliye total_stock se map kar rahe hain
+                batch_stock = batch.total_stock
+                qty_to_take = min(batch_stock, qty_remaining)
+                
+                # 3. Kiska maal gaya uska hisaab lagao
+                payable_amt = Decimal(getattr(batch, 'cost_price', "0.00")) * Decimal(qty_to_take) if getattr(batch, 'owner', None) else Decimal("0.00")
+                
+                OrderItemFulfillment.objects.create(
+                    order_item=order_item,
+                    inventory_batch=batch,
+                    quantity_allocated=qty_to_take,
+                    vendor_payable_amount=payable_amt
+                )
+                
+                qty_remaining -= qty_to_take
+
+            if qty_remaining > 0:
+                logger.error(f"Fulfillment mismatch for {sku} in order {order.id}")
+        # --- END OF NEW LOGIC ---
 
         surge_multiplier = SurgePricingService.calculate(order)
         
