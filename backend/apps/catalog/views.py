@@ -159,6 +159,7 @@ class SkuListAPIView(generics.ListAPIView):
             for item in results:
                 item['available_stock'] = 0
                 item['delivery_eta'] = 'Unavailable'
+                item['has_more_in_mega'] = False
             return
 
         inventory_items = InventoryItem.objects.filter(
@@ -166,30 +167,52 @@ class SkuListAPIView(generics.ListAPIView):
             bin__rack__aisle__zone__warehouse__in=serviceable_warehouses
         ).select_related('bin__rack__aisle__zone__warehouse')
         
-        inv_map = {}
+        # SMART STOCK CALCULATION (Dark vs Mega)
+        stock_map = {}
         for inv in inventory_items:
             wh_type = inv.warehouse.warehouse_type
             stock = inv.total_stock - inv.reserved_stock
             
-            if inv.sku not in inv_map:
-                inv_map[inv.sku] = {'price': inv.price, 'stock': stock, 'type': wh_type}
-            else:
-                inv_map[inv.sku]['stock'] += stock
-                if wh_type == 'dark_store':
-                    inv_map[inv.sku]['type'] = 'dark_store'
-                    inv_map[inv.sku]['price'] = inv.price
+            if inv.sku not in stock_map:
+                stock_map[inv.sku] = {'express_stock': 0, 'standard_stock': 0, 'sale_price': 0}
+                
+            if wh_type == 'dark_store':
+                stock_map[inv.sku]['express_stock'] += stock
+                stock_map[inv.sku]['sale_price'] = inv.price # Dark store price ki priority
+            elif wh_type == 'mega':
+                stock_map[inv.sku]['standard_stock'] += stock
+                if stock_map[inv.sku]['sale_price'] == 0:
+                    stock_map[inv.sku]['sale_price'] = inv.price
 
         for item in results:
             sku = item.get('sku')
-            if sku in inv_map:
-                item['sale_price'] = inv_map[sku]['price']
-                item['available_stock'] = inv_map[sku]['stock']
-                w_type = inv_map[sku]['type']
-                item['delivery_type'] = w_type
-                item['delivery_eta'] = '10 Mins' if w_type == 'dark_store' else '1-2 Days'
+            if sku in stock_map:
+                sku_info = stock_map[sku]
+                exp_stock = sku_info['express_stock']
+                std_stock = sku_info['standard_stock']
+                
+                # Agar dark store me 1 bhi item hai, toh pehle wo dikhao
+                if exp_stock > 0:
+                    item['available_stock'] = exp_stock
+                    item['delivery_type'] = 'dark_store'
+                    item['delivery_eta'] = '10 Mins'
+                    item['sale_price'] = sku_info['sale_price']
+                    item['has_more_in_mega'] = std_stock > 0 # Frontend me tag lagane ke liye (ex: "+ More in 1-2 Days")
+                elif std_stock > 0:
+                    item['available_stock'] = std_stock
+                    item['delivery_type'] = 'mega'
+                    item['delivery_eta'] = '1-2 Days'
+                    item['sale_price'] = sku_info['sale_price']
+                    item['has_more_in_mega'] = False
+                else:
+                    item['available_stock'] = 0
+                    item['delivery_eta'] = 'Out of Stock'
+                    item['delivery_type'] = 'unavailable'
+                    item['has_more_in_mega'] = False
             else:
                 item['available_stock'] = 0
                 item['delivery_eta'] = 'Unavailable'
+                item['has_more_in_mega'] = False
 
 class SkuDetailAPIView(generics.RetrieveAPIView):
     """
@@ -224,35 +247,58 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        warehouse = getattr(request, 'warehouse', None)
         
-        available_stock = 0
-        sale_price = getattr(instance, 'mrp', 0) 
+        lat = request.headers.get('X-Location-Lat') or request.query_params.get('lat')
+        lng = request.headers.get('X-Location-Lng') or request.query_params.get('lon')
 
-        if warehouse:
-            stock_data = InventoryItem.objects.filter(
-                sku=instance.sku, 
-                bin__rack__aisle__zone__warehouse=warehouse
-            ).aggregate(total_stock=Sum('total_stock'), reserved=Sum('reserved_stock'))
-            
-            t_stock = stock_data.get('total_stock') or 0
-            r_stock = stock_data.get('reserved') or 0
-            
-            available_stock = t_stock - (stock_data.get('reserved') or 0)
+        if lat and lng:
+            user_location = Point(float(lng), float(lat), srid=4326)
+            serviceable_warehouses = Warehouse.objects.filter(is_active=True, delivery_zone__contains=user_location)
+        else:
+            warehouse = getattr(request, 'warehouse', None)
+            serviceable_warehouses = Warehouse.objects.filter(id=warehouse.id) if warehouse else Warehouse.objects.none()
 
-            inv_item = InventoryItem.objects.filter(
-                sku=instance.sku,
-                bin__rack__aisle__zone__warehouse=warehouse
-            ).first()
-            if inv_item:
-                sale_price = inv_item.price
+        inventory_items = InventoryItem.objects.filter(
+            sku=instance.sku,
+            bin__rack__aisle__zone__warehouse__in=serviceable_warehouses
+        ).select_related('bin__rack__aisle__zone__warehouse')
+
+        express_stock = 0
+        standard_stock = 0
+        sale_price = getattr(instance, 'mrp', 0)
+        
+        for inv in inventory_items:
+            wh_type = inv.warehouse.warehouse_type
+            stock = inv.total_stock - inv.reserved_stock
+            
+            if wh_type == 'dark_store':
+                express_stock += stock
+                sale_price = inv.price
+            elif wh_type == 'mega':
+                standard_stock += stock
+                if express_stock == 0:
+                    sale_price = inv.price
 
         serializer = self.get_serializer(instance)
         data = serializer.data
         
-        data['available_stock'] = available_stock
-        data['sale_price'] = sale_price
+        if express_stock > 0:
+            data['available_stock'] = express_stock
+            data['delivery_type'] = 'dark_store'
+            data['delivery_eta'] = '10 Mins'
+            data['has_more_in_mega'] = standard_stock > 0
+        elif standard_stock > 0:
+            data['available_stock'] = standard_stock
+            data['delivery_type'] = 'mega'
+            data['delivery_eta'] = '1-2 Days'
+            data['has_more_in_mega'] = False
+        else:
+            data['available_stock'] = 0
+            data['delivery_type'] = 'unavailable'
+            data['delivery_eta'] = 'Out of Stock'
+            data['has_more_in_mega'] = False
         
+        data['sale_price'] = sale_price
         if data.get('effective_price') is None:
             data['effective_price'] = sale_price
 
@@ -338,18 +384,36 @@ class StorefrontCatalogAPIView(APIView):
                 stock_map = {}
                 for inv in inventory_qs:
                     wh_type = inv.warehouse.warehouse_type
+                    stock = inv.total_stock - inv.reserved_stock
+                    
                     if inv.sku not in stock_map:
-                        stock_map[inv.sku] = {'stock': 0, 'type': wh_type}
-                    stock_map[inv.sku]['stock'] += (inv.total_stock - inv.reserved_stock)
+                        stock_map[inv.sku] = {'express_stock': 0, 'standard_stock': 0}
+                        
                     if wh_type == 'dark_store':
-                        stock_map[inv.sku]['type'] = 'dark_store'
+                        stock_map[inv.sku]['express_stock'] += stock
+                    elif wh_type == 'mega':
+                        stock_map[inv.sku]['standard_stock'] += stock
                 
                 for p in p_data: 
-                    sku_info = stock_map.get(p['sku'], {})
-                    p['available_stock'] = sku_info.get('stock', 0) 
-                    w_type = sku_info.get('type', 'mega')
-                    p['delivery_type'] = w_type
-                    p['delivery_eta'] = '10 Mins' if w_type == 'dark_store' else '1-2 Days'
+                    sku_info = stock_map.get(p['sku'], {'express_stock': 0, 'standard_stock': 0})
+                    exp_stock = sku_info['express_stock']
+                    std_stock = sku_info['standard_stock']
+                    
+                    if exp_stock > 0:
+                        p['available_stock'] = exp_stock
+                        p['delivery_type'] = 'dark_store'
+                        p['delivery_eta'] = '10 Mins'
+                        p['has_more_in_mega'] = std_stock > 0
+                    elif std_stock > 0:
+                        p['available_stock'] = std_stock
+                        p['delivery_type'] = 'mega'
+                        p['delivery_eta'] = '1-2 Days'
+                        p['has_more_in_mega'] = False
+                    else:
+                        p['available_stock'] = 0
+                        p['delivery_type'] = 'unavailable'
+                        p['delivery_eta'] = 'Out of Stock'
+                        p['has_more_in_mega'] = False
                     
                     if p.get('effective_price') is None:
                         p['effective_price'] = p.get('mrp')

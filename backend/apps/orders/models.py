@@ -13,6 +13,11 @@ class Order(models.Model):
         ("confirmed", "Confirmed"),
         ("picking", "Picking"),
         ("packed", "Packed"),
+        # Naye Statuses (Mega Store se Dark Store transfer ke liye)
+        ("packed_at_hub", "Packed at Mega Hub"),
+        ("in_transit_to_local", "In Transit to Dark Store"),
+        ("received_at_local", "Received at Dark Store"),
+        # Purane Statuses
         ("out_for_delivery", "Out For Delivery"),
         ("delivered", "Delivered"),
         ("cancelled", "Cancelled"),
@@ -30,7 +35,15 @@ class Order(models.Model):
     )
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="orders")
-    warehouse = models.ForeignKey('warehouse.Warehouse', on_delete=models.PROTECT)
+    
+    # ------------------ UPDATE IDHAR HUA HAI ------------------
+    # Jahan se product asal me pack hoga (Mega ya Dark Store)
+    fulfillment_warehouse = models.ForeignKey('warehouse.Warehouse', on_delete=models.PROTECT, related_name="fulfilled_orders", help_text="Jahan inventory hai",null=True, blank=True)
+    
+    # Customer ke pados wala warehouse (Rider kahan se pick karega)
+    # Agar order 10 mins wala hai, toh last_mile = fulfillment.
+    last_mile_warehouse = models.ForeignKey('warehouse.Warehouse', on_delete=models.PROTECT, related_name="last_mile_orders", null=True, blank=True, help_text="Rider pickup location")
+    # ----------------------------------------------------------
 
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="created")
     delivery_type = models.CharField(max_length=20, choices=DELIVERY_TYPE_CHOICES)
@@ -45,13 +58,12 @@ class Order(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['warehouse', 'status', 'created_at']),
+            models.Index(fields=['fulfillment_warehouse', 'status', 'created_at']),
             models.Index(fields=['user', '-created_at']),
         ]
 
     def __str__(self):
         return f"Order #{self.id} ({self.status})"
-
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")

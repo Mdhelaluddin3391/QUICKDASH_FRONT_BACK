@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.contrib import messages # <--- ADDED FOR ADMIN MESSAGES
+from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
@@ -7,6 +7,7 @@ from django.utils.timezone import localtime
 from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
+from django.db.models import Q # <--- ADDED FOR MANAGER QUERY FILTER
 
 # IMPORT NEW MODEL
 from .models import Order, OrderItem, OrderConfiguration, OrderItemFulfillment
@@ -25,10 +26,16 @@ class OrderResource(resources.ModelResource):
         attribute='user',
         widget=ForeignKeyWidget(User, 'phone')
     )
-    # Linking Warehouse by name
-    warehouse = fields.Field(
-        column_name='warehouse_name',
-        attribute='warehouse',
+    # Linking Fulfillment Warehouse by name
+    fulfillment_warehouse = fields.Field(
+        column_name='fulfillment_warehouse_name',
+        attribute='fulfillment_warehouse',
+        widget=ForeignKeyWidget(Warehouse, 'name')
+    )
+    # Linking Last Mile Warehouse by name
+    last_mile_warehouse = fields.Field(
+        column_name='last_mile_warehouse_name',
+        attribute='last_mile_warehouse',
         widget=ForeignKeyWidget(Warehouse, 'name')
     )
 
@@ -37,7 +44,8 @@ class OrderResource(resources.ModelResource):
         fields = (
             'id', 
             'user', 
-            'warehouse', 
+            'fulfillment_warehouse', 
+            'last_mile_warehouse', 
             'status', 
             'delivery_type', 
             'payment_method', 
@@ -50,7 +58,6 @@ class OrderResource(resources.ModelResource):
 
 
 class OrderItemResource(resources.ModelResource):
-    # Linking Order by id
     order = fields.Field(
         column_name='order_id',
         attribute='order',
@@ -73,11 +80,9 @@ class OrderConfigurationResource(resources.ModelResource):
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
-    # ADDED fulfillment_details HERE
     readonly_fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal', 'fulfillment_details')
     can_delete = False
     
-    # ---> UPDATED: Added 'status' and 'cancel_reason' to fields so admin can edit them
     fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal', 'fulfillment_details', 'status', 'cancel_reason')
     show_change_link = False
 
@@ -94,7 +99,6 @@ class OrderItemInline(admin.TabularInline):
         return f"₹{obj.price * obj.quantity:.2f}"
     subtotal.short_description = "Subtotal"
 
-    # --- NEW METHOD: Shows Vendor details inline in Order Details ---
     def fulfillment_details(self, obj):
         if not obj.pk: return "-"
         fulfillments = obj.fulfillments.select_related('inventory_batch', 'inventory_batch__owner').all()
@@ -114,7 +118,8 @@ class OrderAdmin(ImportExportModelAdmin):
     list_display = (
         'id',
         'customer_phone',
-        'warehouse_name',
+        'fulfillment_warehouse', # Pehle yahan 'warehouse_name' tha
+        'transit_route',         # NAYA COLUMN: Route dikhane ke liye
         'status_badge',
         'payment_method',
         'total_amount_display',
@@ -126,7 +131,8 @@ class OrderAdmin(ImportExportModelAdmin):
     )
     list_filter = (
         'status',
-        'warehouse',
+        'fulfillment_warehouse', # NAYA FILTER
+        'last_mile_warehouse',   # NAYA FILTER
         'created_at',
         'payment_method',
         'delivery_type'
@@ -136,11 +142,12 @@ class OrderAdmin(ImportExportModelAdmin):
         'user__phone',
         'user__first_name',
         'user__last_name',
-        'warehouse__name',
-        'warehouse__code'
+        'fulfillment_warehouse__name',
+        'fulfillment_warehouse__code',
+        'last_mile_warehouse__name'
     )
-    list_select_related = ('user', 'warehouse')
-    raw_id_fields = ('user', 'warehouse')
+    list_select_related = ('user', 'fulfillment_warehouse', 'last_mile_warehouse')
+    raw_id_fields = ('user', 'fulfillment_warehouse', 'last_mile_warehouse')
     inlines = [OrderItemInline]
     list_per_page = 25
     actions = [
@@ -154,7 +161,7 @@ class OrderAdmin(ImportExportModelAdmin):
 
     fieldsets = (
         ('Order Information', {
-            'fields': ('id', 'user', 'warehouse')
+            'fields': ('id', 'user', 'fulfillment_warehouse', 'last_mile_warehouse')
         }),
         ('Order Details', {
             'fields': ('status', 'delivery_type', 'payment_method', 'total_amount')
@@ -174,7 +181,35 @@ class OrderAdmin(ImportExportModelAdmin):
 
     readonly_fields = ('id', 'created_at', 'updated_at', 'total_amount', 'delivery_name', 'delivery_phone', 'full_delivery_address', 'Maps_link')
 
-    # ---> NEW LOGIC FOR PARTIAL CANCEL + AUTO REFUND
+    # ---> MANAGER QUERYSET FILTER LOGIC (NEW)
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        
+        # Agar admin maalik/superadmin hai, toh use sab dikhega
+        if request.user.is_superuser:
+            return qs
+            
+        # Agar user ke pass 'warehouse' assigned hai, toh usko sirf apne store ke orders dikhenge
+        if hasattr(request.user, 'warehouse') and request.user.warehouse:
+            user_wh = request.user.warehouse
+            return qs.filter(
+                Q(fulfillment_warehouse=user_wh) | Q(last_mile_warehouse=user_wh)
+            )
+            
+        return qs
+
+    # ---> TRANSIT ROUTE LOGIC (NEW)
+    def transit_route(self, obj):
+        if obj.fulfillment_warehouse and obj.last_mile_warehouse:
+            if obj.fulfillment_warehouse != obj.last_mile_warehouse:
+                return format_html(
+                    '<span style="color: #17a2b8; font-weight: bold; font-size: 0.9em;">🚚 {} ➔ {}</span>', 
+                    obj.fulfillment_warehouse.name, 
+                    obj.last_mile_warehouse.name
+                )
+        return format_html('<span style="color: #28a745; font-weight: bold; font-size: 0.9em;">📍 Direct Delivery</span>')
+    transit_route.short_description = "Transit Route"
+
     def save_formset(self, request, form, formset, change):
         instances = formset.save(commit=False)
         for instance in instances:
@@ -184,7 +219,6 @@ class OrderAdmin(ImportExportModelAdmin):
                     old_status = getattr(old_instance, 'status', 'active')
                     new_status = getattr(instance, 'status', 'active')
                     
-                    # Agar status abhi just cancel hua hai
                     if old_status != 'cancelled' and new_status == 'cancelled':
                         item_total = instance.price * instance.quantity
                         order = instance.order
@@ -193,11 +227,9 @@ class OrderAdmin(ImportExportModelAdmin):
                         
                         if order.payment_method == 'online':
                             try:
-                                # Payment integration calls
                                 from apps.payments.models import Payment
                                 from apps.payments.refund_services import RefundService
                                 
-                                # Order se linked paid payment dhundenge
                                 payment = Payment.objects.filter(order=order, status='paid').first()
                                 if payment:
                                     RefundService.initiate_partial_refund(payment, item_total)
@@ -228,16 +260,14 @@ class OrderAdmin(ImportExportModelAdmin):
     customer_phone.short_description = "Customer Phone"
     customer_phone.admin_order_field = 'user__phone'
 
-    def warehouse_name(self, obj):
-        return obj.warehouse.name if obj.warehouse else "N/A"
-    warehouse_name.short_description = "Warehouse"
-    warehouse_name.admin_order_field = 'warehouse__name'
-
     def status_badge(self, obj):
         colors = {
             'created': '#6c757d',
             'confirmed': '#007bff',
             'picking': '#ffc107',
+            'packed_at_hub': '#fd7e14',        # New Status Colors
+            'in_transit_to_local': '#6f42c1',  # New Status Colors
+            'received_at_local': '#20c997',    # New Status Colors
             'packed': '#28a745',
             'out_for_delivery': '#17a2b8',
             'delivered': '#28a745',
@@ -246,7 +276,7 @@ class OrderAdmin(ImportExportModelAdmin):
         }
         color = colors.get(obj.status, '#6c757d')
         return format_html(
-            '<span style="background-color: {}; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8em;">{}</span>',
+            '<span style="background-color: {}; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; white-space: nowrap;">{}</span>',
             color,
             obj.get_status_display()
         )
@@ -351,7 +381,6 @@ class OrderAdmin(ImportExportModelAdmin):
         )
     Maps_link.short_description = "Customer Map Location"
 
-
     def mark_as_confirmed(self, request, queryset):
         updated = queryset.filter(status='created').update(status='confirmed')
         self.message_user(request, f"{updated} orders marked as confirmed.")
@@ -375,11 +404,10 @@ class OrderAdmin(ImportExportModelAdmin):
             retry_auto_assign_rider.delay(order_id)
 
         self.message_user(request, f"{updated} orders marked as packed. Auto-assigning riders...")
-    
     mark_as_packed.short_description = "Mark selected orders as Packed"
 
     def mark_as_out_for_delivery(self, request, queryset):
-        updated = queryset.filter(status__in=['created', 'confirmed', 'picking', 'packed']).update(status='out_for_delivery')
+        updated = queryset.filter(status__in=['created', 'confirmed', 'picking', 'packed', 'received_at_local']).update(status='out_for_delivery')
         self.message_user(request, f"{updated} orders marked as out for delivery.")
     mark_as_out_for_delivery.short_description = "Mark selected orders as Out for Delivery"
 
