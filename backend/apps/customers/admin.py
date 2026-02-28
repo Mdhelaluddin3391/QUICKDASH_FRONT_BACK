@@ -71,6 +71,9 @@ class CustomerAddressInline(admin.StackedInline):
     can_delete = False
 
     def address_summary_view(self, obj):
+        # Yahan object None ka check lagana zaroori hai
+        if not obj or not obj.pk:
+            return "-"
         return f"{obj.house_no}, {obj.apartment_name}, {obj.landmark} - {obj.google_address_text}"
     address_summary_view.short_description = "Full Address"
 
@@ -135,16 +138,29 @@ class CustomerProfileAdmin(ImportExportModelAdmin):
     user_email.short_description = "Email ID"
 
     def total_orders(self, obj):
-        count = obj.user.orders.count()
-        url = reverse('admin:orders_order_changelist') + f'?user__id__exact={obj.user.id}'
-        return format_html('<a href="{}" style="font-weight: bold; color: #007bff;">{} Orders</a>', url, count)
+        # Handle both 'orders' or default 'order_set' relation
+        orders_relation = getattr(obj.user, 'orders', getattr(obj.user, 'order_set', None))
+        count = orders_relation.count() if orders_relation else 0
+        
+        try:
+            url = reverse('admin:orders_order_changelist') + f'?user__id__exact={obj.user.id}'
+            return format_html('<a href="{}" style="font-weight: bold; color: #007bff;">{} Orders</a>', url, count)
+        except Exception:
+            # Agar URL resolve na ho toh safe fallback
+            return f"{count} Orders"
+            
     total_orders.short_description = "Total Orders"
 
     def total_spent(self, obj):
-        total = obj.user.orders.filter(status='delivered').aggregate(
-            total=models.Sum('total_amount')
-        )['total'] or 0
-        return format_html('<span style="color: green; font-weight: bold;">₹{:.2f}</span>', total)
+        orders_relation = getattr(obj.user, 'orders', getattr(obj.user, 'order_set', None))
+        total = 0
+        if orders_relation:
+            total = orders_relation.filter(status='delivered').aggregate(
+                total=models.Sum('total_amount')
+            )['total'] or 0
+            
+        return format_html('<span style="color: green; font-weight: bold;">₹{:.2f}</span>', float(total))
+        
     total_spent.short_description = "Total Spent (Delivered)"
 
     def support_tickets_count(self, obj):
