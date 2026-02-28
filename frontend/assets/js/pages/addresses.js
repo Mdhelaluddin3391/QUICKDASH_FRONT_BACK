@@ -74,35 +74,55 @@ window.openAddressModal = function() {
 };
 
 // --- FIX APPLIED HERE: Form open logic updated to clear old map address ---
+// --- UPDATED: Form open logic to auto-fill map data ---
 function openAddressForm(data) {
     const modal = document.getElementById('address-modal');
     if(modal) modal.classList.add('active');
 
-    // Auto-Fill Form (Lat/Lng is required for backend)
-    document.getElementById('a-lat').value = data.lat;
-    document.getElementById('a-lng').value = data.lng;
+    // Auto-Fill Lat/Lng (Hidden fields)
+    document.getElementById('a-lat').value = data.lat || '';
+    document.getElementById('a-lng').value = data.lng || '';
+    document.getElementById('a-google-text').value = data.address || '';
     
-    // FIX 1: Display generic text instead of the specific map address "Malhanwara..."
+    // Display the actual Map Address that the user pinned
     const displaySpan = document.getElementById('display-map-address');
     if(displaySpan) {
-        displaySpan.innerText = "Pin Location Selected (Fill details below)";
-        displaySpan.style.color = "#2c3e50"; // Darker color for better visibility
+        displaySpan.innerText = data.address || "Pin Location Selected (Fill missing details below)";
+        displaySpan.style.color = "#2c3e50"; 
     }
-    
-    // Hidden field value (backup)
-    document.getElementById('a-google-text').value = data.address || '';
 
-    // FIX 2: Clear City and Pincode inputs so the user fills them manually
-    // This removes the confusion of seeing the old map data
-    document.getElementById('a-city').value = ''; 
+    // ✅ AUTO FILL FROM MAP PIN
+    // Yahan hum map se aayi details ko pre-fill kar rahe hain
+    document.getElementById('a-city').value = data.city || ''; 
     
     const pinEl = document.getElementById('a-pin');
-    if(pinEl) pinEl.value = ''; 
+    if(pinEl) pinEl.value = data.pincode || ''; 
     
-    // Reset other fields
-    document.getElementById('a-house').value = '';
-    document.getElementById('a-building').value = '';
-    document.getElementById('a-landmark').value = '';
+    // Building/Street/Area details auto-fill
+    document.getElementById('a-building').value = data.building || ''; 
+    document.getElementById('a-landmark').value = data.area || ''; 
+    document.getElementById('a-house').value = data.houseNo || '';
+    document.getElementById('a-floor').value = ''; // Floor hamesha blank rahega
+
+    // ✅ AUTO FILL NAME & PHONE (Agar localStorage mein user login details hain)
+    try {
+        const userStr = localStorage.getItem('user'); // Ya jo bhi aapki storage key ho: APP_CONFIG.STORAGE_KEYS.USER
+        if (userStr) {
+            const user = JSON.parse(userStr);
+            const nameEl = document.getElementById('a-name');
+            const phoneEl = document.getElementById('a-phone');
+            
+            // Agar input khali hai, tabhi user ki details fill karo
+            if(nameEl && !nameEl.value) {
+                nameEl.value = user.full_name || user.first_name || user.name || '';
+            }
+            if(phoneEl && !phoneEl.value) {
+                phoneEl.value = user.phone_number || user.phone || '';
+            }
+        }
+    } catch (e) {
+        console.warn("Could not auto-fill user details", e);
+    }
 }
 
 // Close Modal Function
