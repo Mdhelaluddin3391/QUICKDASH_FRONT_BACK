@@ -127,9 +127,14 @@ class OrderService:
         }
 
         order = Order.objects.create(
-            user=user, warehouse=warehouse, status="created",
-            delivery_type=delivery_type, total_amount=Decimal("0.00"),
-            delivery_address_json=address_snapshot, payment_method=payment_method,
+            user=user, 
+            fulfillment_warehouse=warehouse, # Changed here
+            last_mile_warehouse=warehouse,   # Changed here
+            status="created",
+            delivery_type=delivery_type, 
+            total_amount=Decimal("0.00"),
+            delivery_address_json=address_snapshot, 
+            payment_method=payment_method,
         )
 
         total = Decimal("0.00")
@@ -220,7 +225,7 @@ class OrderService:
         order.status = "cancelled"; order.save(update_fields=["status", "updated_at"])
 
         for order_item in order.items.all():
-            inv = InventoryItem.objects.filter(sku=order_item.sku, bin__rack__aisle__zone__warehouse=order.warehouse).first()
+            inv = InventoryItem.objects.filter(sku=order_item.sku, bin__rack__aisle__zone__warehouse=order.fulfillment_warehouse).first()
             if inv: InventoryService.release_stock(inv.id, order_item.quantity, f"cancel:{order.id}")
 
         if hasattr(order, "payment") and order.payment.status == "paid":
@@ -260,7 +265,7 @@ class OrderSimulationService:
         if not hasattr(order, 'delivery'): DeliveryService.initiate_delivery_search(order)
         order.refresh_from_db()
         if not order.delivery.rider: 
-            DeliveryService.assign_rider(order, OrderSimulationService._get_or_create_bot_rider(order.warehouse))
+            DeliveryService.assign_rider(order, OrderSimulationService._get_or_create_bot_rider(order.last_mile_warehouse))
         order.delivery.status = "out_for_delivery"; order.delivery.save()
         order.status = "out_for_delivery"; order.save()
         OrderService._broadcast_status(order)
