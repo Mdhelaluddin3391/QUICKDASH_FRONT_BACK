@@ -27,7 +27,6 @@ class ProductImageInline(admin.TabularInline):
 
 
 class CategoryResource(resources.ModelResource):
-    # Linking parent category by name
     parent = fields.Field(
         column_name='parent',
         attribute='parent',
@@ -37,18 +36,19 @@ class CategoryResource(resources.ModelResource):
     class Meta:
         model = Category
         import_id_fields = ('name',)
-        fields = ('id', 'name', 'slug', 'parent', 'icon', 'is_active', 'created_at')
+        # FIX: Removed 'created_at' as it does not exist in Category Model
+        fields = ('id', 'name', 'slug', 'parent', 'icon', 'is_active')
 
 
 class BrandResource(resources.ModelResource):
     class Meta:
         model = Brand
         import_id_fields = ('name',)
-        fields = ('id', 'name', 'slug', 'logo', 'is_active', 'created_at')
+        # FIX: Removed 'created_at' as it does not exist in Brand Model
+        fields = ('id', 'name', 'slug', 'logo', 'is_active')
 
 
 class ProductResource(resources.ModelResource):
-    # Linking category and brand by their names
     category = fields.Field(
         column_name='category',
         attribute='category',
@@ -62,18 +62,18 @@ class ProductResource(resources.ModelResource):
 
     class Meta:
         model = Product
-        import_id_fields = ('sku',)  # SKU unique identifier rahega
+        import_id_fields = ('sku',) 
         fields = ('id', 'name', 'sku', 'description', 'unit', 'mrp', 'image', 'is_active', 'category', 'brand', 'created_at')
 
 
 class BannerResource(resources.ModelResource):
     class Meta:
         model = Banner
-        fields = ('id', 'title', 'image', 'target_url', 'position', 'bg_gradient', 'is_active', 'created_at')
+        # FIX: Removed 'created_at' as it does not exist in Banner Model
+        fields = ('id', 'title', 'image', 'target_url', 'position', 'bg_gradient', 'is_active')
 
 
 class FlashSaleResource(resources.ModelResource):
-    # Linking product by its sku
     product = fields.Field(
         column_name='product',
         attribute='product',
@@ -91,29 +91,11 @@ class ProductAdmin(ImportExportModelAdmin):
     change_list_template = "admin/catalog/product/change_list.html"
 
     list_display = (
-        'name',
-        'sku',
-        'image_preview',
-        'image', 
-        'category_name',
-        'mrp',
-        'stock_status',
-        'is_active',
-        'created_at_date'
+        'name', 'sku', 'image_preview', 'image', 'category_name',
+        'mrp', 'stock_status', 'is_active', 'created_at_date'
     )
-    list_filter = (
-        'is_active',
-        'category',
-        'brand',
-        'created_at'
-    )
-    search_fields = (
-        'name',
-        'sku',
-        'description',
-        'category__name',
-        'brand__name'
-    )
+    list_filter = ('is_active', 'category', 'brand', 'created_at')
+    search_fields = ('name', 'sku', 'description', 'category__name', 'brand__name')
     list_select_related = ('category', 'brand')
     raw_id_fields = ('category', 'brand')
     
@@ -122,32 +104,18 @@ class ProductAdmin(ImportExportModelAdmin):
     actions = ['activate_products', 'deactivate_products', 'mark_featured', 'unmark_featured']
 
     fieldsets = (
-        ('Basic Information', {
-            'fields': ('name', 'sku', 'description', 'unit')
-        }),
-        ('Shop by Store', {  
-            'fields': ('category', 'brand')
-        }),
-        ('Pricing & Inventory', {
-            'fields': ('mrp', 'is_active')
-        }),
-        ('Media', {
-            'fields': ('image', 'image_preview'),
-            'classes': ('collapse',)
-        }),
-        ('Timestamps', {
-            'fields': ('created_at',),
-            'classes': ('collapse',)
-        }),
+        ('Basic Information', {'fields': ('name', 'sku', 'description', 'unit')}),
+        ('Shop by Store', {'fields': ('category', 'brand')}),
+        ('Pricing & Inventory', {'fields': ('mrp', 'is_active')}),
+        ('Media', {'fields': ('image', 'image_preview'), 'classes': ('collapse',)}),
+        ('Timestamps', {'fields': ('created_at',), 'classes': ('collapse',)}),
     )
 
     readonly_fields = ('created_at', 'image_preview')
 
     def get_urls(self):
         urls = super().get_urls()
-        new_urls = [
-            path('import-csv/', self.import_csv),
-        ]
+        new_urls = [path('import-csv/', self.import_csv)]
         return new_urls + urls
 
     def import_csv(self, request):
@@ -160,14 +128,12 @@ class ProductAdmin(ImportExportModelAdmin):
             
             file_data = csv_file.read().decode("utf-8")
             csv_data = io.StringIO(file_data)
-            
             reader = csv.DictReader(csv_data)
             
             count = 0
             for row in reader:
                 sku_val = row.get('sku', '').strip()
-                if not sku_val:
-                    continue 
+                if not sku_val: continue 
                 
                 name_val = row.get('name', '').strip()
                 brand_name = row.get('brand', '').strip()
@@ -184,7 +150,6 @@ class ProductAdmin(ImportExportModelAdmin):
                         
                         if data.get('status') == 1:
                             product_data = data.get('product', {})
-                            
                             name_val = product_data.get('product_name', '')
                             image_val = product_data.get('image_front_url', '')
                             desc_val = product_data.get('ingredients_text', '') 
@@ -197,23 +162,18 @@ class ProductAdmin(ImportExportModelAdmin):
                     except Exception as e:
                         pass 
 
-                if not name_val:
-                    name_val = f"Unknown Product (SKU: {sku_val})"
-
-                if not category_name:
-                    category_name = "Uncategorized"
+                if not name_val: name_val = f"Unknown Product (SKU: {sku_val})"
+                if not category_name: category_name = "Uncategorized"
 
                 try:
                     category_obj, _ = Category.objects.get_or_create(
-                        name=category_name, 
-                        defaults={'slug': category_name.lower().replace(" ", "-")}
+                        name=category_name, defaults={'slug': category_name.lower().replace(" ", "-")}
                     )
 
                     brand_obj = None
                     if brand_name:
                         brand_obj, _ = Brand.objects.get_or_create(
-                            name=brand_name, 
-                            defaults={'slug': brand_name.lower().replace(" ", "-")}
+                            name=brand_name, defaults={'slug': brand_name.lower().replace(" ", "-")}
                         )
 
                     is_active_val = str(row.get('is_active', 'TRUE')).strip().upper() == 'TRUE'
@@ -221,14 +181,9 @@ class ProductAdmin(ImportExportModelAdmin):
                     obj, created = Product.objects.update_or_create(
                         sku=sku_val,
                         defaults={
-                            'name': name_val,
-                            'description': desc_val,
-                            'unit': row.get('unit', '1 Unit'),
-                            'image': image_val,
-                            'mrp': mrp_val,
-                            'is_active': is_active_val,
-                            'category': category_obj,
-                            'brand': brand_obj,
+                            'name': name_val, 'description': desc_val, 'unit': row.get('unit', '1 Unit'),
+                            'image': image_val, 'mrp': mrp_val, 'is_active': is_active_val,
+                            'category': category_obj, 'brand': brand_obj,
                         }
                     )
                     count += 1
@@ -262,13 +217,11 @@ class ProductAdmin(ImportExportModelAdmin):
     def stock_status(self, obj):
         from apps.inventory.models import InventoryItem
         stock_data = InventoryItem.objects.filter(sku=obj.sku).aggregate(
-            t_stock=Sum('total_stock'),
-            r_stock=Sum('reserved_stock')
+            t_stock=Sum('total_stock'), r_stock=Sum('reserved_stock')
         )
         
         t_stock = stock_data['t_stock'] or 0
         r_stock = stock_data['r_stock'] or 0
-        
         available_stock = t_stock - r_stock
 
         if available_stock > 10:
@@ -280,10 +233,8 @@ class ProductAdmin(ImportExportModelAdmin):
     stock_status.short_description = "Stock Status"
 
     def is_active_badge(self, obj):
-        if obj.is_active:
-            return format_html('<span style="color: green; font-weight: bold;">✓ Active</span>')
-        else:
-            return format_html('<span style="color: red; font-weight: bold;">✗ Inactive</span>')
+        if obj.is_active: return format_html('<span style="color: green; font-weight: bold;">✓ Active</span>')
+        else: return format_html('<span style="color: red; font-weight: bold;">✗ Inactive</span>')
     is_active_badge.short_description = "Status"
 
     def created_at_date(self, obj):
@@ -292,32 +243,6 @@ class ProductAdmin(ImportExportModelAdmin):
         return "N/A"
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
-
-    @admin.action(description='Activate selected products')
-    def activate_products(self, request, queryset):
-        updated = queryset.update(is_active=True)
-        self.message_user(request, f"{updated} products activated.")
-
-    @admin.action(description='Deactivate selected products')
-    def deactivate_products(self, request, queryset):
-        updated = queryset.update(is_active=False)
-        self.message_user(request, f"{updated} products deactivated.")
-
-    @admin.action(description='Mark selected products as featured')
-    def mark_featured(self, request, queryset):
-        if hasattr(Product, 'is_featured'):
-            updated = queryset.update(is_featured=True)
-            self.message_user(request, f"{updated} products marked as featured.")
-        else:
-            self.message_user(request, "is_featured field not available.")
-
-    @admin.action(description='Unmark selected products as featured')
-    def unmark_featured(self, request, queryset):
-        if hasattr(Product, 'is_featured'):
-            updated = queryset.update(is_featured=False)
-            self.message_user(request, f"{updated} products unmarked as featured.")
-        else:
-            self.message_user(request, "is_featured field not available.")
 
 
 @admin.register(Category)
@@ -334,16 +259,9 @@ class CategoryAdmin(ImportExportModelAdmin):
     actions = ['activate_categories', 'deactivate_categories']
 
     fieldsets = (
-        ('Basic Information', {
-            'fields': ('name', 'slug', 'parent') 
-        }),
-        ('Media', {
-            'fields': ('icon', 'icon_preview'),
-            'classes': ('collapse',)
-        }),
-        ('Status', {
-            'fields': ('is_active',)
-        }),
+        ('Basic Information', {'fields': ('name', 'slug', 'parent')}),
+        ('Media', {'fields': ('icon', 'icon_preview'), 'classes': ('collapse',)}),
+        ('Status', {'fields': ('is_active',)}),
     )
 
     prepopulated_fields = {'slug': ('name',)}
@@ -360,32 +278,9 @@ class CategoryAdmin(ImportExportModelAdmin):
     parent_name.short_description = "Parent"
     parent_name.admin_order_field = 'parent__name'
 
-    def is_active_badge(self, obj):
-        if obj.is_active:
-            return format_html('<span style="color: green; font-weight: bold;">✓ Active</span>')
-        else:
-            return format_html('<span style="color: red; font-weight: bold;">✗ Inactive</span>')
-    is_active_badge.short_description = "Status"
-
     def product_count(self, obj):
         return obj.products.count()
     product_count.short_description = "Products"
-
-    def created_at_date(self, obj):
-        if hasattr(obj, 'created_at') and obj.created_at:
-            return localtime(obj.created_at).strftime('%d/%m/%Y')
-        return "N/A"
-    created_at_date.short_description = "Created"
-
-    @admin.action(description='Activate selected categories')
-    def activate_categories(self, request, queryset):
-        updated = queryset.update(is_active=True)
-        self.message_user(request, f"{updated} categories activated.")
-
-    @admin.action(description='Deactivate selected categories')
-    def deactivate_categories(self, request, queryset):
-        updated = queryset.update(is_active=False)
-        self.message_user(request, f"{updated} categories deactivated.")
 
 
 @admin.register(Brand)
@@ -397,19 +292,11 @@ class BrandAdmin(ImportExportModelAdmin):
     
     list_editable = ('is_active', 'logo') 
     list_per_page = 25
-    actions = ['activate_brands', 'deactivate_brands']
 
     fieldsets = (
-        ('Basic Information', {
-            'fields': ('name', 'slug')
-        }),
-        ('Media', {
-            'fields': ('logo', 'logo_preview'),
-            'classes': ('collapse',)
-        }),
-        ('Status', {
-            'fields': ('is_active',)
-        }),
+        ('Basic Information', {'fields': ('name', 'slug')}),
+        ('Media', {'fields': ('logo', 'logo_preview'), 'classes': ('collapse',)}),
+        ('Status', {'fields': ('is_active',)}),
     )
 
     prepopulated_fields = {'slug': ('name',)}
@@ -421,32 +308,9 @@ class BrandAdmin(ImportExportModelAdmin):
         return "-"
     logo_preview.short_description = "Logo"
 
-    def is_active_badge(self, obj):
-        if obj.is_active:
-            return format_html('<span style="color: green; font-weight: bold;">✓ Active</span>')
-        else:
-            return format_html('<span style="color: red; font-weight: bold;">✗ Inactive</span>')
-    is_active_badge.short_description = "Status"
-
     def product_count(self, obj):
         return obj.products.count()
     product_count.short_description = "Products"
-
-    def created_at_date(self, obj):
-        if hasattr(obj, 'created_at') and obj.created_at:
-            return localtime(obj.created_at).strftime('%d/%m/%Y')
-        return "N/A"
-    created_at_date.short_description = "Created"
-
-    @admin.action(description='Activate selected brands')
-    def activate_brands(self, request, queryset):
-        updated = queryset.update(is_active=True)
-        self.message_user(request, f"{updated} brands activated.")
-
-    @admin.action(description='Deactivate selected brands')
-    def deactivate_brands(self, request, queryset):
-        updated = queryset.update(is_active=False)
-        self.message_user(request, f"{updated} brands deactivated.")
 
 
 @admin.register(Banner)
@@ -459,12 +323,8 @@ class BannerAdmin(ImportExportModelAdmin):
     list_per_page = 25
 
     fieldsets = (
-        ('Content', {
-            'fields': ('title', 'image', 'image_preview', 'target_url')
-        }),
-        ('Display Settings', {
-            'fields': ('position', 'bg_gradient', 'is_active')
-        }),
+        ('Content', {'fields': ('title', 'image', 'image_preview', 'target_url')}),
+        ('Display Settings', {'fields': ('position', 'bg_gradient', 'is_active')}),
     )
 
     readonly_fields = ('image_preview',)
@@ -474,19 +334,6 @@ class BannerAdmin(ImportExportModelAdmin):
             return format_html('<img src="{}" style="max-height: 60px; max-width: 120px; border-radius: 5px; object-fit: cover;" />', obj.image)
         return "-"
     image_preview.short_description = "Banner Preview"
-
-    def is_active_badge(self, obj):
-        if obj.is_active:
-            return format_html('<span style="color: green; font-weight: bold;">✓ Active</span>')
-        else:
-            return format_html('<span style="color: red; font-weight: bold;">✗ Inactive</span>')
-    is_active_badge.short_description = "Status"
-
-    def created_at_date(self, obj):
-        if hasattr(obj, 'created_at') and obj.created_at:
-            return localtime(obj.created_at).strftime('%d/%m/%Y')
-        return "N/A"
-    created_at_date.short_description = "Created"
 
 
 @admin.register(FlashSale)
@@ -501,9 +348,7 @@ class FlashSaleAdmin(ImportExportModelAdmin):
     list_per_page = 25
 
     fieldsets = (
-        ('Sale Details', {
-            'fields': ('product', 'discount_percentage', 'end_time', 'is_active')
-        }),
+        ('Sale Details', {'fields': ('product', 'discount_percentage', 'end_time', 'is_active')}),
     )
 
     def product_name(self, obj):
@@ -514,10 +359,3 @@ class FlashSaleAdmin(ImportExportModelAdmin):
     def discount_percentage_display(self, obj):
         return f"{obj.discount_percentage}% OFF"
     discount_percentage_display.short_description = "Discount"
-
-    def is_active_badge(self, obj):
-        if obj.is_active:
-            return format_html('<span style="color: green; font-weight: bold;">✓ Active</span>')
-        else:
-            return format_html('<span style="color: red; font-weight: bold;">✗ Inactive</span>')
-    is_active_badge.short_description = "Status"

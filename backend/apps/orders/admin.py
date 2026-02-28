@@ -7,32 +7,29 @@ from django.utils.timezone import localtime
 from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
-from django.db.models import Q # <--- ADDED FOR MANAGER QUERY FILTER
+from django.db.models import Q 
 
-# IMPORT NEW MODEL
 from .models import Order, OrderItem, OrderConfiguration, OrderItemFulfillment
 from apps.catalog.models import Product
 from apps.warehouse.models import Warehouse
 from apps.delivery.tasks import retry_auto_assign_rider
 from apps.customers.models import CustomerAddress 
+from apps.inventory.models import InventoryItem
 
 User = get_user_model()
 
 
 class OrderResource(resources.ModelResource):
-    # Linking User by phone
     user = fields.Field(
         column_name='user_phone',
         attribute='user',
         widget=ForeignKeyWidget(User, 'phone')
     )
-    # Linking Fulfillment Warehouse by name
     fulfillment_warehouse = fields.Field(
         column_name='fulfillment_warehouse_name',
         attribute='fulfillment_warehouse',
         widget=ForeignKeyWidget(Warehouse, 'name')
     )
-    # Linking Last Mile Warehouse by name
     last_mile_warehouse = fields.Field(
         column_name='last_mile_warehouse_name',
         attribute='last_mile_warehouse',
@@ -42,17 +39,9 @@ class OrderResource(resources.ModelResource):
     class Meta:
         model = Order
         fields = (
-            'id', 
-            'user', 
-            'fulfillment_warehouse', 
-            'last_mile_warehouse', 
-            'status', 
-            'delivery_type', 
-            'payment_method', 
-            'total_amount', 
-            'delivery_address_json', 
-            'created_at', 
-            'updated_at'
+            'id', 'user', 'fulfillment_warehouse', 'last_mile_warehouse', 
+            'status', 'delivery_type', 'payment_method', 'total_amount', 
+            'delivery_address_json', 'created_at', 'updated_at'
         )
         export_order = fields
 
@@ -66,7 +55,27 @@ class OrderItemResource(resources.ModelResource):
 
     class Meta:
         model = OrderItem
-        fields = ('id', 'order', 'sku', 'product_name', 'quantity', 'price')
+        # FIX: Added 'status' and 'cancel_reason' to match the updated models.py
+        fields = ('id', 'order', 'sku', 'product_name', 'quantity', 'price', 'status', 'cancel_reason')
+        export_order = fields
+
+
+# NEW: Added Resource for OrderItemFulfillment for Full Backup
+class OrderItemFulfillmentResource(resources.ModelResource):
+    order_item = fields.Field(
+        column_name='order_item_id',
+        attribute='order_item',
+        widget=ForeignKeyWidget(OrderItem, 'id')
+    )
+    inventory_batch = fields.Field(
+        column_name='inventory_batch_id',
+        attribute='inventory_batch',
+        widget=ForeignKeyWidget(InventoryItem, 'id')
+    )
+
+    class Meta:
+        model = OrderItemFulfillment
+        fields = ('id', 'order_item', 'inventory_batch', 'quantity_allocated', 'vendor_payable_amount', 'created_at')
         export_order = fields
 
 
@@ -82,7 +91,6 @@ class OrderItemInline(admin.TabularInline):
     extra = 0
     readonly_fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal', 'fulfillment_details')
     can_delete = False
-    
     fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal', 'fulfillment_details', 'status', 'cancel_reason')
     show_change_link = False
 
@@ -116,97 +124,47 @@ class OrderItemInline(admin.TabularInline):
 class OrderAdmin(ImportExportModelAdmin):
     resource_class = OrderResource
     list_display = (
-        'id',
-        'customer_phone',
-        'fulfillment_warehouse', # Pehle yahan 'warehouse_name' tha
-        'transit_route',         # NAYA COLUMN: Route dikhane ke liye
-        'status_badge',
-        'payment_method',
-        'total_amount_display',
-        'delivery_type',
-        'delivery_name',
-        'delivery_phone',
-        'Maps_link',
-        'created_at_date'
+        'id', 'customer_phone', 'fulfillment_warehouse', 'transit_route', 
+        'status_badge', 'payment_method', 'total_amount_display', 
+        'delivery_type', 'delivery_name', 'delivery_phone', 'Maps_link', 'created_at_date'
     )
-    list_filter = (
-        'status',
-        'fulfillment_warehouse', # NAYA FILTER
-        'last_mile_warehouse',   # NAYA FILTER
-        'created_at',
-        'payment_method',
-        'delivery_type'
-    )
+    list_filter = ('status', 'fulfillment_warehouse', 'last_mile_warehouse', 'created_at', 'payment_method', 'delivery_type')
     search_fields = (
-        'id',
-        'user__phone',
-        'user__first_name',
-        'user__last_name',
-        'fulfillment_warehouse__name',
-        'fulfillment_warehouse__code',
-        'last_mile_warehouse__name'
+        'id', 'user__phone', 'user__first_name', 'user__last_name',
+        'fulfillment_warehouse__name', 'fulfillment_warehouse__code', 'last_mile_warehouse__name'
     )
     list_select_related = ('user', 'fulfillment_warehouse', 'last_mile_warehouse')
     raw_id_fields = ('user', 'fulfillment_warehouse', 'last_mile_warehouse')
     inlines = [OrderItemInline]
     list_per_page = 25
     actions = [
-        'mark_as_confirmed',
-        'mark_as_picking',
-        'mark_as_packed',
-        'mark_as_out_for_delivery',
-        'mark_as_delivered',
-        'cancel_orders'
+        'mark_as_confirmed', 'mark_as_picking', 'mark_as_packed',
+        'mark_as_out_for_delivery', 'mark_as_delivered', 'cancel_orders'
     ]
 
     fieldsets = (
-        ('Order Information', {
-            'fields': ('id', 'user', 'fulfillment_warehouse', 'last_mile_warehouse')
-        }),
-        ('Order Details', {
-            'fields': ('status', 'delivery_type', 'payment_method', 'total_amount')
-        }),
-        ('Delivery Address Details', {
-            'fields': ('delivery_name', 'delivery_phone', 'full_delivery_address', 'Maps_link')
-        }),
-        ('Raw Delivery JSON (For Debugging)', {
-            'fields': ('delivery_address_json',),
-            'classes': ('collapse',)
-        }),
-        ('Timestamps', {
-            'fields': ('created_at', 'updated_at'),
-            'classes': ('collapse',)
-        }),
+        ('Order Information', {'fields': ('id', 'user', 'fulfillment_warehouse', 'last_mile_warehouse')}),
+        ('Order Details', {'fields': ('status', 'delivery_type', 'payment_method', 'total_amount')}),
+        ('Delivery Address Details', {'fields': ('delivery_name', 'delivery_phone', 'full_delivery_address', 'Maps_link')}),
+        ('Raw Delivery JSON', {'fields': ('delivery_address_json',), 'classes': ('collapse',)}),
+        ('Timestamps', {'fields': ('created_at', 'updated_at'), 'classes': ('collapse',)}),
     )
 
     readonly_fields = ('id', 'created_at', 'updated_at', 'total_amount', 'delivery_name', 'delivery_phone', 'full_delivery_address', 'Maps_link')
 
-    # ---> MANAGER QUERYSET FILTER LOGIC (NEW)
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        
-        # Agar admin maalik/superadmin hai, toh use sab dikhega
         if request.user.is_superuser:
             return qs
-            
-        # Agar user ke pass 'warehouse' assigned hai, toh usko sirf apne store ke orders dikhenge
         if hasattr(request.user, 'warehouse') and request.user.warehouse:
             user_wh = request.user.warehouse
-            return qs.filter(
-                Q(fulfillment_warehouse=user_wh) | Q(last_mile_warehouse=user_wh)
-            )
-            
+            return qs.filter(Q(fulfillment_warehouse=user_wh) | Q(last_mile_warehouse=user_wh))
         return qs
 
-    # ---> TRANSIT ROUTE LOGIC (NEW)
     def transit_route(self, obj):
         if obj.fulfillment_warehouse and obj.last_mile_warehouse:
             if obj.fulfillment_warehouse != obj.last_mile_warehouse:
-                return format_html(
-                    '<span style="color: #17a2b8; font-weight: bold; font-size: 0.9em;">🚚 {} ➔ {}</span>', 
-                    obj.fulfillment_warehouse.name, 
-                    obj.last_mile_warehouse.name
-                )
+                return format_html('<span style="color: #17a2b8; font-weight: bold; font-size: 0.9em;">🚚 {} ➔ {}</span>', obj.fulfillment_warehouse.name, obj.last_mile_warehouse.name)
         return format_html('<span style="color: #28a745; font-weight: bold; font-size: 0.9em;">📍 Direct Delivery</span>')
     transit_route.short_description = "Transit Route"
 
@@ -229,29 +187,16 @@ class OrderAdmin(ImportExportModelAdmin):
                             try:
                                 from apps.payments.models import Payment
                                 from apps.payments.refund_services import RefundService
-                                
                                 payment = Payment.objects.filter(order=order, status='paid').first()
                                 if payment:
                                     RefundService.initiate_partial_refund(payment, item_total)
-                                    self.message_user(
-                                        request, 
-                                        f"Item '{instance.product_name}' cancelled. ₹{item_total} partial refund auto-initiated to bank!", 
-                                        level=messages.SUCCESS
-                                    )
+                                    self.message_user(request, f"Item '{instance.product_name}' cancelled. ₹{item_total} partial refund auto-initiated to bank!", level=messages.SUCCESS)
                                 else:
-                                    self.message_user(
-                                        request, 
-                                        f"Item cancelled. Total deducted. But NO valid payment record found to auto-refund ₹{item_total}.", 
-                                        level=messages.WARNING
-                                    )
+                                    self.message_user(request, f"Item cancelled. Total deducted. But NO valid payment record found to auto-refund ₹{item_total}.", level=messages.WARNING)
                             except Exception as e:
                                 self.message_user(request, f"Item Cancelled. Auto-Refund failed: {str(e)}", level=messages.ERROR)
                         else:
-                            self.message_user(
-                                request, 
-                                f"Item '{instance.product_name}' cancelled. COD Amount reduced by ₹{item_total}. New Total: ₹{order.total_amount}", 
-                                level=messages.SUCCESS
-                            )
+                            self.message_user(request, f"Item '{instance.product_name}' cancelled. COD Amount reduced by ₹{item_total}. New Total: ₹{order.total_amount}", level=messages.SUCCESS)
             instance.save()
         formset.save_m2m()
 
@@ -262,168 +207,61 @@ class OrderAdmin(ImportExportModelAdmin):
 
     def status_badge(self, obj):
         colors = {
-            'created': '#6c757d',
-            'confirmed': '#007bff',
-            'picking': '#ffc107',
-            'packed_at_hub': '#fd7e14',        # New Status Colors
-            'in_transit_to_local': '#6f42c1',  # New Status Colors
-            'received_at_local': '#20c997',    # New Status Colors
-            'packed': '#28a745',
-            'out_for_delivery': '#17a2b8',
-            'delivered': '#28a745',
-            'cancelled': '#dc3545',
-            'failed': '#dc3545',
+            'created': '#6c757d', 'confirmed': '#007bff', 'picking': '#ffc107',
+            'packed_at_hub': '#fd7e14', 'in_transit_to_local': '#6f42c1', 'received_at_local': '#20c997',
+            'packed': '#28a745', 'out_for_delivery': '#17a2b8', 'delivered': '#28a745',
+            'cancelled': '#dc3545', 'failed': '#dc3545',
         }
         color = colors.get(obj.status, '#6c757d')
-        return format_html(
-            '<span style="background-color: {}; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; white-space: nowrap;">{}</span>',
-            color,
-            obj.get_status_display()
-        )
+        return format_html('<span style="background-color: {}; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; white-space: nowrap;">{}</span>', color, obj.get_status_display())
     status_badge.short_description = "Status"
 
     def total_amount_display(self, obj):
         return f"₹{obj.total_amount:.2f}"
     total_amount_display.short_description = "Total Amount"
-    total_amount_display.admin_order_field = 'total_amount'
 
     def created_at_date(self, obj):
         if hasattr(obj, 'created_at') and obj.created_at:
             return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
         return "N/A"
     created_at_date.short_description = "Created"
-    created_at_date.admin_order_field = 'created_at'
 
     def delivery_name(self, obj):
         addr = obj.delivery_address_json or {}
         name = addr.get('receiver_name') or addr.get('name')
-        
-        if not name and addr.get('id'):
-            try:
-                real_addr = CustomerAddress.objects.get(id=addr.get('id'))
-                name = real_addr.receiver_name
-            except Exception:
-                pass
-                
-        if not name and obj.user:
-            name = f"{obj.user.first_name} {obj.user.last_name}".strip()
-            
+        if not name and obj.user: name = f"{obj.user.first_name} {obj.user.last_name}".strip()
         return name or "N/A"
     delivery_name.short_description = "Delivery Name"
 
     def delivery_phone(self, obj):
         addr = obj.delivery_address_json or {}
         phone = addr.get('receiver_phone') or addr.get('phone')
-        
-        if not phone and addr.get('id'):
-            try:
-                real_addr = CustomerAddress.objects.get(id=addr.get('id'))
-                phone = real_addr.receiver_phone
-            except Exception:
-                pass
-                
-        if not phone and obj.user:
-            phone = getattr(obj.user, 'phone', None)
-            
+        if not phone and obj.user: phone = getattr(obj.user, 'phone', None)
         return phone or "N/A"
     delivery_phone.short_description = "Delivery Phone"
 
     def full_delivery_address(self, obj):
         addr_json = obj.delivery_address_json or {}
-        if not addr_json:
-            return "No Address Details Found"
-            
+        if not addr_json: return "No Address Details Found"
         details = []
-        
-        real_addr = None
-        if addr_json.get('id'):
-            try:
-                real_addr = CustomerAddress.objects.get(id=addr_json.get('id'))
-            except Exception:
-                pass
-
-        if real_addr:
-            if real_addr.house_no: details.append(f"<b>House/Flat:</b> {real_addr.house_no}")
-            if real_addr.floor_no: details.append(f"<b>Floor:</b> {real_addr.floor_no}")
-            if real_addr.apartment_name: details.append(f"<b>Building:</b> {real_addr.apartment_name}")
-            if real_addr.landmark: details.append(f"<b>Landmark:</b> {real_addr.landmark}")
-            
-            city = real_addr.city or addr_json.get('city', '')
-            if city or real_addr.pincode:
-                details.append(f"<b>Area:</b> {city} - {real_addr.pincode}")
-                
-            if real_addr.google_address_text: 
-                details.append(f"<b>Map Address:</b> {real_addr.google_address_text}")
-        else:
-            if addr_json.get('full_address'): 
-                details.append(f"<b>Full Address:</b> {addr_json.get('full_address')}")
-            if addr_json.get('city'):
-                details.append(f"<b>City:</b> {addr_json.get('city')}")
-            
-        if not details:
-            return str(addr_json) 
-            
-        return format_html("<br>".join(details))
-    full_delivery_address.short_description = "Complete Address Details"
+        if addr_json.get('full_address'): details.append(f"<b>Full Address:</b> {addr_json.get('full_address')}")
+        if addr_json.get('city'): details.append(f"<b>City:</b> {addr_json.get('city')}")
+        return format_html("<br>".join(details)) if details else str(addr_json)
+    full_delivery_address.short_description = "Address Details"
 
     def Maps_link(self, obj):
         addr = obj.delivery_address_json or {}
-        lat = addr.get('latitude') or addr.get('lat')
-        lng = addr.get('longitude') or addr.get('lng')
-        
-        if lat is None or lng is None:
-            return format_html('<span style="color:red;">Location Missing</span>')
-            
+        lat, lng = addr.get('latitude') or addr.get('lat'), addr.get('longitude') or addr.get('lng')
+        if lat is None or lng is None: return format_html('<span style="color:red;">Location Missing</span>')
         url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}"
-        return format_html(
-            '<a style="background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block;" href="{}" target="_blank" rel="noopener noreferrer">📍 Get Directions</a>', 
-            url
-        )
-    Maps_link.short_description = "Customer Map Location"
-
-    def mark_as_confirmed(self, request, queryset):
-        updated = queryset.filter(status='created').update(status='confirmed')
-        self.message_user(request, f"{updated} orders marked as confirmed.")
-    mark_as_confirmed.short_description = "Mark selected orders as Confirmed"
-
-    def mark_as_picking(self, request, queryset):
-        updated = queryset.filter(status__in=['created', 'confirmed']).update(status='picking')
-        self.message_user(request, f"{updated} orders marked as picking.")
-    mark_as_picking.short_description = "Mark selected orders as Picking"
-
-    def mark_as_packed(self, request, queryset):
-        orders_to_update = list(queryset.filter(status__in=['created', 'confirmed', 'picking']).values_list('id', flat=True))
-        
-        if not orders_to_update:
-            self.message_user(request, "No eligible orders found.")
-            return
-
-        updated = queryset.filter(id__in=orders_to_update).update(status='packed')
-        
-        for order_id in orders_to_update:
-            retry_auto_assign_rider.delay(order_id)
-
-        self.message_user(request, f"{updated} orders marked as packed. Auto-assigning riders...")
-    mark_as_packed.short_description = "Mark selected orders as Packed"
-
-    def mark_as_out_for_delivery(self, request, queryset):
-        updated = queryset.filter(status__in=['created', 'confirmed', 'picking', 'packed', 'received_at_local']).update(status='out_for_delivery')
-        self.message_user(request, f"{updated} orders marked as out for delivery.")
-    mark_as_out_for_delivery.short_description = "Mark selected orders as Out for Delivery"
-
-    def mark_as_delivered(self, request, queryset):
-        updated = queryset.filter(status__in=['created', 'confirmed', 'picking', 'packed', 'out_for_delivery']).update(status='delivered')
-        self.message_user(request, f"{updated} orders marked as delivered.")
-    mark_as_delivered.short_description = "Mark selected orders as Delivered"
-
-    def cancel_orders(self, request, queryset):
-        updated = queryset.exclude(status__in=['delivered', 'cancelled']).update(status='cancelled')
-        self.message_user(request, f"{updated} orders cancelled.")
-    cancel_orders.short_description = "Cancel selected orders"
+        return format_html('<a style="background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block;" href="{}" target="_blank">📍 Directions</a>', url)
+    Maps_link.short_description = "Map"
 
 
+# FIX: Added ImportExportModelAdmin to allow backup of fulfillments too
 @admin.register(OrderItemFulfillment)
-class OrderItemFulfillmentAdmin(admin.ModelAdmin):
+class OrderItemFulfillmentAdmin(ImportExportModelAdmin):
+    resource_class = OrderItemFulfillmentResource
     list_display = ('id', 'order_id_link', 'sku_link', 'batch_id', 'vendor_phone', 'quantity_allocated', 'vendor_payable_amount', 'created_at')
     list_filter = ('inventory_batch__owner', 'created_at')
     search_fields = ('order_item__order__id', 'inventory_batch__owner__phone', 'order_item__sku')
@@ -454,7 +292,4 @@ class OrderItemFulfillmentAdmin(admin.ModelAdmin):
 class OrderConfigurationAdmin(ImportExportModelAdmin):
     resource_class = OrderConfigurationResource
     list_display = ['delivery_fee', 'free_delivery_threshold']
-    list_filter = ['delivery_fee', 'free_delivery_threshold']
-    search_fields = ['delivery_fee', 'free_delivery_threshold']
     list_per_page = 25
-    readonly_fields = ['delivery_fee', 'free_delivery_threshold']
