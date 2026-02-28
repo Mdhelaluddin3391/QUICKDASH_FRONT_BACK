@@ -1,19 +1,51 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
-from import_export import resources
+from import_export import resources, fields
+from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
+
 from .models import Delivery
+from apps.orders.models import Order
+from apps.riders.models import Rider
 
 
 class DeliveryResource(resources.ModelResource):
+    # Linking order by id
+    order = fields.Field(
+        column_name='order_id',
+        attribute='order',
+        widget=ForeignKeyWidget(Order, 'id')
+    )
+    
+    # Linking rider by user's phone number
+    rider = fields.Field(
+        column_name='rider_phone',
+        attribute='rider',
+        widget=ForeignKeyWidget(Rider, 'user__phone')
+    )
+
     class Meta:
         model = Delivery
+        fields = (
+            'id', 
+            'order', 
+            'rider', 
+            'status', 
+            'job_status', 
+            'otp', 
+            'proof_image', 
+            'dispatch_location', 
+            'created_at', 
+            'updated_at'
+        )
+        export_order = fields
 
 
 @admin.register(Delivery)
 class DeliveryAdmin(ImportExportModelAdmin):
     resource_class = DeliveryResource
+    
     list_display = (
         'order_id_display',
         'rider_info',

@@ -5,20 +5,59 @@ from django.utils.timezone import localtime
 from django.db import models
 from django.urls import path            
 from django.http import JsonResponse    
-from import_export import resources
+from import_export import resources, fields
+from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
+
 from .models import InventoryItem, InventoryTransaction
 from apps.catalog.models import Product 
+from apps.warehouse.models import Bin
 
 
 class InventoryItemResource(resources.ModelResource):
+    # Linking Bin by its unique bin_code
+    bin = fields.Field(
+        column_name='bin_code',
+        attribute='bin',
+        widget=ForeignKeyWidget(Bin, 'bin_code')
+    )
+
     class Meta:
         model = InventoryItem
+        fields = (
+            'id', 
+            'bin', 
+            'sku', 
+            'product_name', 
+            'price', 
+            'total_stock', 
+            'reserved_stock', 
+            'mode', 
+            'lead_time_hours', 
+            'updated_at'
+        )
+        export_order = fields
 
 
 class InventoryTransactionResource(resources.ModelResource):
+    # Linking InventoryItem by sku
+    inventory_item = fields.Field(
+        column_name='inventory_item_sku',
+        attribute='inventory_item',
+        widget=ForeignKeyWidget(InventoryItem, 'sku')
+    )
+
     class Meta:
         model = InventoryTransaction
+        fields = (
+            'id', 
+            'inventory_item', 
+            'transaction_type', 
+            'quantity', 
+            'reference', 
+            'created_at'
+        )
+        export_order = fields
 
 
 @admin.register(InventoryItem)

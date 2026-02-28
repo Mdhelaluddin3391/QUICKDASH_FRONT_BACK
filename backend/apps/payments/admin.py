@@ -2,19 +2,57 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
-from import_export import resources
+from import_export import resources, fields
+from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
+
 from .models import Payment, Refund
+from apps.orders.models import Order
 
 
 class PaymentResource(resources.ModelResource):
+    # Linking Order by id
+    order = fields.Field(
+        column_name='order_id',
+        attribute='order',
+        widget=ForeignKeyWidget(Order, 'id')
+    )
+
     class Meta:
         model = Payment
+        fields = (
+            'id', 
+            'order', 
+            'provider', 
+            'provider_order_id', 
+            'provider_payment_id', 
+            'amount', 
+            'status', 
+            'created_at', 
+            'updated_at'
+        )
+        export_order = fields
 
 
 class RefundResource(resources.ModelResource):
+    # Linking Payment by id
+    payment = fields.Field(
+        column_name='payment_id',
+        attribute='payment',
+        widget=ForeignKeyWidget(Payment, 'id')
+    )
+
     class Meta:
         model = Refund
+        fields = (
+            'id', 
+            'payment', 
+            'provider_refund_id', 
+            'amount', 
+            'status', 
+            'created_at'
+        )
+        export_order = fields
 
 
 @admin.register(Payment)

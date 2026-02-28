@@ -1,25 +1,72 @@
 from django.contrib import admin
+from django.contrib.auth import get_user_model
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import localtime
-from import_export import resources
+from import_export import resources, fields
+from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
+
 from .models import Order, OrderItem, OrderConfiguration
 from apps.catalog.models import Product
+from apps.warehouse.models import Warehouse
 from apps.delivery.tasks import retry_auto_assign_rider
 from apps.customers.models import CustomerAddress 
 
+User = get_user_model()
+
+
 class OrderResource(resources.ModelResource):
+    # Linking User by phone
+    user = fields.Field(
+        column_name='user_phone',
+        attribute='user',
+        widget=ForeignKeyWidget(User, 'phone')
+    )
+    # Linking Warehouse by name
+    warehouse = fields.Field(
+        column_name='warehouse_name',
+        attribute='warehouse',
+        widget=ForeignKeyWidget(Warehouse, 'name')
+    )
+
     class Meta:
         model = Order
+        fields = (
+            'id', 
+            'user', 
+            'warehouse', 
+            'status', 
+            'delivery_type', 
+            'payment_method', 
+            'total_amount', 
+            'delivery_address_json', 
+            'created_at', 
+            'updated_at'
+        )
+        export_order = fields
+
 
 class OrderItemResource(resources.ModelResource):
+    # Linking Order by id
+    order = fields.Field(
+        column_name='order_id',
+        attribute='order',
+        widget=ForeignKeyWidget(Order, 'id')
+    )
+
     class Meta:
         model = OrderItem
+        fields = ('id', 'order', 'sku', 'product_name', 'quantity', 'price')
+        export_order = fields
+
 
 class OrderConfigurationResource(resources.ModelResource):
     class Meta:
         model = OrderConfiguration
+        fields = ('id', 'delivery_fee', 'free_delivery_threshold')
+        export_order = fields
+
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem

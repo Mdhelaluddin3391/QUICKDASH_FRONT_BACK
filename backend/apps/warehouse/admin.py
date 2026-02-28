@@ -3,44 +3,132 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import localtime
 from leaflet.admin import LeafletGeoAdmin
-from import_export import resources
+from import_export import resources, fields
+from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
+
 from .models import Warehouse, PickingTask, PackingTask, StorageZone, Aisle, Rack, Bin
+from apps.orders.models import Order
 
 
 class WarehouseResource(resources.ModelResource):
     class Meta:
         model = Warehouse
+        fields = (
+            'id', 
+            'name', 
+            'code', 
+            'warehouse_type', 
+            'city', 
+            'state', 
+            'location', 
+            'delivery_zone', 
+            'is_active', 
+            'created_at'
+        )
+        export_order = fields
 
 
 class PickingTaskResource(resources.ModelResource):
+    # Linking Order by id
+    order = fields.Field(
+        column_name='order_id',
+        attribute='order',
+        widget=ForeignKeyWidget(Order, 'id')
+    )
+    # Linking target_bin by unique bin_code
+    target_bin = fields.Field(
+        column_name='target_bin_code',
+        attribute='target_bin',
+        widget=ForeignKeyWidget(Bin, 'bin_code')
+    )
+    # Dynamically getting the related model for picker and linking by user__phone
+    picker = fields.Field(
+        column_name='picker_phone',
+        attribute='picker',
+        widget=ForeignKeyWidget(PickingTask._meta.get_field('picker').related_model, 'user__phone')
+    )
+
     class Meta:
         model = PickingTask
+        fields = ('id', 'order', 'item_sku', 'picker', 'target_bin', 'status', 'picked_at')
+        export_order = fields
 
 
 class PackingTaskResource(resources.ModelResource):
+    # Linking Order by id
+    order = fields.Field(
+        column_name='order_id',
+        attribute='order',
+        widget=ForeignKeyWidget(Order, 'id')
+    )
+    # Dynamically getting the related model for packer and linking by user__phone
+    packer = fields.Field(
+        column_name='packer_phone',
+        attribute='packer',
+        widget=ForeignKeyWidget(PackingTask._meta.get_field('packer').related_model, 'user__phone')
+    )
+
     class Meta:
         model = PackingTask
+        fields = ('id', 'order', 'packer', 'is_completed', 'created_at')
+        export_order = fields
 
 
 class StorageZoneResource(resources.ModelResource):
+    # Linking Warehouse by name
+    warehouse = fields.Field(
+        column_name='warehouse_name',
+        attribute='warehouse',
+        widget=ForeignKeyWidget(Warehouse, 'name')
+    )
+
     class Meta:
         model = StorageZone
+        fields = ('id', 'warehouse', 'name')
+        export_order = fields
 
 
 class AisleResource(resources.ModelResource):
+    # Linking StorageZone by name
+    zone = fields.Field(
+        column_name='zone_name',
+        attribute='zone',
+        widget=ForeignKeyWidget(StorageZone, 'name')
+    )
+
     class Meta:
         model = Aisle
+        fields = ('id', 'zone', 'aisle_number')
+        export_order = fields
 
 
 class RackResource(resources.ModelResource):
+    # Linking Aisle by ID (safer as numbers might repeat across zones)
+    aisle = fields.Field(
+        column_name='aisle_id',
+        attribute='aisle',
+        widget=ForeignKeyWidget(Aisle, 'id')
+    )
+
     class Meta:
         model = Rack
+        fields = ('id', 'aisle', 'rack_number')
+        export_order = fields
 
 
 class BinResource(resources.ModelResource):
+    # Linking Rack by ID
+    rack = fields.Field(
+        column_name='rack_id',
+        attribute='rack',
+        widget=ForeignKeyWidget(Rack, 'id')
+    )
+
     class Meta:
         model = Bin
+        fields = ('id', 'rack', 'bin_code', 'capacity_units')
+        export_order = fields
 
 
 @admin.register(Warehouse)
@@ -272,3 +360,4 @@ class BinAdmin(ImportExportModelAdmin):
     def rack_info(self, obj):
         return f"{obj.rack.aisle.zone.warehouse.code} - {obj.rack.aisle.zone.name} - A{obj.rack.aisle.aisle_number} - R{obj.rack.rack_number}"
     rack_info.short_description = "Location"
+    rack_info.admin_order_field = 'rack__aisle__zone__warehouse__code'

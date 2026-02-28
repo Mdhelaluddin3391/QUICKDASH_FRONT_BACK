@@ -1,25 +1,43 @@
 from django.contrib import admin
+from django.contrib.auth import get_user_model
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
-from import_export import resources
+from import_export import resources, fields
+from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
+
 from .models import PhoneOTP, Notification, OTPAbuseLog
+
+User = get_user_model()
 
 
 class PhoneOTPResource(resources.ModelResource):
     class Meta:
         model = PhoneOTP
+        fields = ('id', 'phone', 'otp', 'is_verified', 'attempts', 'created_at')
+        export_order = fields
 
 
 class NotificationResource(resources.ModelResource):
+    # Linking User by their phone number
+    user = fields.Field(
+        column_name='user_phone',
+        attribute='user',
+        widget=ForeignKeyWidget(User, 'phone')
+    )
+
     class Meta:
         model = Notification
+        fields = ('id', 'user', 'type', 'title', 'message', 'created_at')
+        export_order = fields
 
 
 class OTPAbuseLogResource(resources.ModelResource):
     class Meta:
         model = OTPAbuseLog
+        fields = ('id', 'phone', 'failed_attempts', 'blocked_until', 'last_attempt')
+        export_order = fields
 
 
 @admin.register(PhoneOTP)

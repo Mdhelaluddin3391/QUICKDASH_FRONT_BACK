@@ -1,20 +1,43 @@
 from django.contrib import admin
+from django.contrib.auth import get_user_model
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
-from import_export import resources
+from import_export import resources, fields
+from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
+
 from .models import GeoLocation
 
+User = get_user_model()
 
 class GeoLocationResource(resources.ModelResource):
+    # Linking user by phone number
+    user = fields.Field(
+        column_name='user_phone',
+        attribute='user',
+        widget=ForeignKeyWidget(User, 'phone')
+    )
+
     class Meta:
         model = GeoLocation
+        fields = (
+            'id', 
+            'user', 
+            'label', 
+            'address_text', 
+            'latitude', 
+            'longitude', 
+            'is_active', 
+            'created_at'
+        )
+        export_order = fields
 
 
 @admin.register(GeoLocation)
 class GeoLocationAdmin(ImportExportModelAdmin):
     resource_class = GeoLocationResource
+    
     list_display = (
         'id',
         'user_phone',

@@ -2,14 +2,26 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
-from import_export import resources
+from import_export import resources, fields
+from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
+
 from .models import SurgeRule
+from apps.warehouse.models import Warehouse
 
 
 class SurgeRuleResource(resources.ModelResource):
+    # Linking Warehouse by name
+    warehouse = fields.Field(
+        column_name='warehouse_name',
+        attribute='warehouse',
+        widget=ForeignKeyWidget(Warehouse, 'name')
+    )
+
     class Meta:
         model = SurgeRule
+        fields = ('id', 'warehouse', 'max_multiplier', 'base_factor', 'created_at')
+        export_order = fields
 
 
 @admin.register(SurgeRule)
