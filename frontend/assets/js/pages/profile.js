@@ -1,4 +1,3 @@
-
 document.addEventListener('DOMContentLoaded', initDashboard);
 
 /* =========================
@@ -50,38 +49,30 @@ function getStoredUser() {
     } catch (e) { return {}; }
 }
 
-                window.ApiService.clearCache();
+window.ApiService.clearCache(); // Run on init
+
 /* =========================
    EVENT BINDINGS
 ========================= */
 function bindEvents() {
-    // 1. Profile Update Form Submit
     const profileForm = document.getElementById('profile-form');
-    if (profileForm) {
-        profileForm.addEventListener('submit', updateProfile);
-    }
+    if (profileForm) profileForm.addEventListener('submit', updateProfile);
 
-    // 2. Edit Profile Button Click
     const editBtn = document.getElementById('edit-profile-btn');
-    if (editBtn) {
-        editBtn.addEventListener('click', openEditModal);
-    }
+    if (editBtn) editBtn.addEventListener('click', openEditModal);
 
-    // 3. Logout Button Click
     const logoutBtn = document.getElementById('logout-btn-page');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
             if (typeof window.logout === 'function') {
                 window.logout();
             } else {
-                // Fallback logout if window.logout is not defined
                 localStorage.clear();
                 window.location.href = 'auth.html';
             }
         });
     }
 
-    // 4. Close Modal Buttons
     const closeBtns = document.querySelectorAll('.close-modal, .btn-secondary[data-dismiss="modal"]');
     closeBtns.forEach(btn => {
         btn.addEventListener('click', (e) => {
@@ -97,49 +88,34 @@ function bindEvents() {
 function renderUserInfo(user) {
     if (!user) return;
 
-    // --- 1. Name Display ---
     const nameEl = document.getElementById('user-name');
     if (nameEl) {
-        let displayName = '';
-        
-        if (user.first_name) {
-            displayName = user.first_name;
-            if (user.last_name) displayName += ` ${user.last_name}`;
-        } else {
-            // Default agar name na ho
-            displayName = 'User'; 
-        }
-        
+        let displayName = user.first_name || 'User';
+        if (user.first_name && user.last_name) displayName += ` ${user.last_name}`;
         nameEl.innerText = displayName;
     }
 
-    // --- 2. Phone Display (Updated Logic) ---
     const phoneEl = document.getElementById('user-phone');
     if (phoneEl) {
-        // Backend kabhi 'phone' bhejta hai, kabhi 'mobile'
         const phoneValue = user.phone || user.mobile || '';
-        
         if (phoneValue) {
             phoneEl.innerText = phoneValue;
-            phoneEl.style.color = '#333'; // Make it visible
+            phoneEl.style.color = '#333';
         } else {
             phoneEl.innerText = 'Add Phone Number';
             phoneEl.style.color = '#999';
         }
     }
 
-    // --- 3. Avatar/Greeting ---
     const greeting = document.getElementById('user-greeting');
     if (greeting) greeting.innerText = user.first_name || 'User';
     
     const avatarEl = document.querySelector('.avatar-circle');
     if (avatarEl) {
-        // Pehla letter uthayein (e.g., 'R' for Rahul)
         const initial = user.first_name ? user.first_name.charAt(0).toUpperCase() : 'U';
         avatarEl.innerText = initial;
     }
 
-    // --- 4. Pre-fill Edit Modal Inputs ---
     const editFname = document.getElementById('edit-fname'); 
     if (editFname) editFname.value = user.first_name || '';
 
@@ -151,97 +127,60 @@ function renderUserInfo(user) {
 }
 
 /* =========================
-   API: LOAD PROFILE
+   API: LOAD & UPDATE PROFILE
 ========================= */
 async function loadProfile() {
     try {
-        // Fetch fresh data from backend
-        // Note: '/customers/me/' is standard for customer profiles
         const user = await window.ApiService.get('/customers/me/');
-        
-        // Update LocalStorage and UI
         localStorage.setItem(window.APP_CONFIG.STORAGE_KEYS.USER, JSON.stringify(user));
         renderUserInfo(user);
     } catch (err) {
         console.error("Profile Load Error", err);
-        // Error aane par hum kuch nahi karte, kyunki purana data already dikh raha hai
     }
 }
 
-/* =========================
-   API: UPDATE PROFILE
-========================= */
 async function updateProfile(e) {
     e.preventDefault();
 
     const btn = e.target.querySelector('button[type="submit"]');
     const originalText = btn ? btn.innerText : 'Save Changes';
     
-    if(btn) {
-        btn.disabled = true;
-        btn.innerText = 'Saving...';
-    }
-
-    // Get values from inputs
-    const first_name = document.getElementById('edit-fname')?.value.trim();
-    const last_name = document.getElementById('edit-lname')?.value.trim();
-    const email = document.getElementById('edit-email')?.value.trim();
+    if(btn) { btn.disabled = true; btn.innerText = 'Saving...'; }
 
     const payload = { 
-        first_name: first_name, 
-        last_name: last_name, 
-        email: email 
+        first_name: document.getElementById('edit-fname')?.value.trim(), 
+        last_name: document.getElementById('edit-lname')?.value.trim(), 
+        email: document.getElementById('edit-email')?.value.trim() 
     };
 
     try {
-        // Send PATCH request to update
         const updatedUser = await window.ApiService.patch('/customers/me/', payload);
-        
-        window.Toast.success('Profile Updated Successfully');
-        
-        // Update Local Storage & UI immediately
+        if(window.Toast) window.Toast.success('Profile Updated Successfully');
         localStorage.setItem(window.APP_CONFIG.STORAGE_KEYS.USER, JSON.stringify(updatedUser));
         renderUserInfo(updatedUser);
-        
         closeProfileModal();
-
     } catch (err) {
         console.error('Update Error:', err);
         let msg = err.message || 'Update failed';
         if (err.data && err.data.detail) msg = err.data.detail;
-        
-        // Sometimes backend errors are in object format {email: ["Invalid email"]}
         if (typeof err.data === 'object' && !err.data.detail) {
             const firstKey = Object.keys(err.data)[0];
             msg = `${firstKey}: ${err.data[firstKey][0]}`;
         }
-        
-        window.Toast.error(msg);
+        if(window.Toast) window.Toast.error(msg);
     } finally {
-        if(btn) {
-            btn.disabled = false;
-            btn.innerText = originalText;
-        }
+        if(btn) { btn.disabled = false; btn.innerText = originalText; }
     }
 }
 
-/* =========================
-   MODAL UTILS
-========================= */
 function openEditModal() {
     const modal = document.getElementById('profile-modal');
-    if (modal) {
-        modal.classList.remove('d-none');
-        modal.style.display = 'flex'; // Flex for centering
-    }
+    if (modal) { modal.classList.remove('d-none'); modal.style.display = 'flex'; }
 }
 
 window.closeProfileModal = function () {
     const modal = document.getElementById('profile-modal');
-    if (modal) {
-        modal.classList.add('d-none');
-        modal.style.display = 'none';
-    }
+    if (modal) { modal.classList.add('d-none'); modal.style.display = 'none'; }
 };
 
 /* =========================
@@ -250,29 +189,29 @@ window.closeProfileModal = function () {
 async function loadStats() {
     try {
         const res = await window.ApiService.get('/orders/my/');
-        const orders = res.results || res; // Handle pagination structure
+        const orders = res.results || res;
 
-        // 1. Total Orders
         const totalOrdersEl = document.getElementById('total-orders');
         if (totalOrdersEl) totalOrdersEl.innerText = orders.length;
 
-        // 2. Total Spent
-        const totalSpent = orders.reduce(
-            (sum, o) => sum + Number(o.final_amount || o.total_amount || 0),
-            0
-        );
-
+        const totalSpent = orders.reduce((sum, o) => sum + Number(o.final_amount || o.total_amount || 0), 0);
         const totalSpentEl = document.getElementById('total-spent');
-        if (totalSpentEl) totalSpentEl.innerText = window.Formatters.currency(totalSpent);
+        if (totalSpentEl && window.Formatters) totalSpentEl.innerText = window.Formatters.currency(totalSpent);
 
-    } catch (err) {
-        console.warn('Failed to load stats', err);
-    }
+    } catch (err) { console.warn('Failed to load stats', err); }
 }
 
 /* =========================
-   RECENT ORDERS
+   RECENT ORDERS (DASHBOARD)
 ========================= */
+const getStatusConfig = (status) => {
+    const s = (status || 'PENDING').toLowerCase();
+    if (s === 'delivered') return { class: 'delivered', icon: 'fa-check-circle', text: 'Delivered' };
+    if (s === 'cancelled') return { class: 'cancelled', icon: 'fa-times-circle', text: 'Cancelled' };
+    if (s === 'shipped' || s === 'out_for_delivery') return { class: 'shipped', icon: 'fa-truck', text: s.replace(/_/g, ' ') };
+    return { class: 'processing', icon: 'fa-box-open', text: s.replace(/_/g, ' ') };
+};
+
 async function loadRecentOrders() {
     const container = document.getElementById('recent-orders-list');
     if (!container) return;
@@ -282,48 +221,65 @@ async function loadRecentOrders() {
         const orders = res.results || res;
 
         if (!orders || orders.length === 0) {
-            container.innerHTML = '<p class="text-muted text-center py-3">No orders placed yet.</p>';
+            container.innerHTML = `
+                <div class="empty-state text-center py-4" style="background: #f8fafc; border-radius: 12px;">
+                    <i class="fas fa-shopping-bag text-muted mb-2" style="font-size: 2rem;"></i>
+                    <p class="text-muted mb-0">No orders placed yet.</p>
+                </div>`;
             return;
         }
 
-        container.innerHTML = orders.map(renderOrderCard).join('');
+        container.innerHTML = orders.map(renderOrderCardPro).join('');
     } catch (e) {
         console.error("Order Load Error", e);
         container.innerHTML = '<p class="text-danger text-center">Failed to load recent orders.</p>';
     }
 }
 
-function renderOrderCard(order) {
-    const dateStr = new Date(order.created_at).toLocaleDateString();
-    const amount = order.final_amount || order.total_amount || 0;
-    const status = order.status || 'Pending';
+// Premium Order Card Generator
+function renderOrderCardPro(order) {
+    const statusConfig = getStatusConfig(order.status);
+    const date = new Date(order.created_at).toLocaleDateString('en-IN', {
+        day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
     
-    // Status Badge Color Logic
-    let badgeClass = 'badge-secondary';
-    const s = status.toLowerCase();
-    
-    if (s === 'delivered') badgeClass = 'badge-success';
-    else if (s === 'cancelled') badgeClass = 'badge-danger';
-    else if (s === 'confirmed' || s === 'processing') badgeClass = 'badge-info';
-    else if (s === 'shipped') badgeClass = 'badge-primary';
+    const itemsCount = order.item_count || (order.items ? order.items.length : 1);
+    const totalAmount = order.final_amount || order.total_amount || 0;
+    const isCancelledClass = statusConfig.class === 'cancelled' ? 'is-cancelled' : '';
+
+    let partialCancelBadge = '';
+    if (order.status !== 'cancelled' && order.items) {
+        const hasCancelledItems = order.items.some(item => item.status === 'cancelled' || item.is_cancelled);
+        if (hasCancelledItems) {
+            partialCancelBadge = `<div style="font-size: 0.75rem; color: #9a3412; background: #ffedd5; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px;"><i class="fas fa-exclamation-triangle"></i> Partial items cancelled</div>`;
+        }
+    }
 
     return `
-        <div class="order-card p-3 mb-2 bg-white rounded shadow-sm" 
-             onclick="window.location.href='order_detail.html?id=${order.id}'" 
-             style="cursor:pointer; border:1px solid #eee; transition: all 0.2s;">
-            <div class="d-flex justify-content-between align-items-center">
-                <div>
-                    <strong class="text-dark" style="font-size: 1rem;">Order #${order.id}</strong>
-                    <p class="text-muted small mb-0 mt-1">
-                        <i class="far fa-calendar-alt"></i> ${dateStr}
-                    </p>
+        <div class="order-card-pro ${isCancelledClass}">
+            <div class="order-card-header">
+                <div class="order-id-pro">
+                    <i class="fas fa-shopping-bag text-primary"></i> 
+                    Order #${order.id || order.order_id}
                 </div>
-                <div class="text-right">
-                    <span class="badge ${badgeClass} mb-1" style="font-size: 0.75rem; padding: 4px 8px;">${status}</span>
-                    <div class="font-weight-bold text-primary mt-1">
-                        ${window.Formatters.currency(amount)}
-                    </div>
+                <div class="status-badge ${statusConfig.class}">
+                    <i class="fas ${statusConfig.icon}"></i> ${statusConfig.text}
                 </div>
+            </div>
+            <div class="order-card-body">
+                <div class="order-details-summary">
+                    <span class="order-date-pro"><i class="far fa-clock"></i> ${date}</span>
+                    <span class="order-items-count">${itemsCount} Item(s)</span>
+                    ${partialCancelBadge}
+                </div>
+                <div class="order-total-pro">
+                    ${window.Formatters ? window.Formatters.currency(totalAmount) : `₹${parseFloat(totalAmount).toFixed(2)}`}
+                </div>
+            </div>
+            <div class="order-card-footer">
+                <button class="btn-view-details" onclick="window.location.href='/order_detail.html?id=${order.id}'">
+                    View Details <i class="fas fa-chevron-right" style="font-size:0.8em; margin-left:4px;"></i>
+                </button>
             </div>
         </div>
     `;

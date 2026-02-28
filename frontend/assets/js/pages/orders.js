@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadOrderHistory() {
     const container = document.getElementById('orders-list-container');
+    if (!container) return; // Fail safe
     container.innerHTML = '<div class="loader-spinner"></div>';
 
     try {
@@ -38,69 +39,83 @@ async function loadOrderHistory() {
 }
 
 function createOrderCard(order) {
-    // Status Badge Logic
-    const statusColors = {
-        'created': 'secondary',
-        'confirmed': 'info',
-        'picking': 'info',
-        'packed': 'warning',
-        'out_for_delivery': 'primary',
-        'delivered': 'success',
-        'cancelled': 'danger'
-    };
-    const badgeColor = statusColors[order.status] || 'secondary';
-    const isActive = ['created', 'confirmed', 'picking', 'packed', 'out_for_delivery'].includes(order.status);
+    // 1. Status & Active Check
+    const s = (order.status || 'created').toLowerCase();
+    let badgeClass = 'processing';
+    let iconClass = 'fa-box-open';
+    
+    if (s === 'delivered') { badgeClass = 'delivered'; iconClass = 'fa-check-circle'; }
+    else if (s === 'cancelled') { badgeClass = 'cancelled'; iconClass = 'fa-times-circle'; }
+    else if (s === 'shipped' || s === 'out_for_delivery') { badgeClass = 'shipped'; iconClass = 'fa-truck'; }
 
-    // Format Date
+    const isActive = ['created', 'confirmed', 'picking', 'packed', 'out_for_delivery'].includes(s);
+    const isCancelledClass = badgeClass === 'cancelled' ? 'is-cancelled' : '';
+
+    // 2. Format Date
     const date = new Date(order.created_at).toLocaleDateString('en-IN', {
         day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
     });
 
-    // OTP Badge (If available in list view)
-    const otpBadge = order.delivery_otp 
-        ? `<div class="mt-2 px-2 py-1 bg-light border border-info rounded text-center text-primary font-weight-bold" style="font-size: 0.9em;">
-             📦 OTP: ${order.delivery_otp}
+    // 3. OTP Badge
+    const otpBadge = order.delivery_otp && isActive
+        ? `<div style="display:inline-block; margin-top:8px; padding: 4px 10px; background: #f0fdf4; border: 1px dashed #fdba74; border-radius: 6px; color: #c2410c; font-weight: bold; font-size: 0.85rem; letter-spacing: 1px;">
+             <i class="fas fa-key"></i> OTP: ${order.delivery_otp}
            </div>`
         : '';
 
+    // 4. Partial Cancel Badge Logic
+    let partialCancelBadge = '';
+    if (s !== 'cancelled' && order.items) {
+        const hasCancelledItems = order.items.some(item => item.status === 'cancelled' || item.is_cancelled);
+        if (hasCancelledItems) {
+            partialCancelBadge = `<div style="font-size: 0.75rem; color: #9a3412; background: #ffedd5; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-top: 4px;"><i class="fas fa-exclamation-triangle"></i> Partial items cancelled</div>`;
+        }
+    }
+
+    // 5. Render HTML
     return `
-        <div class="card mb-3 order-card shadow-sm">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <div>
-                        <h6 class="mb-0 font-weight-bold">Order #${order.id}</h6>
-                        <small class="text-muted">${date}</small>
-                    </div>
-                    <span class="badge badge-${badgeColor}">${formatStatus(order.status)}</span>
+        <div class="order-card-pro ${isCancelledClass}">
+            <div class="order-card-header">
+                <div class="order-id-pro">
+                    <i class="fas fa-shopping-bag text-primary"></i> 
+                    Order #${order.id}
                 </div>
-                
-                <div class="d-flex justify-content-between align-items-center">
-                    <div class="text-muted small">
-                        ${order.item_count} Items | Total: <strong class="text-dark">${Formatters.currency(order.final_amount)}</strong>
-                    </div>
+                <div class="status-badge ${badgeClass}">
+                    <i class="fas ${iconClass}"></i> ${formatStatus(order.status)}
                 </div>
-
-                ${otpBadge}
-
-                <hr class="my-2">
-
-                <div class="d-flex justify-content-end">
-                    ${isActive ? 
-                        `<a href="/track_order.html?id=${order.id}" class="btn btn-sm btn-primary">
-                            <i class="fas fa-map-marker-alt"></i> Track Order
-                        </a>` : 
-                        `<button onclick="reorder(${order.id})" class="btn btn-sm btn-outline-secondary">
-                            <i class="fas fa-redo"></i> Reorder
-                        </button>`
-                    }
-                    <a href="/order_detail.html?id=${order.id}" class="btn btn-sm btn-link text-muted ml-2">Details ></a>
+            </div>
+            
+            <div class="order-card-body align-items-start">
+                <div class="order-details-summary">
+                    <span class="order-date-pro"><i class="far fa-clock"></i> ${date}</span>
+                    <span class="order-items-count">${order.item_count || 1} Item(s)</span>
+                    ${partialCancelBadge}
+                    ${otpBadge}
                 </div>
+                <div class="order-total-pro">
+                    ${window.Formatters ? Formatters.currency(order.final_amount || order.total_amount) : `₹${order.final_amount}`}
+                </div>
+            </div>
+
+            <div class="order-card-footer mt-3" style="border-top: 1px solid #f1f5f9; padding-top: 12px; justify-content: flex-end; display: flex; gap: 10px;">
+                ${isActive ? 
+                    `<button onclick="window.location.href='/track_order.html?id=${order.id}'" class="btn-view-details" style="background: #eff6ff; color: #0ea5e9; border-color: #bae6fd;">
+                        <i class="fas fa-map-marker-alt"></i> Track
+                    </button>` : 
+                    `<button onclick="reorder(${order.id})" class="btn-view-details" style="background: #fff; color: #64748b; border-color: #e2e8f0;">
+                        <i class="fas fa-redo"></i> Reorder
+                    </button>`
+                }
+                <button onclick="window.location.href='/order_detail.html?id=${order.id}'" class="btn-view-details" style="background: #0f172a; color: #fff; border-color: #0f172a;">
+                    Details <i class="fas fa-arrow-right" style="font-size:0.8em; margin-left:4px;"></i>
+                </button>
             </div>
         </div>
     `;
 }
 
 function formatStatus(status) {
+    if (!status) return 'Pending';
     return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
@@ -108,7 +123,6 @@ window.reorder = async function(orderId) {
     if(!confirm("Add items from this order to your cart?")) return;
     
     try {
-        // Fetch details to get items
         const order = await ApiService.get(`/orders/${orderId}/`);
         
         let addedCount = 0;
@@ -122,13 +136,13 @@ window.reorder = async function(orderId) {
         }
         
         if (addedCount > 0) {
-            Toast.success(`${addedCount} items added to cart`);
+            if(window.Toast) Toast.success(`${addedCount} items added to cart`);
             window.location.href = '/cart.html';
         } else {
-            Toast.warning("Items are currently out of stock");
+            if(window.Toast) Toast.warning("Items are currently out of stock");
         }
 
     } catch (e) {
-        Toast.error("Failed to reorder");
+        if(window.Toast) Toast.error("Failed to reorder");
     }
 };

@@ -355,3 +355,128 @@
     from { opacity: 0; transform: translateY(30px) scale(0.95); }
     to { opacity: 1; transform: translateY(0) scale(1); }
 }
+
+
+
+
+/* =========================================
+   🌟 PROFESSIONAL ORDER CARDS UI
+   ========================================= */
+.order-card-pro {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.order-card-pro:hover {
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    transform: translateY(-2px);
+    border-color: #cbd5e1;
+}
+
+.order-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px dashed #e2e8f0;
+    padding-bottom: 15px;
+}
+
+.order-id-pro {
+    font-weight: 700;
+    color: #0f172a;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 🌟 Status Badges (Professional Colors) */
+.status-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.status-badge.delivered { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+.status-badge.cancelled { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+.status-badge.processing { background: #fef9c3; color: #9a3412; border: 1px solid #fef08a; }
+.status-badge.shipped { background: #e0f2fe; color: #075985; border: 1px solid #bae6fd; }
+
+.order-card-body {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+}
+
+.order-details-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.order-date-pro {
+    font-size: 0.85rem;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.order-items-count {
+    color: #334155;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.order-total-pro {
+    font-weight: 800;
+    font-size: 1.3rem;
+    color: #ef4444; /* QuickDash Brand Red */
+}
+
+.order-card-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.btn-view-details {
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    background: #f8fafc;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.btn-view-details:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+    border-color: #94a3b8;
+}
+
+/* Gray out everything slightly if cancelled */
+.order-card-pro.is-cancelled .order-id-pro,
+.order-card-pro.is-cancelled .order-total-pro {
+    color: #64748b;
+}
