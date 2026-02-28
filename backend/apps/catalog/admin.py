@@ -8,7 +8,7 @@ from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Sum
-from import_export import resources
+from import_export import resources, fields, widgets
 from import_export.admin import ImportExportModelAdmin
 from .models import Product, Category, Brand, Banner, FlashSale
 import requests
@@ -26,29 +26,63 @@ class ProductImageInline(admin.TabularInline):
         return False
 
 
-class ProductResource(resources.ModelResource):
-    class Meta:
-        model = Product
-
-
 class CategoryResource(resources.ModelResource):
+    # Linking parent category by name
+    parent = fields.Field(
+        column_name='parent',
+        attribute='parent',
+        widget=widgets.ForeignKeyWidget(Category, 'name')
+    )
+
     class Meta:
         model = Category
+        import_id_fields = ('name',)
+        fields = ('id', 'name', 'slug', 'parent', 'icon', 'is_active', 'created_at')
 
 
 class BrandResource(resources.ModelResource):
     class Meta:
         model = Brand
+        import_id_fields = ('name',)
+        fields = ('id', 'name', 'slug', 'logo', 'is_active', 'created_at')
+
+
+class ProductResource(resources.ModelResource):
+    # Linking category and brand by their names
+    category = fields.Field(
+        column_name='category',
+        attribute='category',
+        widget=widgets.ForeignKeyWidget(Category, 'name')
+    )
+    brand = fields.Field(
+        column_name='brand',
+        attribute='brand',
+        widget=widgets.ForeignKeyWidget(Brand, 'name')
+    )
+
+    class Meta:
+        model = Product
+        import_id_fields = ('sku',)  # SKU unique identifier rahega
+        fields = ('id', 'name', 'sku', 'description', 'unit', 'mrp', 'image', 'is_active', 'category', 'brand', 'created_at')
 
 
 class BannerResource(resources.ModelResource):
     class Meta:
         model = Banner
+        fields = ('id', 'title', 'image', 'target_url', 'position', 'bg_gradient', 'is_active', 'created_at')
 
 
 class FlashSaleResource(resources.ModelResource):
+    # Linking product by its sku
+    product = fields.Field(
+        column_name='product',
+        attribute='product',
+        widget=widgets.ForeignKeyWidget(Product, 'sku')
+    )
+
     class Meta:
         model = FlashSale
+        fields = ('id', 'product', 'discount_percentage', 'end_time', 'is_active')
 
 
 @admin.register(Product)

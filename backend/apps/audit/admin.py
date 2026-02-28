@@ -1,15 +1,25 @@
 from django.contrib import admin
+from django.contrib.auth import get_user_model
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
-from import_export import resources
+from import_export import resources, fields, widgets
 from import_export.admin import ImportExportModelAdmin
 from .models import AuditLog
 
+User = get_user_model()
 
 class AuditLogResource(resources.ModelResource):
+    # ForeignKey linking with phone
+    user = fields.Field(
+        column_name='user',
+        attribute='user',
+        widget=widgets.ForeignKeyWidget(User, 'phone')
+    )
+
     class Meta:
         model = AuditLog
+        fields = ('id', 'action', 'reference_id', 'user', 'metadata', 'created_at')
 
 
 @admin.register(AuditLog)

@@ -1,27 +1,65 @@
 from django.contrib import admin
+from django.contrib.auth import get_user_model
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import localtime
 from django.db import models
 from django.urls import reverse
-from import_export import resources
+from import_export import resources, fields, widgets
 from import_export.admin import ImportExportModelAdmin
+from apps.orders.models import Order
 from .models import CustomerProfile, CustomerAddress, SupportTicket
 
+User = get_user_model()
 
 class CustomerProfileResource(resources.ModelResource):
+    # Linking user by phone number
+    user = fields.Field(
+        column_name='user',
+        attribute='user',
+        widget=widgets.ForeignKeyWidget(User, 'phone')
+    )
+
     class Meta:
         model = CustomerProfile
+        fields = ('id', 'user', 'created_at')
 
 
 class CustomerAddressResource(resources.ModelResource):
+    # Linking customer by their User's phone number
+    customer = fields.Field(
+        column_name='customer',
+        attribute='customer',
+        widget=widgets.ForeignKeyWidget(CustomerProfile, 'user__phone')
+    )
+
     class Meta:
         model = CustomerAddress
+        fields = (
+            'id', 'customer', 'label', 'house_no', 'floor_no', 
+            'apartment_name', 'landmark', 'city', 'pincode', 
+            'latitude', 'longitude', 'google_address_text', 
+            'receiver_name', 'receiver_phone', 'is_default', 
+            'is_deleted', 'created_at'
+        )
 
 
 class SupportTicketResource(resources.ModelResource):
+    # Linking user by phone and order by id
+    user = fields.Field(
+        column_name='user',
+        attribute='user',
+        widget=widgets.ForeignKeyWidget(User, 'phone')
+    )
+    order = fields.Field(
+        column_name='order',
+        attribute='order',
+        widget=widgets.ForeignKeyWidget(Order, 'id')
+    )
+
     class Meta:
         model = SupportTicket
+        fields = ('id', 'user', 'order', 'issue_type', 'description', 'status', 'admin_response', 'created_at')
 
 
 class CustomerAddressInline(admin.StackedInline):

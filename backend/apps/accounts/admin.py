@@ -4,7 +4,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
-from import_export import resources
+from import_export import resources, fields, widgets
 from import_export.admin import ImportExportModelAdmin, ImportExportMixin
 from .models import User, UserRole, Address
 
@@ -32,16 +32,34 @@ class UserRoleInline(admin.TabularInline):
 class UserResource(resources.ModelResource):
     class Meta:
         model = User
+        import_id_fields = ('phone',)  # Phone ko unique identifier banaya hai
+        fields = ('id', 'phone', 'first_name', 'last_name', 'email', 'is_active', 'is_staff', 'is_superuser', 'created_at')
 
 
 class UserRoleResource(resources.ModelResource):
+    # ForeignKey linking with phone
+    user = fields.Field(
+        column_name='user',
+        attribute='user',
+        widget=widgets.ForeignKeyWidget(User, 'phone')
+    )
+
     class Meta:
         model = UserRole
+        fields = ('id', 'user', 'role')
 
 
 class AddressResource(resources.ModelResource):
+    # ForeignKey linking with phone
+    user = fields.Field(
+        column_name='user',
+        attribute='user',
+        widget=widgets.ForeignKeyWidget(User, 'phone')
+    )
+
     class Meta:
         model = Address
+        fields = ('id', 'user', 'address_type', 'street_address', 'city', 'pincode', 'is_default', 'created_at')
 
 
 @admin.register(User)
