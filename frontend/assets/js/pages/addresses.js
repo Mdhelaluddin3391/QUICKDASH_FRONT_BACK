@@ -69,7 +69,7 @@ window.openAddressModal = function() {
             openAddressForm(locationData);
         });
     } else {
-        alert("Map module loading... please try again.");
+        if(window.Toast) Toast.error("Map module loading... please try again.");
     }
 };
 
@@ -211,24 +211,87 @@ async function saveAddress(e) {
         
     } catch (err) {
         console.error(err);
-        alert(err.message || "Failed to save address");
+        if(window.Toast) Toast.error(err.message || "Failed to save address");
     } finally {
         btn.disabled = false;
         btn.innerText = originalText;
     }
 }
 
-window.deleteAddress = async function(id) {
-    if (!confirm("Are you sure you want to delete this address?")) return;
-    try {
-        await ApiService.delete(`/auth/customer/addresses/${id}/`);
-        if(window.Toast) Toast.success("Address deleted");
-            ApiService.clearCache();
-        loadAddresses();
-    } catch (e) {
-        alert("Failed to delete address");
+// --- 🌟 CUSTOM CONFIRMATION POPUP LOGIC ---
+window.customConfirm = function(message, callback) {
+    // Agar pehle se koi popup hai toh hata do
+    const existingOverlay = document.getElementById('custom-confirm-overlay');
+    if (existingOverlay) existingOverlay.remove();
+
+    // Naya overlay aur box create karo
+    const overlay = document.createElement('div');
+    overlay.id = 'custom-confirm-overlay';
+    overlay.className = 'modal-overlay active';
+    overlay.style.zIndex = '99999'; // Sabse upar dikhane ke liye
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+
+    const box = document.createElement('div');
+    box.className = 'modal-box';
+    box.style.maxWidth = '350px';
+    box.style.textAlign = 'center';
+    box.style.padding = '30px 20px';
+    box.style.borderRadius = '12px';
+    box.style.transform = 'scale(0.9)';
+    box.style.animation = 'popIn 0.3s forwards ease-out'; // Chhoti si animation
+
+    // Animation ke liye CSS (dynamically add)
+    if (!document.getElementById('confirm-styles')) {
+        const style = document.createElement('style');
+        style.id = 'confirm-styles';
+        style.innerHTML = `@keyframes popIn { to { transform: scale(1); } }`;
+        document.head.appendChild(style);
     }
-}
+
+    // Modal ka design (Red warning icon aur buttons)
+    box.innerHTML = `
+        <div style="font-size: 3.5rem; color: #ef4444; margin-bottom: 15px;">
+            <i class="fas fa-exclamation-circle"></i>
+        </div>
+        <h4 style="margin-bottom: 10px; color: #2c3e50; font-size:1.2rem;">Are you sure?</h4>
+        <p style="color: #64748b; margin-bottom: 25px; font-size:0.95rem;">${message}</p>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+            <button id="confirm-cancel-btn" class="btn btn-outline" style="flex: 1; border-radius: 8px;">Cancel</button>
+            <button id="confirm-ok-btn" class="btn btn-primary" style="flex: 1; background-color: #ef4444; border-color: #ef4444; border-radius: 8px;">Delete</button>
+        </div>
+    `;
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    // Button Clicks Handle karna
+    document.getElementById('confirm-cancel-btn').onclick = () => {
+        overlay.remove();
+    };
+    
+    document.getElementById('confirm-ok-btn').onclick = () => {
+        overlay.remove();
+        if(callback) callback(); // Delete API call run karega
+    };
+};
+
+// --- UPDATED DELETE FUNCTION ---
+window.deleteAddress = function(id) {
+    // Browser ke confirm ki jagah apna custom modal call karo
+    customConfirm("Do you really want to delete this address? This action cannot be undone.", async () => {
+        try {
+            await ApiService.delete(`/auth/customer/addresses/${id}/`);
+            if(window.Toast) Toast.success("Address deleted successfully");
+            ApiService.clearCache();
+            loadAddresses(); // List wapas reload karega
+        } catch (e) {
+            console.error(e);
+            if(window.Toast) Toast.error("Failed to delete address");
+        }
+    });
+};
 
 function setupModalHandlers() {
     const form = document.getElementById('address-form');
