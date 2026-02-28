@@ -18,6 +18,12 @@
 
 <body>
     <div id="navbar-placeholder"></div>
+    <script>
+        const cachedNav = sessionStorage.getItem('html_cache_./components/navbar.html');
+        if (cachedNav) {
+            document.getElementById('navbar-placeholder').innerHTML = cachedNav;
+        }
+    </script>
 
     <div class="chat-container">
         <div class="chat-header">

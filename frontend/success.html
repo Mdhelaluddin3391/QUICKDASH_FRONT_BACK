@@ -16,6 +16,12 @@
 
 <body>
     <div id="navbar-placeholder"></div>
+    <script>
+        const cachedNav = sessionStorage.getItem('html_cache_./components/navbar.html');
+        if (cachedNav) {
+            document.getElementById('navbar-placeholder').innerHTML = cachedNav;
+        }
+    </script>
 
     <main class="container text-center py-5">
         <div style="margin-top: 50px;">
