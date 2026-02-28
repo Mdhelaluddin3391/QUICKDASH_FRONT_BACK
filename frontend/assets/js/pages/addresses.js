@@ -167,11 +167,16 @@ async function saveAddress(e) {
     btn.disabled = true;
     btn.innerText = "Saving...";
 
-    // 4. Serviceability Check (Purana Logic as it is)
+    // 4. Serviceability Check (Updated with Toast)
     try {
         const checkRes = await ApiService.post('/warehouse/find-serviceable/', { latitude: lat, longitude: lng });
         if (!checkRes.serviceable) {
-            alert("Location currently unserviceable, but address will be saved.");
+            // Browser alert ki jagah ab Toast show hoga
+            if(window.Toast) {
+                // Agar aapke Toast me warning color hai toh wo, warna normal error red color me show karega
+                if(typeof Toast.warning === 'function') Toast.warning("Location unserviceable, but address will be saved.");
+                else Toast.error("Location unserviceable, but address will be saved.");
+            }
         }
     } catch (checkError) {
         console.warn("Serviceability check failed, proceeding with save", checkError);
