@@ -7,20 +7,18 @@ from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
 
-from .models import RiderProfile, RiderDocument, RiderPayout
+from .models import RiderProfile, RiderDocument, RiderPayout, RiderEarning
 from apps.warehouse.models import Warehouse
 
 User = get_user_model()
 
 
 class RiderProfileResource(resources.ModelResource):
-    # Linking User by phone
     user = fields.Field(
         column_name='user_phone',
         attribute='user',
         widget=ForeignKeyWidget(User, 'phone')
     )
-    # Linking Warehouse by name
     current_warehouse = fields.Field(
         column_name='warehouse_name',
         attribute='current_warehouse',
@@ -29,20 +27,12 @@ class RiderProfileResource(resources.ModelResource):
 
     class Meta:
         model = RiderProfile
-        fields = (
-            'id', 
-            'user', 
-            'is_active', 
-            'is_available', 
-            'is_kyc_verified', 
-            'current_warehouse', 
-            'created_at'
-        )
+        # FIX: Removed 'is_kyc_verified' as it is a python @property, not a database field
+        fields = ('id', 'user', 'is_active', 'is_available', 'current_warehouse', 'created_at')
         export_order = fields
 
 
 class RiderDocumentResource(resources.ModelResource):
-    # Linking RiderProfile by user's phone
     rider = fields.Field(
         column_name='rider_phone',
         attribute='rider',
@@ -51,12 +41,12 @@ class RiderDocumentResource(resources.ModelResource):
 
     class Meta:
         model = RiderDocument
-        fields = ('id', 'rider', 'doc_type', 'status', 'admin_notes', 'updated_at')
+        # FIX: Added 'file_key' so that the actual document links aren't lost in backup
+        fields = ('id', 'rider', 'doc_type', 'file_key', 'status', 'admin_notes', 'updated_at')
         export_order = fields
 
 
 class RiderPayoutResource(resources.ModelResource):
-    # Linking RiderProfile by user's phone
     rider = fields.Field(
         column_name='rider_phone',
         attribute='rider',
@@ -69,11 +59,30 @@ class RiderPayoutResource(resources.ModelResource):
         export_order = fields
 
 
+# NEW: Added Resource for RiderEarning so financial logs can be safely backed up
+class RiderEarningResource(resources.ModelResource):
+    rider = fields.Field(
+        column_name='rider_phone',
+        attribute='rider',
+        widget=ForeignKeyWidget(RiderProfile, 'user__phone')
+    )
+    payout = fields.Field(
+        column_name='payout_id',
+        attribute='payout',
+        widget=ForeignKeyWidget(RiderPayout, 'id')
+    )
+
+    class Meta:
+        model = RiderEarning
+        fields = ('id', 'rider', 'amount', 'reference', 'payout', 'created_at')
+        export_order = fields
+
+
 class RiderDocumentInline(admin.TabularInline):
     model = RiderDocument
     extra = 0
     readonly_fields = ('updated_at',)
-    fields = ('doc_type', 'status', 'admin_notes')
+    fields = ('doc_type', 'file_key', 'status', 'admin_notes')
     can_delete = False
     show_change_link = False
 
@@ -81,26 +90,9 @@ class RiderDocumentInline(admin.TabularInline):
 @admin.register(RiderProfile)
 class RiderProfileAdmin(ImportExportModelAdmin):
     resource_class = RiderProfileResource
-    list_display = (
-        'rider_name',
-        'phone',
-        'availability_status',
-        'wallet_balance',
-        'assigned_warehouse',
-        'kyc_status',
-        'created_at_date'
-    )
-    list_filter = (
-        'is_active',
-        'is_available',
-        'current_warehouse',
-        'created_at'
-    )
-    search_fields = (
-        'user__phone',
-        'user__first_name',
-        'user__last_name'
-    )
+    list_display = ('rider_name', 'phone', 'availability_status', 'wallet_balance', 'assigned_warehouse', 'kyc_status', 'created_at_date')
+    list_filter = ('is_active', 'is_available', 'current_warehouse', 'created_at')
+    search_fields = ('user__phone', 'user__first_name', 'user__last_name')
     list_select_related = ('user', 'current_warehouse')
     raw_id_fields = ('user', 'current_warehouse')
     inlines = [RiderDocumentInline]
@@ -108,16 +100,9 @@ class RiderProfileAdmin(ImportExportModelAdmin):
     actions = ['approve_riders', 'suspend_riders', 'mark_available', 'mark_unavailable']
 
     fieldsets = (
-        ('Personal Information', {
-            'fields': ('user', 'is_active')
-        }),
-        ('Operational Details', {
-            'fields': ('is_available', 'current_warehouse')
-        }),
-        ('Timestamps', {
-            'fields': ('created_at',),
-            'classes': ('collapse',)
-        }),
+        ('Personal Information', {'fields': ('user', 'is_active')}),
+        ('Operational Details', {'fields': ('is_available', 'current_warehouse')}),
+        ('Timestamps', {'fields': ('created_at',), 'classes': ('collapse',)}),
     )
 
     readonly_fields = ('created_at',)
@@ -136,8 +121,7 @@ class RiderProfileAdmin(ImportExportModelAdmin):
     def availability_status(self, obj):
         if obj.is_available:
             return format_html('<span style="color: green; font-weight: bold;">● Online</span>')
-        else:
-            return format_html('<span style="color: red; font-weight: bold;">● Offline</span>')
+        return format_html('<span style="color: red; font-weight: bold;">● Offline</span>')
     availability_status.short_description = "Status"
 
     def wallet_balance(self, obj):
@@ -155,8 +139,7 @@ class RiderProfileAdmin(ImportExportModelAdmin):
     def kyc_status(self, obj):
         if obj.is_kyc_verified:
             return format_html('<span style="color: green;">✓ Verified</span>')
-        else:
-            return format_html('<span style="color: orange;">⚠ Pending</span>')
+        return format_html('<span style="color: orange;">⚠ Pending</span>')
     kyc_status.short_description = "KYC Status"
 
     def created_at_date(self, obj):
@@ -164,27 +147,6 @@ class RiderProfileAdmin(ImportExportModelAdmin):
             return obj.created_at.strftime('%d/%m/%Y')
         return "N/A"
     created_at_date.short_description = "Joined"
-    created_at_date.admin_order_field = 'created_at'
-
-    @admin.action(description='Approve selected riders')
-    def approve_riders(self, request, queryset):
-        updated = queryset.update(is_active=True)
-        self.message_user(request, f"{updated} riders approved and activated.")
-
-    @admin.action(description='Suspend selected riders')
-    def suspend_riders(self, request, queryset):
-        updated = queryset.update(is_active=False, is_available=False)
-        self.message_user(request, f"{updated} riders suspended.")
-
-    @admin.action(description='Mark selected riders as available')
-    def mark_available(self, request, queryset):
-        updated = queryset.filter(is_active=True).update(is_available=True)
-        self.message_user(request, f"{updated} riders marked as available.")
-
-    @admin.action(description='Mark selected riders as unavailable')
-    def mark_unavailable(self, request, queryset):
-        updated = queryset.update(is_available=False)
-        self.message_user(request, f"{updated} riders marked as unavailable.")
 
 
 @admin.register(RiderPayout)
@@ -202,25 +164,15 @@ class RiderPayoutAdmin(ImportExportModelAdmin):
     def rider_info(self, obj):
         return f"{obj.rider.user.phone} ({obj.rider.user.first_name})"
     rider_info.short_description = "Rider"
-    rider_info.admin_order_field = 'rider__user__phone'
 
     def amount_display(self, obj):
         return f"₹{obj.amount:.2f}"
     amount_display.short_description = "Amount"
-    amount_display.admin_order_field = 'amount'
 
     def status_badge(self, obj):
-        colors = {
-            'processing': '#ffc107',
-            'completed': '#28a745',
-            'failed': '#dc3545',
-        }
+        colors = {'processing': '#ffc107', 'completed': '#28a745', 'failed': '#dc3545'}
         color = colors.get(obj.status, '#6c757d')
-        return format_html(
-            '<span style="background-color: {}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">{}</span>',
-            color,
-            obj.get_status_display()
-        )
+        return format_html('<span style="background-color: {}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">{}</span>', color, obj.get_status_display())
     status_badge.short_description = "Status"
 
     def created_at_date(self, obj):
@@ -228,4 +180,45 @@ class RiderPayoutAdmin(ImportExportModelAdmin):
             return obj.created_at.strftime('%d/%m/%Y %H:%M')
         return "N/A"
     created_at_date.short_description = "Created"
-    created_at_date.admin_order_field = 'created_at'
+
+
+# NEW: Added Admin for RiderDocument so it can be exported independently
+@admin.register(RiderDocument)
+class RiderDocumentAdmin(ImportExportModelAdmin):
+    resource_class = RiderDocumentResource
+    list_display = ('id', 'rider_phone', 'doc_type', 'status', 'updated_at')
+    list_filter = ('status', 'doc_type')
+    search_fields = ('rider__user__phone',)
+    list_select_related = ('rider', 'rider__user')
+    raw_id_fields = ('rider',)
+    list_per_page = 25
+
+    def rider_phone(self, obj):
+        return obj.rider.user.phone
+    rider_phone.short_description = "Rider Phone"
+
+
+# NEW: Added Admin for RiderEarning to secure financial backups
+@admin.register(RiderEarning)
+class RiderEarningAdmin(ImportExportModelAdmin):
+    resource_class = RiderEarningResource
+    list_display = ('id', 'rider_phone', 'amount_display', 'reference', 'created_at_date')
+    list_filter = ('created_at',)
+    search_fields = ('rider__user__phone', 'reference')
+    list_select_related = ('rider', 'rider__user', 'payout')
+    raw_id_fields = ('rider', 'payout')
+    list_per_page = 25
+
+    def rider_phone(self, obj):
+        return obj.rider.user.phone
+    rider_phone.short_description = "Rider Phone"
+
+    def amount_display(self, obj):
+        return format_html('<span style="color: green; font-weight: bold;">+₹{:.2f}</span>', obj.amount)
+    amount_display.short_description = "Amount Earned"
+
+    def created_at_date(self, obj):
+        if hasattr(obj, 'created_at') and obj.created_at:
+            return obj.created_at.strftime('%d/%m/%Y %H:%M')
+        return "N/A"
+    created_at_date.short_description = "Date"
