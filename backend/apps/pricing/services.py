@@ -9,15 +9,21 @@ class SurgePricingService:
 
     @staticmethod
     def calculate(order: Order) -> Decimal:
-        warehouse = order.warehouse
+        # 1. FIX: Changed 'order.warehouse' to 'order.last_mile_warehouse'
+        warehouse = order.last_mile_warehouse
         
+        # Ek safety check agar warehouse assign nahi hua hai
+        if not warehouse:
+            return Decimal("1.0")
+            
         rule = getattr(warehouse, "surge_rule", None)
         
         max_multiplier = Decimal(str(rule.max_multiplier)) if rule else Decimal("2.0")
         base_factor = Decimal(str(rule.base_factor)) if rule else Decimal("0.1")
 
+        # 2. FIX: Updated filter field from 'warehouse' to 'last_mile_warehouse'
         active_orders = Order.objects.filter(
-            warehouse=warehouse,
+            last_mile_warehouse=warehouse, 
             status__in=["confirmed", "picking", "packed", "out_for_delivery"]
         ).count()
 
