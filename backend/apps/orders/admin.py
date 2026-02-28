@@ -174,37 +174,50 @@ class OrderAdmin(ImportExportModelAdmin):
 
     readonly_fields = ('id', 'created_at', 'updated_at', 'total_amount', 'delivery_name', 'delivery_phone', 'full_delivery_address', 'Maps_link')
 
-    # ---> NEW LOGIC: Intercept Order Save for Partial Item Cancel and Auto Price Deduction
+    # ---> NEW LOGIC FOR PARTIAL CANCEL + AUTO REFUND
     def save_formset(self, request, form, formset, change):
         instances = formset.save(commit=False)
         for instance in instances:
             if isinstance(instance, OrderItem):
-                # Ensure the item existed before so we don't accidentally check new items
                 if instance.pk:
                     old_instance = OrderItem.objects.get(pk=instance.pk)
-                    # Use getattr to prevent errors if the model fields aren't fully migrated yet
                     old_status = getattr(old_instance, 'status', 'active')
                     new_status = getattr(instance, 'status', 'active')
                     
-                    # If status changed to cancelled just now
+                    # Agar status abhi just cancel hua hai
                     if old_status != 'cancelled' and new_status == 'cancelled':
-                        # Deduct the cancelled item price from total order amount
                         item_total = instance.price * instance.quantity
                         order = instance.order
                         order.total_amount -= item_total
                         order.save(update_fields=['total_amount'])
                         
-                        # Generate dynamic message based on payment method
                         if order.payment_method == 'online':
-                            self.message_user(
-                                request, 
-                                f"Item {instance.product_name} cancelled. ₹{item_total} deducted. Order Total is updated. [NOTE: Please initiate ₹{item_total} refund to Bank via Payment Gateway]", 
-                                level=messages.WARNING
-                            )
+                            try:
+                                # Payment integration calls
+                                from apps.payments.models import Payment
+                                from apps.payments.refund_services import RefundService
+                                
+                                # Order se linked paid payment dhundenge
+                                payment = Payment.objects.filter(order=order, status='paid').first()
+                                if payment:
+                                    RefundService.initiate_partial_refund(payment, item_total)
+                                    self.message_user(
+                                        request, 
+                                        f"Item '{instance.product_name}' cancelled. ₹{item_total} partial refund auto-initiated to bank!", 
+                                        level=messages.SUCCESS
+                                    )
+                                else:
+                                    self.message_user(
+                                        request, 
+                                        f"Item cancelled. Total deducted. But NO valid payment record found to auto-refund ₹{item_total}.", 
+                                        level=messages.WARNING
+                                    )
+                            except Exception as e:
+                                self.message_user(request, f"Item Cancelled. Auto-Refund failed: {str(e)}", level=messages.ERROR)
                         else:
                             self.message_user(
                                 request, 
-                                f"Item {instance.product_name} cancelled. COD Amount reduced by ₹{item_total}. New Total: ₹{order.total_amount}", 
+                                f"Item '{instance.product_name}' cancelled. COD Amount reduced by ₹{item_total}. New Total: ₹{order.total_amount}", 
                                 level=messages.SUCCESS
                             )
             instance.save()
