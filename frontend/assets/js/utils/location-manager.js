@@ -52,6 +52,13 @@
                 area_name: data.area_name || data.formatted_address || 'Current Location',
                 timestamp: Date.now()
             };
+            
+            // 👇 YAHAN FIX HUA HAI 👇
+            // Jab user actively map par pin set karta hai, toh hum saved delivery 
+            // address ko hata dete hain taaki naya pin location priority le sake.
+            localStorage.removeItem(this.KEYS.DELIVERY_CONTEXT);
+            // 👆 FIX END 👆
+
             this._set(this.KEYS.SERVICE_CONTEXT, context);
             console.log(`[LocationManager] Service Location Set: ${context.area_name}`);
         },
