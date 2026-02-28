@@ -31,15 +31,12 @@ async function loadProduct(skuCode) {
     if(document.getElementById('qty-val')) document.getElementById('qty-val').innerText = "1";
 
     try {
-        // ApiService injects X-Location headers.
-        // Backend uses this to return STOCK & PRICE for THIS WAREHOUSE.
-        // Endpoint supports lookup by ID or SKU.
         const product = await window.ApiService.get(`/catalog/products/${skuCode}/`);
         currentProduct = product;
 
         renderProduct(product);
 
-        // NEW CODE: Load related products in the background
+        // Load related products in the background
         loadRelatedProducts(product);
 
         // Show
@@ -70,7 +67,6 @@ function renderProduct(p) {
     document.getElementById('p-desc').innerText = p.description || "Fresh and high quality product delivered to your doorstep.";
     
     // Price Rendering
-    // 'sale_price' or 'price' should come from backend logic (Warehouse specific)
     const finalPrice = p.sale_price || p.selling_price || p.price;
     document.getElementById('p-price').innerText = window.Formatters.currency(finalPrice);
     
@@ -85,13 +81,11 @@ function renderProduct(p) {
 
     // Stock & ETA Logic
     const actionArea = document.getElementById('action-area');
-    const etaArea = document.getElementById('eta-display'); // Ensure this element exists in HTML or handle check
+    const etaArea = document.getElementById('eta-display'); 
 
-    // Check 'available_stock' injected by backend
     const stock = p.available_stock !== undefined ? p.available_stock : 0;
 
     if (stock > 0) {
-        // Enable Add Button
         const addBtn = document.getElementById('add-btn');
         if(addBtn) {
             addBtn.disabled = false;
@@ -99,7 +93,6 @@ function renderProduct(p) {
             addBtn.onclick = addToCart;
         }
         
-        // Show ETA
         if (etaArea) {
             const locType = window.LocationManager?.getLocationContext()?.type;
             const eta = locType === 'L2' ? '10-15 mins' : '15-25 mins';
@@ -107,7 +100,6 @@ function renderProduct(p) {
             etaArea.classList.remove('text-muted');
         }
     } else {
-        // Out of Stock UI
         const addBtn = document.getElementById('add-btn');
         if(addBtn) {
             addBtn.disabled = true;
@@ -146,8 +138,6 @@ async function addToCart() {
     btn.innerText = "Adding...";
 
     try {
-        // Use Singleton CartService
-        // Pass SKU (string) and Quantity
         await window.CartService.addItem(currentProduct.sku, quantity);
         
         if(window.Toast) window.Toast.success("Added to Cart Successfully");
@@ -165,64 +155,7 @@ async function addToCart() {
     }
 }
 
-// NEW CODE: Function to load and render recommended products
-async function loadRelatedProducts(mainProduct) {
-    try {
-        // Yahan humne products/ ki jagah skus/ kar diya hai
-        const endpoint = `/catalog/skus/?limit=10`;
-        const response = await window.ApiService.get(endpoint);
-        
-        // Handle pagination object if your API uses it (e.g. Django REST Framework)
-        let allProducts = response.results ? response.results : response;
-
-        if (!Array.isArray(allProducts)) return;
-
-        // Make sure we don't show the exact same product that user is currently viewing
-        let filteredProducts = allProducts.filter(p => p.sku !== mainProduct.sku && p.id !== mainProduct.id);
-        
-        // Take top 5 items for display
-        const productsToShow = filteredProducts.slice(0, 5);
-
-        const section = document.getElementById('related-products-section');
-        const grid = document.getElementById('related-products-grid');
-
-        if (productsToShow.length > 0 && section && grid) {
-            section.classList.remove('d-none'); // Unhide the container
-            
-            // Build and inject HTML for cards
-            grid.innerHTML = productsToShow.map(p => {
-                const finalPrice = p.sale_price || p.selling_price || p.price;
-                const imageSrc = p.image || p.image_url || 'https://via.placeholder.com/200';
-                
-                // Make sure window.Formatters works safely
-                const formattedPrice = window.Formatters ? window.Formatters.currency(finalPrice) : '₹' + finalPrice;
-                
-                return `
-                    <div class="related-card border rounded p-3 d-flex flex-column align-items-center" style="background:#fff; transition: transform 0.2s;">
-                        <img src="${imageSrc}" alt="${p.name}" style="width: 100%; height: 140px; object-fit: contain; cursor: pointer;" onclick="window.location.href='./product.html?code=${p.sku || p.id}'">
-                        <div class="mt-3 w-100 text-left">
-                            <div class="text-muted small mb-1">${p.unit || ''}</div>
-                            <h6 class="text-truncate mb-2" style="font-size: 1rem; cursor: pointer;" onclick="window.location.href='./product.html?code=${p.sku || p.id}'" title="${p.name}">${p.name}</h6>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <strong>${formattedPrice}</strong>
-                                ${p.available_stock > 0 ? 
-                                    `<button class="btn btn-sm btn-outline-primary" style="padding: 2px 10px;" onclick="window.location.href='./product.html?code=${p.sku || p.id}'">View</button>` 
-                                    : 
-                                    `<span class="badge bg-secondary text-white" style="font-size:0.7rem;">Out of Stock</span>`
-                                }
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-    } catch (error) {
-        console.warn("Silent Fail: Related products could not be loaded", error);
-    }
-}
-
-
-
+// Single clean function for Related Products (Synced with APK version)
 async function loadRelatedProducts(mainProduct) {
     try {
         const endpoint = `/catalog/skus/?limit=10`;
@@ -232,7 +165,7 @@ async function loadRelatedProducts(mainProduct) {
         if (!Array.isArray(allProducts)) return;
 
         let filteredProducts = allProducts.filter(p => p.sku !== mainProduct.sku && p.id !== mainProduct.id);
-        const productsToShow = filteredProducts.slice(0, 5); // 5 items
+        const productsToShow = filteredProducts.slice(0, 5); // Show 5 items
 
         const section = document.getElementById('related-products-section');
         const grid = document.getElementById('related-products-grid');
@@ -240,31 +173,28 @@ async function loadRelatedProducts(mainProduct) {
         if (productsToShow.length > 0 && section && grid) {
             section.classList.remove('d-none');
             
-            // Render Standardized Cards
+            // Standardized Cards
             grid.innerHTML = productsToShow.map(p => {
                 const finalPrice = p.sale_price || p.selling_price || p.price;
                 const imageSrc = p.image || p.image_url || 'https://via.placeholder.com/200';
                 const formattedPrice = window.Formatters ? window.Formatters.currency(finalPrice) : '₹' + finalPrice;
                 const isOOS = p.available_stock <= 0;
 
-                // Standardized Delivery Badge
                 let deliveryBadge = '';
                 if (p.delivery_eta) {
                     let badgeClass = p.delivery_type === 'dark_store' ? 'badge-instant' : 'badge-mega';
-// icon wali line yahan se hata di gayi hai
-deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:8px; right:8px; color:white; padding:3px 6px; border-radius:6px; font-size:0.65rem; font-weight:bold; z-index:2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${p.delivery_eta}</div>`; 
-// Upar HTML mein se ${icon} ko bhi hata diya gaya hai
+                    deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:8px; right:8px; color:white; padding:3px 6px; border-radius:6px; font-size:0.65rem; font-weight:bold; z-index:2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${p.delivery_eta}</div>`; 
                 }
 
                 return `
-                    <div class="card product-card">
+                    <div class="card product-card" style="position: relative;">
                         ${deliveryBadge}
                         <a href="./product.html?code=${p.sku || p.id}" style="text-decoration:none; color:inherit;">
-                            <img src="${imageSrc}" style="opacity: ${isOOS ? 0.5 : 1};">
-                            <div class="item-name">${p.name}</div>
+                            <img src="${imageSrc}" style="width: 100%; height: 140px; object-fit: contain; opacity: ${isOOS ? 0.5 : 1};">
+                            <div class="item-name mt-2" style="font-weight: 500;">${p.name}</div>
                             <div class="item-unit text-muted small mb-2" style="font-size:0.8rem;">${p.unit || '1 Unit'}</div>
                         </a>
-                        <div class="d-flex justify-between align-center mt-auto">
+                        <div class="d-flex justify-content-between align-items-center mt-auto w-100">
                             <div style="font-weight:700; font-size:1.05rem;">${formattedPrice}</div>
                             ${isOOS ? 
                                 `<button class="btn btn-sm btn-secondary" style="border-radius:6px; padding: 6px 16px;" disabled>OOS</button>` : 
@@ -280,7 +210,7 @@ deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:8px; r
     }
 }
 
-// Global Suggestion Add to Cart logic specially for Product page
+// Ensure global Add to cart function works on the web version as well
 window.addSuggestionToCart = async function(skuCode, btn) {
     if (!localStorage.getItem(window.APP_CONFIG.STORAGE_KEYS.TOKEN)) {
         window.Toast.warning("Login required");
@@ -292,10 +222,10 @@ window.addSuggestionToCart = async function(skuCode, btn) {
     btn.innerHTML = '...';
     try {
         await window.CartService.addItem(skuCode, 1);
-        window.Toast.success("Added");
+        if(window.Toast) window.Toast.success("Added");
         btn.innerHTML = '✔';
     } catch (e) {
-        window.Toast.error(e.message || "Failed");
+        if(window.Toast) window.Toast.error(e.message || "Failed");
         btn.innerHTML = originalText;
     } finally {
         setTimeout(() => {
