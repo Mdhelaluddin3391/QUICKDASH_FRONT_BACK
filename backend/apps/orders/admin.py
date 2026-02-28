@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.contrib import messages # <--- ADDED FOR ADMIN MESSAGES
 from django.contrib.auth import get_user_model
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
@@ -75,7 +76,9 @@ class OrderItemInline(admin.TabularInline):
     # ADDED fulfillment_details HERE
     readonly_fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal', 'fulfillment_details')
     can_delete = False
-    fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal', 'fulfillment_details')
+    
+    # ---> UPDATED: Added 'status' and 'cancel_reason' to fields so admin can edit them
+    fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal', 'fulfillment_details', 'status', 'cancel_reason')
     show_change_link = False
 
     def product_image(self, obj):
@@ -170,6 +173,42 @@ class OrderAdmin(ImportExportModelAdmin):
     )
 
     readonly_fields = ('id', 'created_at', 'updated_at', 'total_amount', 'delivery_name', 'delivery_phone', 'full_delivery_address', 'Maps_link')
+
+    # ---> NEW LOGIC: Intercept Order Save for Partial Item Cancel and Auto Price Deduction
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if isinstance(instance, OrderItem):
+                # Ensure the item existed before so we don't accidentally check new items
+                if instance.pk:
+                    old_instance = OrderItem.objects.get(pk=instance.pk)
+                    # Use getattr to prevent errors if the model fields aren't fully migrated yet
+                    old_status = getattr(old_instance, 'status', 'active')
+                    new_status = getattr(instance, 'status', 'active')
+                    
+                    # If status changed to cancelled just now
+                    if old_status != 'cancelled' and new_status == 'cancelled':
+                        # Deduct the cancelled item price from total order amount
+                        item_total = instance.price * instance.quantity
+                        order = instance.order
+                        order.total_amount -= item_total
+                        order.save(update_fields=['total_amount'])
+                        
+                        # Generate dynamic message based on payment method
+                        if order.payment_method == 'online':
+                            self.message_user(
+                                request, 
+                                f"Item {instance.product_name} cancelled. ₹{item_total} deducted. Order Total is updated. [NOTE: Please initiate ₹{item_total} refund to Bank via Payment Gateway]", 
+                                level=messages.WARNING
+                            )
+                        else:
+                            self.message_user(
+                                request, 
+                                f"Item {instance.product_name} cancelled. COD Amount reduced by ₹{item_total}. New Total: ₹{order.total_amount}", 
+                                level=messages.SUCCESS
+                            )
+            instance.save()
+        formset.save_m2m()
 
     def customer_phone(self, obj):
         return obj.user.phone

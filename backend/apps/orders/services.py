@@ -24,7 +24,7 @@ from .abuse_services import OrderAbuseService
 from .models import Order, OrderItem, OrderItemFulfillment  
 from .abuse_services import OrderAbuseService
 from apps.catalog.models import Product
-
+# from apps.payments.refund_services import initiate_partial_refund # Aapka refund service
 
 
 
@@ -272,3 +272,28 @@ class OrderSimulationService:
         if order.status != 'out_for_delivery': OrderSimulationService.advance_to_out_for_delivery(order)
         DeliveryService.mark_delivered(order.delivery, order.delivery.otp)
         return "Delivered"
+    
+
+
+
+def cancel_order_item(order_item, reason):
+    if order_item.status == 'cancelled':
+        return False, "Item pehle se hi cancel ho chuka hai."
+
+    order_item.status = 'cancelled'
+    order_item.cancel_reason = reason
+    order_item.save()
+
+    order = order_item.order
+    item_total = order_item.price * order_item.quantity
+    order.total_amount -= item_total
+    order.save()
+
+    if order.payment_method == 'online':
+        initiate_partial_refund(
+            order=order, 
+            amount=item_total, 
+            reason=reason
+        )
+
+    return True, "Item successfully cancel ho gaya aur amount adjust ho gaya."

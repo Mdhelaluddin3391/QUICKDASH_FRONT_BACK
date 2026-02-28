@@ -47,16 +47,28 @@ document.addEventListener('DOMContentLoaded', async () => {
             actionContainer.appendChild(cancelBtn);
         }
 
-        document.getElementById('od-items').innerHTML = order.items.map(i => `
-            <div class="item-row">
-                <img src="${i.sku_image || 'https://via.placeholder.com/60'}" width="60" height="60" style="object-fit:contain; border-radius:8px; border:1px solid #eee;">
+        // ---> UPDATED LOGIC: Checking item status for Partial Cancellation display
+        document.getElementById('od-items').innerHTML = order.items.map(i => {
+            const isCancelled = i.status === 'cancelled';
+            const rowStyle = isCancelled ? 'opacity: 0.6;' : '';
+            const imgStyle = `object-fit:contain; border-radius:8px; border:1px solid #eee; ${isCancelled ? 'filter: grayscale(100%);' : ''}`;
+            const textStrike = isCancelled ? 'text-decoration: line-through;' : '';
+
+            return `
+            <div class="item-row" style="${rowStyle}">
+                <img src="${i.sku_image || 'https://via.placeholder.com/60'}" width="60" height="60" style="${imgStyle}">
                 <div style="flex:1;">
-                    <div class="font-weight-600">${i.sku_name}</div>
+                    <div class="font-weight-600" style="${textStrike}">${i.sku_name}</div>
                     <div class="text-muted small">Qty: ${i.quantity}</div>
+                    ${isCancelled ? `
+                        <div class="text-danger small mt-1">
+                            <i class="fas fa-exclamation-circle"></i> Item Cancelled (Reason: ${i.cancel_reason || 'Out of Stock'})
+                        </div>
+                    ` : ''}
                 </div>
-                <div class="font-weight-bold">${Formatters.currency(i.total_price)}</div>
+                <div class="font-weight-bold" style="${textStrike}">${Formatters.currency(i.total_price)}</div>
             </div>
-        `).join('');
+        `}).join('');
 
         document.getElementById('val-total').innerText = Formatters.currency(order.final_amount);
         const subtotal = order.items.reduce((acc, i) => acc + parseFloat(i.total_price), 0);
