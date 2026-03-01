@@ -57,7 +57,7 @@ class HomeCategoryAPIView(APIView):
             is_active=True, 
             parent__isnull=False,        
             parent__parent__isnull=True  
-        ).select_related('parent').order_by('parent__name', 'name')
+        ).select_related('parent').order_by('sort_order', 'name')
 
         serializer = HomeCategorySerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
@@ -572,4 +572,4 @@ class CategoryListAPIView(generics.ListAPIView):
     
     
     def get_queryset(self):
-        return Category.objects.filter(is_active=True).order_by('name')
+        return Category.objects.filter(is_active=True).order_by('sort_order', 'name')

@@ -264,7 +264,6 @@ class ProductAdmin(ImportExportModelAdmin):
 @admin.register(Category)
 class CategoryAdmin(ImportExportModelAdmin):
     resource_class = CategoryResource
-    # FIX: sort_order added to list_display to allow list_editable
     list_display = ('name', 'icon_preview', 'icon', 'parent_name', 'view_subcategories', 'sort_order', 'is_active', 'product_count')
     list_filter = ('is_active', 'parent')
     search_fields = ('name', 'parent__name')
@@ -274,7 +273,7 @@ class CategoryAdmin(ImportExportModelAdmin):
     list_per_page = 100 
     actions = ['activate_categories', 'deactivate_categories']
     
-    ordering = ['name']
+    ordering = ['sort_order', 'name']
 
     fieldsets = (
         ('Basic Information', {'fields': ('name', 'slug', 'parent')}),
