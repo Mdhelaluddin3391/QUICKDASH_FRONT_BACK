@@ -94,9 +94,12 @@ class ProductAdmin(ImportExportModelAdmin):
     list_filter = ('is_active', 'category', 'brand', 'created_at')
     search_fields = ('name', 'sku', 'description', 'category__name', 'brand__name')
     list_select_related = ('category', 'brand')
-    raw_id_fields = ('brand',)
     
-    list_editable = ('mrp', 'is_active', 'image', 'category')
+    # NAYA UPDATE: Autocomplete fields add kiya gaya hai (Searchable dropdown ke liye)
+    autocomplete_fields = ['category', 'brand']
+    
+    # UPDATE: 'category' ko list_editable se hata diya taaki bahar lamba dropdown na bane
+    list_editable = ('mrp', 'is_active', 'image')
     list_per_page = 25
     actions = ['activate_products', 'deactivate_products', 'mark_featured', 'unmark_featured']
     
