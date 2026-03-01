@@ -59,7 +59,7 @@ class RiderDocument(models.Model):
 
     rider = models.ForeignKey(RiderProfile, on_delete=models.CASCADE, related_name="documents")
     doc_type = models.CharField(max_length=20, choices=DOC_TYPE_CHOICES)
-    file_key = models.CharField(max_length=255, help_text="S3 Key")
+    file_key = models.CharField(max_length=255)
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     admin_notes = models.TextField(blank=True)
@@ -71,9 +71,6 @@ class RiderDocument(models.Model):
 
 
 class RiderPayout(models.Model):
-    """
-    Aggregated Payout Record (Weekly/Daily Settlement).
-    """
     STATUS_CHOICES = (
         ("processing", "Processing"),
         ("completed", "Completed"),
@@ -94,17 +91,16 @@ class RiderPayout(models.Model):
 
 
 class RiderEarning(models.Model):
-    """
-    Granular earning log per order/bonus.
-    """
     rider = models.ForeignKey(
         RiderProfile,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="earnings",
     )
 
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    reference = models.CharField(max_length=100) 
+    
+    order = models.ForeignKey('orders.Order', on_delete=models.SET_NULL, null=True, blank=True)
+    reference = models.CharField(max_length=100, blank=True) 
     
     payout = models.ForeignKey(
         RiderPayout, 

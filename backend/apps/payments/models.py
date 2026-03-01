@@ -11,7 +11,7 @@ class Payment(models.Model):
 
     order = models.OneToOneField(
         Order,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="payment",
     )
 
@@ -38,7 +38,7 @@ class Refund(models.Model):
 
     payment = models.OneToOneField(
         Payment,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="refund",
     )
 

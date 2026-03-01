@@ -23,7 +23,7 @@ class Delivery(models.Model):
 
     order = models.OneToOneField(
         Order,
-        on_delete=models.CASCADE,
+        on_delete=models.PROTECT,
         related_name="delivery",
     )
 
@@ -39,7 +39,6 @@ class Delivery(models.Model):
     otp = models.CharField(max_length=6)
 
     proof_image = models.CharField(max_length=255, blank=True, null=True)
-    
     dispatch_location = models.CharField(max_length=50, blank=True)
 
     created_at = models.DateTimeField(default=timezone.now)

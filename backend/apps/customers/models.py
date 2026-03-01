@@ -15,7 +15,6 @@ class CustomerProfile(models.Model):
     def __str__(self):
         return f"Customer {self.user}"
 
-
 class CustomerAddress(models.Model):
     LABEL_CHOICES = (
         ("HOME", "Home"),
@@ -32,15 +31,15 @@ class CustomerAddress(models.Model):
     latitude = models.DecimalField(max_digits=18, decimal_places=15)
     longitude = models.DecimalField(max_digits=18, decimal_places=15)
     
-    house_no = models.CharField(max_length=50, help_text="Flat/House No")
-    floor_no = models.CharField(max_length=50, blank=True, help_text="Floor (Optional)")
-    apartment_name = models.CharField(max_length=100, blank=True, help_text="Building/Apartment Name")
-    landmark = models.CharField(max_length=100, blank=True, help_text="Nearby Landmark")
+    house_no = models.CharField(max_length=50)
+    floor_no = models.CharField(max_length=50, blank=True)
+    apartment_name = models.CharField(max_length=100, blank=True)
+    landmark = models.CharField(max_length=100, blank=True)
     
-    city = models.CharField(max_length=100, blank=True, help_text="City Name")
-    pincode = models.CharField(max_length=20, blank=True, help_text="Area Pincode")
+    city = models.CharField(max_length=100, blank=True)
+    pincode = models.CharField(max_length=20, blank=True)
 
-    google_address_text = models.TextField(help_text="Full address from Google Maps")
+    google_address_text = models.TextField()
     
     label = models.CharField(max_length=10, choices=LABEL_CHOICES, default="HOME")
     receiver_name = models.CharField(max_length=100, blank=True)
@@ -56,7 +55,6 @@ class CustomerAddress(models.Model):
     def __str__(self):
         return f"{self.label}: {self.house_no}, {self.google_address_text}"
 
-
 class SupportTicket(models.Model):
     ISSUE_CHOICES = (
         ("missing_item", "Missing Item"),
@@ -71,10 +69,12 @@ class SupportTicket(models.Model):
         ("rejected", "Rejected"),
     )
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     order = models.ForeignKey(
         'orders.Order', 
-        on_delete=models.CASCADE, 
+        on_delete=models.SET_NULL, 
+        null=True,
+        blank=True,
         related_name="tickets"
     )
     

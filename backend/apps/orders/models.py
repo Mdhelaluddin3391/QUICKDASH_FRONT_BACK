@@ -13,11 +13,9 @@ class Order(models.Model):
         ("confirmed", "Confirmed"),
         ("picking", "Picking"),
         ("packed", "Packed"),
-        # Naye Statuses (Mega Store se Dark Store transfer ke liye)
         ("packed_at_hub", "Packed at Mega Hub"),
         ("in_transit_to_local", "In Transit to Dark Store"),
         ("received_at_local", "Received at Dark Store"),
-        # Purane Statuses
         ("out_for_delivery", "Out For Delivery"),
         ("delivered", "Delivered"),
         ("cancelled", "Cancelled"),
@@ -34,24 +32,17 @@ class Order(models.Model):
         ("RAZORPAY", "Razorpay"),
     )
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="orders")
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="orders")
     
-    # ------------------ UPDATE IDHAR HUA HAI ------------------
-    # Jahan se product asal me pack hoga (Mega ya Dark Store)
-    fulfillment_warehouse = models.ForeignKey('warehouse.Warehouse', on_delete=models.PROTECT, related_name="fulfilled_orders", help_text="Jahan inventory hai",null=True, blank=True)
-    
-    # Customer ke pados wala warehouse (Rider kahan se pick karega)
-    # Agar order 10 mins wala hai, toh last_mile = fulfillment.
-    last_mile_warehouse = models.ForeignKey('warehouse.Warehouse', on_delete=models.PROTECT, related_name="last_mile_orders", null=True, blank=True, help_text="Rider pickup location")
-    # ----------------------------------------------------------
+    fulfillment_warehouse = models.ForeignKey('warehouse.Warehouse', on_delete=models.PROTECT, related_name="fulfilled_orders", null=True, blank=True)
+    last_mile_warehouse = models.ForeignKey('warehouse.Warehouse', on_delete=models.PROTECT, related_name="last_mile_orders", null=True, blank=True)
 
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="created")
     delivery_type = models.CharField(max_length=20, choices=DELIVERY_TYPE_CHOICES)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default="COD")
 
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    
-    delivery_address_json = models.JSONField(default=dict, help_text="Snapshot of address")
+    delivery_address_json = models.JSONField(default=dict)
 
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -66,7 +57,7 @@ class Order(models.Model):
         return f"Order #{self.id} ({self.status})"
 
 class OrderItem(models.Model):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="items")
+    order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name="items")
     
     sku = models.CharField(max_length=100)
     product_name = models.CharField(max_length=255)
@@ -82,17 +73,10 @@ class OrderItem(models.Model):
     cancel_reason = models.CharField(max_length=255, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.product.name} - {self.status}"
-
-    def __str__(self):
-        return f"{self.sku} x {self.quantity}"
-
+        return f"{self.sku} x {self.quantity} - {self.status}"
 
 class OrderAbuseLog(models.Model):
-    """
-    Tracks cancellation abuse to temporarily block users.
-    """
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     cancelled_orders = models.PositiveIntegerField(default=0)
     blocked_until = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -100,10 +84,9 @@ class OrderAbuseLog(models.Model):
     def is_blocked(self):
         return self.blocked_until and self.blocked_until > timezone.now()
 
-
 class Cart(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="cart")
-    warehouse = models.ForeignKey(Warehouse, on_delete=models.CASCADE, null=True) 
+    user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, related_name="cart")
+    warehouse = models.ForeignKey(Warehouse, on_delete=models.SET_NULL, null=True) 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -116,7 +99,6 @@ class Cart(models.Model):
 
     @property
     def delivery_fee(self):
-        from decimal import Decimal
         config = OrderConfiguration.objects.first()
         fee = config.delivery_fee if config else Decimal("5.00")
         threshold = config.free_delivery_threshold if config else Decimal("100.00")
@@ -129,10 +111,8 @@ class Cart(models.Model):
     def final_total(self):
         return self.total_amount + self.delivery_fee
 
-
 class CartItem(models.Model):
     cart = models.ForeignKey(Cart, related_name='items', on_delete=models.CASCADE)
-    
     sku = models.ForeignKey('inventory.InventoryItem', on_delete=models.CASCADE)
     quantity = models.PositiveIntegerField(default=1)
     
@@ -143,12 +123,9 @@ class CartItem(models.Model):
     def total_price(self):
         return self.sku.price * self.quantity
 
-
-
-
 class OrderConfiguration(models.Model):
-    delivery_fee = models.DecimalField(max_digits=6, decimal_places=2, default=5.00, help_text="Standard delivery fee")
-    free_delivery_threshold = models.DecimalField(max_digits=10, decimal_places=2, default=100.00, help_text="Order amount above which delivery is free")
+    delivery_fee = models.DecimalField(max_digits=6, decimal_places=2, default=5.00)
+    free_delivery_threshold = models.DecimalField(max_digits=10, decimal_places=2, default=100.00)
     
     def __str__(self):
         return "Order & Delivery Configuration"
@@ -157,18 +134,11 @@ class OrderConfiguration(models.Model):
         verbose_name = "Order Configuration"
         verbose_name_plural = "Order Configurations"
 
-
-
 class OrderItemFulfillment(models.Model):
-    """
-    Kiska Item Bika? Ye model uski transparent mapping karega.
-    """
-    order_item = models.ForeignKey(OrderItem, on_delete=models.CASCADE, related_name="fulfillments")
+    order_item = models.ForeignKey(OrderItem, on_delete=models.PROTECT, related_name="fulfillments")
     inventory_batch = models.ForeignKey('inventory.InventoryItem', on_delete=models.PROTECT, related_name="order_fulfillments")
-    
     quantity_allocated = models.PositiveIntegerField()
-    vendor_payable_amount = models.DecimalField(max_digits=10, decimal_places=2, default="0.00", help_text="Total amount to pay the vendor for this allocation")
-    
+    vendor_payable_amount = models.DecimalField(max_digits=10, decimal_places=2, default="0.00")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

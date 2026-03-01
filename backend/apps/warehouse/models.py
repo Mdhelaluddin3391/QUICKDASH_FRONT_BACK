@@ -17,8 +17,8 @@ class Warehouse(models.Model):
     city = models.CharField(max_length=50)
     state = models.CharField(max_length=50)
 
-    location = models.PointField(srid=4326, help_text="Exact GPS coordinates")
-    delivery_zone = models.PolygonField(srid=4326, null=True, blank=True, help_text="Serviceable Area")
+    location = models.PointField(srid=4326)
+    delivery_zone = models.PolygonField(srid=4326, null=True, blank=True)
 
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(default=timezone.now)
@@ -33,10 +33,7 @@ class Warehouse(models.Model):
     def __str__(self):
         return f"{self.name} ({self.code})"
 
-
-
 class StorageZone(models.Model):
-    """ E.g., Cold Storage, Frozen, Dry, Secure """
     warehouse = models.ForeignKey(Warehouse, on_delete=models.CASCADE, related_name="zones")
     name = models.CharField(max_length=50)
     
@@ -55,15 +52,12 @@ class Rack(models.Model):
     number = models.CharField(max_length=10) 
 
 class Bin(models.Model):
-    """ Specific Bin location: Smallest unit """
     rack = models.ForeignKey(Rack, on_delete=models.CASCADE, related_name="bins")
     bin_code = models.CharField(max_length=20, unique=True) 
     capacity_units = models.IntegerField(default=100)
 
     def __str__(self):
         return self.bin_code
-
-
 
 class PickingTask(models.Model):
     STATUS_CHOICES = (
@@ -73,13 +67,13 @@ class PickingTask(models.Model):
         ("failed", "Failed"),
     )
 
-    order = models.ForeignKey('orders.Order', on_delete=models.CASCADE, related_name="picking_tasks")
+    order = models.ForeignKey('orders.Order', on_delete=models.PROTECT, related_name="picking_tasks")
     picker = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="assigned_picks")
     
     item_sku = models.CharField(max_length=100)
     quantity_to_pick = models.PositiveIntegerField()
     
-    target_bin = models.ForeignKey("inventory.InventoryItem", on_delete=models.PROTECT)
+    target_inventory_batch = models.ForeignKey("inventory.InventoryItem", on_delete=models.PROTECT)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     picked_at = models.DateTimeField(null=True, blank=True)
@@ -88,7 +82,7 @@ class PickingTask(models.Model):
         return f"Pick {self.item_sku} for Order {self.order_id}"
 
 class PackingTask(models.Model):
-    order = models.ForeignKey('orders.Order', on_delete=models.CASCADE)
+    order = models.ForeignKey('orders.Order', on_delete=models.PROTECT)
     packer = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     is_completed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)

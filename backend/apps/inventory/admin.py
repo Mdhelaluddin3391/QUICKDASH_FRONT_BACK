@@ -17,14 +17,12 @@ from apps.warehouse.models import Bin
 User = get_user_model()
 
 class InventoryItemResource(resources.ModelResource):
-    # Linking Bin by its unique bin_code (Existing)
     bin = fields.Field(
         column_name='bin_code',
         attribute='bin',
         widget=ForeignKeyWidget(Bin, 'bin_code')
     )
     
-    # NEW: Linking Owner by Phone Number for Safe Import/Export
     owner = fields.Field(
         column_name='owner_phone',
         attribute='owner',
@@ -39,24 +37,23 @@ class InventoryItemResource(resources.ModelResource):
             'sku', 
             'product_name', 
             'price', 
-            'owner',          # Naya Add Hua
-            'cost_price',     # Naya Add Hua
+            'owner',
+            'cost_price',
             'total_stock', 
             'reserved_stock', 
             'mode', 
             'lead_time_hours', 
-            'created_at',     # Naya Add Hua
+            'created_at',
             'updated_at'
         )
         export_order = fields
 
 
 class InventoryTransactionResource(resources.ModelResource):
-    # Linking InventoryItem by sku
     inventory_item = fields.Field(
-        column_name='inventory_item_sku',
+        column_name='inventory_batch_id',
         attribute='inventory_item',
-        widget=ForeignKeyWidget(InventoryItem, 'sku')
+        widget=ForeignKeyWidget(InventoryItem, 'id')
     )
 
     class Meta:
@@ -82,8 +79,8 @@ class InventoryItemAdmin(ImportExportModelAdmin):
         'id',
         'sku',
         'product_name',
-        'owner_status', # New Custom Field
-        'cost_price',   # New Field
+        'owner_status',
+        'cost_price',
         'price', 
         'warehouse_name',
         'bin_location',
@@ -96,14 +93,14 @@ class InventoryItemAdmin(ImportExportModelAdmin):
     )
     list_filter = (
         'mode',
-        'owner', # New Field
+        'owner',
         'bin__rack__aisle__zone__warehouse',
         'updated_at'
     )
     search_fields = (
         'sku',
         'product_name',
-        'owner__phone', # Search item by Vendor Phone
+        'owner__phone',
         'bin__bin_code',
         'bin__rack__number'
     )
@@ -121,7 +118,7 @@ class InventoryItemAdmin(ImportExportModelAdmin):
         ('Product Information', {
             'fields': ('bin', 'sku', 'product_name', 'product_mrp_display', 'price')
         }),
-        ('Ownership & Costing (NEW)', {
+        ('Ownership & Costing', {
             'fields': ('owner', 'cost_price', 'mode')
         }),
         ('Stock Levels', {
@@ -135,13 +132,11 @@ class InventoryItemAdmin(ImportExportModelAdmin):
 
     readonly_fields = ('created_at', 'updated_at', 'product_mrp_display')
 
-    # --- NEW METHOD ADDED FOR UI ---
     def owner_status(self, obj):
         if hasattr(obj, 'owner') and obj.owner:
             return format_html('<span style="color: blue; font-weight: bold;">Vendor: {}</span>', obj.owner.phone)
         return format_html('<span style="color: green; font-weight: bold;">Company Owned</span>')
     owner_status.short_description = "Owner"
-    # -------------------------------
 
     def get_urls(self):
         urls = super().get_urls()
@@ -170,7 +165,6 @@ class InventoryItemAdmin(ImportExportModelAdmin):
                 return f"₹ {product.mrp}"
         return "Not Found in Catalog"
     product_mrp_display.short_description = "Product Base MRP (Read Only)"
-
 
     def warehouse_name(self, obj):
         return obj.warehouse.name

@@ -1,5 +1,6 @@
 import csv
 import io
+import requests
 from django.shortcuts import render, redirect
 from django.urls import path
 from django.contrib import admin
@@ -7,15 +8,13 @@ from django.contrib import messages
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
-
-# UPDATE: Naye Database imports add kiye gaye hain taaki dropdown text ke hisaab se sort ho sake
+from django.db import transaction
 from django.db.models import Sum, F, Value, CharField, Case, When
 from django.db.models.functions import Concat
 
 from import_export import resources, fields, widgets
 from import_export.admin import ImportExportModelAdmin
 from .models import Product, Category, Brand, Banner, FlashSale
-import requests
 
 class ProductImageInline(admin.TabularInline):
     model = None  
@@ -29,12 +28,11 @@ class ProductImageInline(admin.TabularInline):
     def has_delete_permission(self, request, obj=None):
         return False
 
-
 class CategoryResource(resources.ModelResource):
     parent = fields.Field(
         column_name='parent',
         attribute='parent',
-        widget=widgets.ForeignKeyWidget(Category, 'name')
+        widget=widgets.ForeignKeyWidget(Category, 'slug')
     )
 
     class Meta:
@@ -42,24 +40,22 @@ class CategoryResource(resources.ModelResource):
         import_id_fields = ('name',)
         fields = ('id', 'name', 'slug', 'parent', 'icon', 'is_active')
 
-
 class BrandResource(resources.ModelResource):
     class Meta:
         model = Brand
         import_id_fields = ('name',)
         fields = ('id', 'name', 'slug', 'logo', 'is_active')
 
-
 class ProductResource(resources.ModelResource):
     category = fields.Field(
         column_name='category',
         attribute='category',
-        widget=widgets.ForeignKeyWidget(Category, 'name')
+        widget=widgets.ForeignKeyWidget(Category, 'slug')
     )
     brand = fields.Field(
         column_name='brand',
         attribute='brand',
-        widget=widgets.ForeignKeyWidget(Brand, 'name')
+        widget=widgets.ForeignKeyWidget(Brand, 'slug')
     )
 
     class Meta:
@@ -67,12 +63,10 @@ class ProductResource(resources.ModelResource):
         import_id_fields = ('sku',) 
         fields = ('id', 'name', 'sku', 'description', 'unit', 'mrp', 'image', 'is_active', 'category', 'brand', 'created_at')
 
-
 class BannerResource(resources.ModelResource):
     class Meta:
         model = Banner
         fields = ('id', 'title', 'image', 'target_url', 'position', 'bg_gradient', 'is_active')
-
 
 class FlashSaleResource(resources.ModelResource):
     product = fields.Field(
@@ -84,7 +78,6 @@ class FlashSaleResource(resources.ModelResource):
     class Meta:
         model = FlashSale
         fields = ('id', 'product', 'discount_percentage', 'end_time', 'is_active')
-
 
 @admin.register(Product)
 class ProductAdmin(ImportExportModelAdmin):
@@ -116,11 +109,8 @@ class ProductAdmin(ImportExportModelAdmin):
 
     readonly_fields = ('created_at', 'image_preview')
 
-    # UPDATE: Dropdown ki A to Z sorting 'Parent > Child' text ke hisaab se karna
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "category":
-            # Is logic se pehle 'Parent' ka naam aur phir 'Child' ka naam judeaga 
-            # aur fir final string ke hisaab se perfectly A to Z sort hoga
             kwargs["queryset"] = Category.objects.annotate(
                 full_display_name=Case(
                     When(parent__isnull=False, then=Concat('parent__name', Value(' > '), 'name')),
@@ -150,72 +140,71 @@ class ProductAdmin(ImportExportModelAdmin):
             reader = csv.DictReader(csv_data)
             
             count = 0
-            for row in reader:
-                sku_val = row.get('sku', '').strip()
-                if not sku_val: continue 
-                
-                name_val = row.get('name', '').strip()
-                brand_name = row.get('brand', '').strip()
-                category_name = row.get('category', '').strip()
-                image_val = row.get('image', '').strip()
-                desc_val = row.get('description', '').strip()
-                mrp_val = row.get('mrp', 0.00)
-
-                if not name_val:
-                    api_url = f"https://world.openfoodfacts.org/api/v0/product/{sku_val}.json"
-                    try:
-                        response = requests.get(api_url, timeout=5)
-                        data = response.json()
+            try:
+                with transaction.atomic():
+                    for row in reader:
+                        sku_val = row.get('sku', '').strip()
+                        if not sku_val: continue 
                         
-                        if data.get('status') == 1:
-                            product_data = data.get('product', {})
-                            name_val = product_data.get('product_name', '')
-                            image_val = product_data.get('image_front_url', '')
-                            desc_val = product_data.get('ingredients_text', '') 
-                            
-                            if not brand_name and product_data.get('brands'):
-                                brand_name = product_data.get('brands').split(',')[0].strip()
+                        name_val = row.get('name', '').strip()
+                        brand_name = row.get('brand', '').strip()
+                        category_name = row.get('category', '').strip()
+                        image_val = row.get('image', '').strip()
+                        desc_val = row.get('description', '').strip()
+                        mrp_val = row.get('mrp', 0.00)
+
+                        if not name_val:
+                            api_url = f"https://world.openfoodfacts.org/api/v0/product/{sku_val}.json"
+                            try:
+                                response = requests.get(api_url, timeout=5)
+                                data = response.json()
                                 
-                            if not category_name and product_data.get('categories'):
-                                category_name = product_data.get('categories').split(',')[0].strip()
-                    except Exception as e:
-                        pass 
+                                if data.get('status') == 1:
+                                    product_data = data.get('product', {})
+                                    name_val = product_data.get('product_name', '')
+                                    image_val = product_data.get('image_front_url', '')
+                                    desc_val = product_data.get('ingredients_text', '') 
+                                    
+                                    if not brand_name and product_data.get('brands'):
+                                        brand_name = product_data.get('brands').split(',')[0].strip()
+                                        
+                                    if not category_name and product_data.get('categories'):
+                                        category_name = product_data.get('categories').split(',')[0].strip()
+                            except Exception:
+                                pass 
 
-                if not name_val: name_val = f"Unknown Product (SKU: {sku_val})"
-                if not category_name: category_name = "Uncategorized"
+                        if not name_val: name_val = f"Unknown Product (SKU: {sku_val})"
+                        if not category_name: category_name = "Uncategorized"
 
-                try:
-                    category_obj, _ = Category.objects.get_or_create(
-                        name=category_name, defaults={'slug': category_name.lower().replace(" ", "-")}
-                    )
-
-                    brand_obj = None
-                    if brand_name:
-                        brand_obj, _ = Brand.objects.get_or_create(
-                            name=brand_name, defaults={'slug': brand_name.lower().replace(" ", "-")}
+                        category_obj, _ = Category.objects.get_or_create(
+                            name=category_name, defaults={'slug': category_name.lower().replace(" ", "-")}
                         )
 
-                    is_active_val = str(row.get('is_active', 'TRUE')).strip().upper() == 'TRUE'
+                        brand_obj = None
+                        if brand_name:
+                            brand_obj, _ = Brand.objects.get_or_create(
+                                name=brand_name, defaults={'slug': brand_name.lower().replace(" ", "-")}
+                            )
 
-                    obj, created = Product.objects.update_or_create(
-                        sku=sku_val,
-                        defaults={
-                            'name': name_val, 'description': desc_val, 'unit': row.get('unit', '1 Unit'),
-                            'image': image_val, 'mrp': mrp_val, 'is_active': is_active_val,
-                            'category': category_obj, 'brand': brand_obj,
-                        }
-                    )
-                    count += 1
-                except Exception as e:
-                    messages.error(request, f"Error in SKU {sku_val}: {e}")
-                    continue
+                        is_active_val = str(row.get('is_active', 'TRUE')).strip().upper() == 'TRUE'
 
-            self.message_user(request, f"{count} products imported (Missing data auto-fetched).")
+                        obj, created = Product.objects.update_or_create(
+                            sku=sku_val,
+                            defaults={
+                                'name': name_val, 'description': desc_val, 'unit': row.get('unit', '1 Unit'),
+                                'image': image_val, 'mrp': mrp_val, 'is_active': is_active_val,
+                                'category': category_obj, 'brand': brand_obj,
+                            }
+                        )
+                        count += 1
+
+                self.message_user(request, f"{count} products imported successfully.")
+            except Exception as e:
+                messages.error(request, f"Import failed and was rolled back! Error: {e}")
+                
             return redirect("..")
             
-        form = {}
-        payload = {"form": form}
-        return render(request, "admin/csv_form.html", payload)
+        return render(request, "admin/csv_form.html", {"form": {}})
 
     def image_preview(self, obj):
         if obj.image:
@@ -258,7 +247,6 @@ class ProductAdmin(ImportExportModelAdmin):
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
-
 @admin.register(Category)
 class CategoryAdmin(ImportExportModelAdmin):
     resource_class = CategoryResource
@@ -267,9 +255,8 @@ class CategoryAdmin(ImportExportModelAdmin):
     search_fields = ('name', 'parent__name')
     list_select_related = ('parent',)
     raw_id_fields = ('parent',)
-    list_editable = ('is_active', 'sort_order')
-    list_editable = ('is_active', 'icon') 
-    list_per_page = 10000 
+    list_editable = ('is_active', 'sort_order', 'icon') 
+    list_per_page = 100 
     actions = ['activate_categories', 'deactivate_categories']
     
     ordering = ['name']
@@ -312,7 +299,6 @@ class CategoryAdmin(ImportExportModelAdmin):
         return obj.products.count()
     product_count.short_description = "Products"
 
-
 @admin.register(Brand)
 class BrandAdmin(ImportExportModelAdmin):
     resource_class = BrandResource
@@ -321,7 +307,7 @@ class BrandAdmin(ImportExportModelAdmin):
     search_fields = ('name',)
     
     list_editable = ('is_active', 'logo') 
-    list_per_page = 10000 
+    list_per_page = 100 
     
     ordering = ['name']
 
@@ -344,7 +330,6 @@ class BrandAdmin(ImportExportModelAdmin):
         return obj.products.count()
     product_count.short_description = "Products"
 
-
 @admin.register(Banner)
 class BannerAdmin(ImportExportModelAdmin):
     resource_class = BannerResource
@@ -366,7 +351,6 @@ class BannerAdmin(ImportExportModelAdmin):
             return format_html('<img src="{}" style="max-height: 60px; max-width: 120px; border-radius: 5px; object-fit: cover;" />', obj.image)
         return "-"
     image_preview.short_description = "Banner Preview"
-
 
 @admin.register(FlashSale)
 class FlashSaleAdmin(ImportExportModelAdmin):
