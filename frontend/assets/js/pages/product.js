@@ -173,7 +173,10 @@ async function loadRelatedProducts(mainProduct) {
         if (productsToShow.length > 0 && section && grid) {
             section.classList.remove('d-none');
             
-            // Standardized Cards
+            // Yahan par hum container ko recommended-grid class assign kar rahe hain
+            grid.className = 'recommended-grid'; 
+            
+            // Standardized Cards with new "recommended-card" class
             grid.innerHTML = productsToShow.map(p => {
                 const finalPrice = p.sale_price || p.selling_price || p.price;
                 const imageSrc = p.image || p.image_url || 'https://via.placeholder.com/200';
@@ -187,18 +190,17 @@ async function loadRelatedProducts(mainProduct) {
                 }
 
                 return `
-                    <div class="card product-card" style="position: relative;">
-                        ${deliveryBadge}
-                        <a href="./product.html?code=${p.sku || p.id}" style="text-decoration:none; color:inherit;">
-                            <img src="${imageSrc}" style="width: 100%; height: 140px; object-fit: contain; opacity: ${isOOS ? 0.5 : 1};">
-                            <div class="item-name mt-2" style="font-weight: 500;">${p.name}</div>
-                            <div class="item-unit text-muted small mb-2" style="font-size:0.8rem;">${p.unit || '1 Unit'}</div>
+                    <div class="recommended-card" style="position: relative;"> ${deliveryBadge}
+                        <a href="./product.html?code=${p.sku || p.id}" style="text-decoration:none; color:inherit; display:flex; flex-direction:column; align-items:center;">
+                            <img src="${imageSrc}" style="width: 100%; max-width: 120px; height: 120px; object-fit: contain; margin-bottom:10px; opacity: ${isOOS ? 0.5 : 1};">
+                            <div class="item-name" style="font-weight: 600; font-size: 0.85rem; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${p.name}</div>
+                            <div class="item-unit text-muted small mt-1 mb-2" style="font-size:0.75rem;">${p.unit || '1 Unit'}</div>
                         </a>
-                        <div class="d-flex justify-content-between align-items-center mt-auto w-100">
-                            <div style="font-weight:700; font-size:1.05rem;">${formattedPrice}</div>
+                        <div class="d-flex justify-content-between align-items-center mt-auto w-100 px-1">
+                            <div style="font-weight:700; font-size:0.95rem;">${formattedPrice}</div>
                             ${isOOS ? 
-                                `<button class="btn btn-sm btn-secondary" style="border-radius:6px; padding: 6px 16px;" disabled>OOS</button>` : 
-                                `<button class="btn btn-sm btn-outline-primary" style="border-radius:6px; padding: 6px 16px;" onclick="addSuggestionToCart('${p.sku || p.id}', this)">ADD</button>`
+                                `<button class="btn btn-sm btn-secondary" style="border-radius:6px; padding: 4px 12px; font-size: 0.8rem;" disabled>OOS</button>` : 
+                                `<button class="btn btn-sm btn-outline-primary" style="border-radius:6px; padding: 4px 12px; font-size: 0.8rem; font-weight: 600;" onclick="addSuggestionToCart('${p.sku || p.id}', this)">ADD</button>`
                             }
                         </div>
                     </div>
