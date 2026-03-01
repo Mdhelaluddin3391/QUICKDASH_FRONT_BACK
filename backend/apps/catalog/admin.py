@@ -36,7 +36,6 @@ class CategoryResource(resources.ModelResource):
     class Meta:
         model = Category
         import_id_fields = ('name',)
-        # FIX: Removed 'created_at' as it does not exist in Category Model
         fields = ('id', 'name', 'slug', 'parent', 'icon', 'is_active')
 
 
@@ -44,7 +43,6 @@ class BrandResource(resources.ModelResource):
     class Meta:
         model = Brand
         import_id_fields = ('name',)
-        # FIX: Removed 'created_at' as it does not exist in Brand Model
         fields = ('id', 'name', 'slug', 'logo', 'is_active')
 
 
@@ -69,7 +67,6 @@ class ProductResource(resources.ModelResource):
 class BannerResource(resources.ModelResource):
     class Meta:
         model = Banner
-        # FIX: Removed 'created_at' as it does not exist in Banner Model
         fields = ('id', 'title', 'image', 'target_url', 'position', 'bg_gradient', 'is_active')
 
 
@@ -90,7 +87,6 @@ class ProductAdmin(ImportExportModelAdmin):
     resource_class = ProductResource
     change_list_template = "admin/catalog/product/change_list.html"
 
-    # UPDATE 1: 'category_name' ki jagah direct 'category' ka use kiya hai 
     list_display = (
         'name', 'sku', 'image_preview', 'image', 'category',
         'mrp', 'stock_status', 'is_active', 'created_at_date'
@@ -98,14 +94,14 @@ class ProductAdmin(ImportExportModelAdmin):
     list_filter = ('is_active', 'category', 'brand', 'created_at')
     search_fields = ('name', 'sku', 'description', 'category__name', 'brand__name')
     list_select_related = ('category', 'brand')
-    
-    # UPDATE 2: 'category' ko raw_id_fields se hata diya taaki dropdown theek se dikhe
     raw_id_fields = ('brand',)
     
-    # UPDATE 3: 'category' ko list_editable mein shamil kiya hai
     list_editable = ('mrp', 'is_active', 'image', 'category')
     list_per_page = 25
     actions = ['activate_products', 'deactivate_products', 'mark_featured', 'unmark_featured']
+    
+    # A to Z Ordering by Name
+    ordering = ['name']
 
     fieldsets = (
         ('Basic Information', {'fields': ('name', 'sku', 'description', 'unit')}),
@@ -247,18 +243,19 @@ class ProductAdmin(ImportExportModelAdmin):
 @admin.register(Category)
 class CategoryAdmin(ImportExportModelAdmin):
     resource_class = CategoryResource
-    list_display = ('name', 'icon_preview', 'icon', 'parent_name', 'is_active', 'product_count')
+    # UPDATE: 'view_subcategories' ko columns me add kiya
+    list_display = ('name', 'icon_preview', 'icon', 'parent_name', 'view_subcategories', 'is_active', 'product_count')
     list_filter = ('is_active', 'parent')
     search_fields = ('name', 'parent__name')
     list_select_related = ('parent',)
     raw_id_fields = ('parent',)
     
     list_editable = ('is_active', 'icon') 
-    
-    # UPDATE 4: Pagination hata kar page size ko bada kar diya
     list_per_page = 10000 
-    
     actions = ['activate_categories', 'deactivate_categories']
+    
+    # UPDATE: A to Z Arrange karna
+    ordering = ['name']
 
     fieldsets = (
         ('Basic Information', {'fields': ('name', 'slug', 'parent')}),
@@ -268,6 +265,23 @@ class CategoryAdmin(ImportExportModelAdmin):
 
     prepopulated_fields = {'slug': ('name',)}
     readonly_fields = ('icon_preview',)
+
+    # UPDATE: Sirf Root (Parent) Categories dikhane ke liye
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        # Agar user search nahi kar raha hai, aur koi parent filter applied nahi hai
+        if not request.GET.get('q') and not request.GET.get('parent__id__exact'):
+            qs = qs.filter(parent__isnull=True)
+        return qs
+
+    # UPDATE: Child Categories open karne ka button
+    def view_subcategories(self, obj):
+        count = obj.subcategories.count()
+        if count > 0:
+            url = f"?parent__id__exact={obj.id}"
+            return format_html('<a class="button" href="{}" style="padding: 3px 10px; background: #417690; color: white; border-radius: 4px;">📂 View {} Subcategories</a>', url, count)
+        return format_html('<span style="color: gray;">-</span>')
+    view_subcategories.short_description = "Subcategories"
 
     def icon_preview(self, obj):
         if obj.icon:
@@ -293,9 +307,10 @@ class BrandAdmin(ImportExportModelAdmin):
     search_fields = ('name',)
     
     list_editable = ('is_active', 'logo') 
-    
-    # UPDATE 5: Brand admin se bhi pagination hata diya
     list_per_page = 10000 
+    
+    # UPDATE: A to Z Arrange karna
+    ordering = ['name']
 
     fieldsets = (
         ('Basic Information', {'fields': ('name', 'slug')}),
