@@ -40,7 +40,7 @@ class NavbarCategoryAPIView(APIView):
     authentication_classes = [] 
 
     def get(self, request):
-        queryset = Category.objects.filter(is_active=True, parent__isnull=True).order_by('name')
+        queryset = Category.objects.filter(is_active=True, parent__isnull=True).order_by('sort_order', 'name')
         serializer = NavigationCategorySerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
 
@@ -341,7 +341,7 @@ class StorefrontCatalogAPIView(APIView):
             total_stock__gt=F('reserved_stock')
         ).values_list('sku', flat=True).distinct()
 
-        all_categories = Category.objects.filter(is_active=True, parent__isnull=True).order_by('id')
+        all_categories = Category.objects.filter(is_active=True, parent__isnull=True).order_by('sort_order', 'name')
         
         page_number = request.query_params.get('page', 1)
         paginator = Paginator(all_categories, 4)

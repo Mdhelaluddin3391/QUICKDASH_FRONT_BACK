@@ -23,9 +23,11 @@ class Category(models.Model):
     slug = models.SlugField(unique=True)
     icon = models.URLField(max_length=500, null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    sort_order = models.IntegerField(default=0, help_text="Lower number comes first (e.g. 1 for Grocery, 2 for Electronics)")
 
     class Meta:
         verbose_name_plural = "Categories"
+        ordering = ['sort_order', 'name']
 
     def __str__(self):
         if self.parent:

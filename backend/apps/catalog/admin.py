@@ -268,7 +268,7 @@ class CategoryAdmin(ImportExportModelAdmin):
     search_fields = ('name', 'parent__name')
     list_select_related = ('parent',)
     raw_id_fields = ('parent',)
-    
+    list_editable = ('is_active', 'sort_order')
     list_editable = ('is_active', 'icon') 
     list_per_page = 10000 
     actions = ['activate_categories', 'deactivate_categories']
