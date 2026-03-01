@@ -104,7 +104,6 @@ class ProductAdmin(ImportExportModelAdmin):
     list_per_page = 25
     actions = ['activate_products', 'deactivate_products', 'mark_featured', 'unmark_featured']
     
-    # Product List ko A-Z order me rakhne ke liye
     ordering = ['name']
 
     fieldsets = (
