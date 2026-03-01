@@ -90,16 +90,20 @@ class ProductAdmin(ImportExportModelAdmin):
     resource_class = ProductResource
     change_list_template = "admin/catalog/product/change_list.html"
 
+    # UPDATE 1: 'category_name' ki jagah direct 'category' ka use kiya hai 
     list_display = (
-        'name', 'sku', 'image_preview', 'image', 'category_name',
+        'name', 'sku', 'image_preview', 'image', 'category',
         'mrp', 'stock_status', 'is_active', 'created_at_date'
     )
     list_filter = ('is_active', 'category', 'brand', 'created_at')
     search_fields = ('name', 'sku', 'description', 'category__name', 'brand__name')
     list_select_related = ('category', 'brand')
-    raw_id_fields = ('category', 'brand')
     
-    list_editable = ('mrp', 'is_active', 'image')
+    # UPDATE 2: 'category' ko raw_id_fields se hata diya taaki dropdown theek se dikhe
+    raw_id_fields = ('brand',)
+    
+    # UPDATE 3: 'category' ko list_editable mein shamil kiya hai
+    list_editable = ('mrp', 'is_active', 'image', 'category')
     list_per_page = 25
     actions = ['activate_products', 'deactivate_products', 'mark_featured', 'unmark_featured']
 
@@ -204,11 +208,6 @@ class ProductAdmin(ImportExportModelAdmin):
         return format_html('<span style="color: gray;">No Image</span>')
     image_preview.short_description = "Preview"
 
-    def category_name(self, obj):
-        return obj.category.name
-    category_name.short_description = "Category"
-    category_name.admin_order_field = 'category__name'
-
     def mrp_display(self, obj):
         return f"₹{obj.mrp:.2f}"
     mrp_display.short_description = "MRP"
@@ -255,7 +254,10 @@ class CategoryAdmin(ImportExportModelAdmin):
     raw_id_fields = ('parent',)
     
     list_editable = ('is_active', 'icon') 
-    list_per_page = 25
+    
+    # UPDATE 4: Pagination hata kar page size ko bada kar diya
+    list_per_page = 10000 
+    
     actions = ['activate_categories', 'deactivate_categories']
 
     fieldsets = (
@@ -291,7 +293,9 @@ class BrandAdmin(ImportExportModelAdmin):
     search_fields = ('name',)
     
     list_editable = ('is_active', 'logo') 
-    list_per_page = 25
+    
+    # UPDATE 5: Brand admin se bhi pagination hata diya
+    list_per_page = 10000 
 
     fieldsets = (
         ('Basic Information', {'fields': ('name', 'slug')}),
