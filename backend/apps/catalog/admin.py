@@ -100,7 +100,7 @@ class ProductAdmin(ImportExportModelAdmin):
     list_per_page = 25
     actions = ['activate_products', 'deactivate_products', 'mark_featured', 'unmark_featured']
     
-    # A to Z Ordering by Name
+    # A to Z Ordering by Name for the product list itself
     ordering = ['name']
 
     fieldsets = (
@@ -112,6 +112,14 @@ class ProductAdmin(ImportExportModelAdmin):
     )
 
     readonly_fields = ('created_at', 'image_preview')
+
+    # UPDATE: Dropdown ke options ko A to Z arrange karne ke liye
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "category":
+            kwargs["queryset"] = Category.objects.order_by('name')
+        elif db_field.name == "brand":
+            kwargs["queryset"] = Brand.objects.order_by('name')
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def get_urls(self):
         urls = super().get_urls()
