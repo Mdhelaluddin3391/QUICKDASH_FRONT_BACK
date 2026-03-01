@@ -9,7 +9,7 @@ from import_export.admin import ImportExportModelAdmin
 
 from .models import Warehouse, PickingTask, PackingTask, StorageZone, Aisle, Rack, Bin
 from apps.orders.models import Order
-
+from apps.inventory.models import InventoryItem
 
 class WarehouseResource(resources.ModelResource):
     class Meta:
@@ -35,21 +35,21 @@ class PickingTaskResource(resources.ModelResource):
         attribute='order',
         widget=ForeignKeyWidget(Order, 'id')
     )
-    target_bin = fields.Field(
-        column_name='target_bin_code',
-        attribute='target_bin',
-        widget=ForeignKeyWidget(Bin, 'bin_code')
+    # FIX: target_bin renamed to target_inventory_batch to match model
+    target_inventory_batch = fields.Field(
+        column_name='target_batch_id',
+        attribute='target_inventory_batch',
+        widget=ForeignKeyWidget(InventoryItem, 'id')
     )
     picker = fields.Field(
         column_name='picker_phone',
         attribute='picker',
-        widget=ForeignKeyWidget(PickingTask._meta.get_field('picker').related_model, 'phone') # FIX: 'user__phone' ki jagah direct 'phone' kyunki user hi abstract model hai
+        widget=ForeignKeyWidget(PickingTask._meta.get_field('picker').related_model, 'phone')
     )
 
     class Meta:
         model = PickingTask
-        # FIX: Added 'quantity_to_pick'
-        fields = ('id', 'order', 'item_sku', 'quantity_to_pick', 'picker', 'target_bin', 'status', 'picked_at')
+        fields = ('id', 'order', 'item_sku', 'quantity_to_pick', 'picker', 'target_inventory_batch', 'status', 'picked_at')
         export_order = fields
 
 
@@ -62,7 +62,7 @@ class PackingTaskResource(resources.ModelResource):
     packer = fields.Field(
         column_name='packer_phone',
         attribute='packer',
-        widget=ForeignKeyWidget(PackingTask._meta.get_field('packer').related_model, 'phone') # FIX: Direct 'phone' use karein
+        widget=ForeignKeyWidget(PackingTask._meta.get_field('packer').related_model, 'phone')
     )
 
     class Meta:
@@ -93,7 +93,6 @@ class AisleResource(resources.ModelResource):
 
     class Meta:
         model = Aisle
-        # FIX: Changed 'aisle_number' to 'number' to match models.py
         fields = ('id', 'zone', 'number')
         export_order = fields
 
@@ -107,7 +106,6 @@ class RackResource(resources.ModelResource):
 
     class Meta:
         model = Rack
-        # FIX: Changed 'rack_number' to 'number' to match models.py
         fields = ('id', 'aisle', 'number')
         export_order = fields
 
@@ -166,11 +164,14 @@ class WarehouseAdmin(ImportExportModelAdmin, LeafletGeoAdmin):
 @admin.register(PickingTask)
 class PickingTaskAdmin(ImportExportModelAdmin):
     resource_class = PickingTaskResource
-    list_display = ("order_id", "item_sku", "quantity_to_pick", "status_badge", "picker_info", "picked_at", "target_bin")
+    # FIX: target_bin renamed to target_inventory_batch
+    list_display = ("order_id", "item_sku", "quantity_to_pick", "status_badge", "picker_info", "picked_at", "target_inventory_batch")
     list_filter = ("status", "picked_at")
     search_fields = ("order__id", "item_sku", "picker__phone", "picker__first_name")
-    list_select_related = ('order', 'picker', 'target_bin')
-    raw_id_fields = ["order", "picker", "target_bin"]
+    # FIX: target_bin renamed to target_inventory_batch
+    list_select_related = ('order', 'picker', 'target_inventory_batch')
+    # FIX: target_bin renamed to target_inventory_batch
+    raw_id_fields = ["order", "picker", "target_inventory_batch"]
     list_per_page = 25
     actions = ["reset_to_pending", "mark_as_completed"]
 
@@ -261,7 +262,6 @@ class BinAdmin(ImportExportModelAdmin):
     list_select_related = ('rack__aisle__zone__warehouse',)
 
     def rack_info(self, obj):
-        # FIX: Changed aisle_number to number and rack_number to number
         return f"{obj.rack.aisle.zone.warehouse.code} - {obj.rack.aisle.zone.name} - A{obj.rack.aisle.number} - R{obj.rack.number}"
     rack_info.short_description = "Location"
     rack_info.admin_order_field = 'rack__aisle__zone__warehouse__code'

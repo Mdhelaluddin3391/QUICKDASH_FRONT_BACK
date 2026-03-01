@@ -35,10 +35,9 @@ class Category(models.Model):
         return self.name
     
 
-
 class Product(models.Model):
-    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="products")
-    brand = models.ForeignKey(Brand, on_delete=models.CASCADE, related_name="products", null=True, blank=True)
+    category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="products")
+    brand = models.ForeignKey(Brand, on_delete=models.PROTECT, related_name="products", null=True, blank=True)
     
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True)
@@ -54,7 +53,6 @@ class Product(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.sku})"
-
 
 
 class Banner(models.Model):

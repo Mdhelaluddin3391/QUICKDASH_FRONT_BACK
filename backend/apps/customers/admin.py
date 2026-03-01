@@ -3,7 +3,7 @@ from django.contrib.auth import get_user_model
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import localtime
-from django.db import models
+from django.db.models import Count, Sum, Q
 from django.urls import reverse
 from import_export import resources, fields, widgets
 from import_export.admin import ImportExportModelAdmin
@@ -13,7 +13,6 @@ from .models import CustomerProfile, CustomerAddress, SupportTicket
 User = get_user_model()
 
 class CustomerProfileResource(resources.ModelResource):
-    # Linking user by phone number
     user = fields.Field(
         column_name='user',
         attribute='user',
@@ -24,9 +23,7 @@ class CustomerProfileResource(resources.ModelResource):
         model = CustomerProfile
         fields = ('id', 'user', 'created_at')
 
-
 class CustomerAddressResource(resources.ModelResource):
-    # Linking customer by their User's phone number
     customer = fields.Field(
         column_name='customer',
         attribute='customer',
@@ -43,9 +40,7 @@ class CustomerAddressResource(resources.ModelResource):
             'is_deleted', 'created_at'
         )
 
-
 class SupportTicketResource(resources.ModelResource):
-    # Linking user by phone and order by id
     user = fields.Field(
         column_name='user',
         attribute='user',
@@ -61,7 +56,6 @@ class SupportTicketResource(resources.ModelResource):
         model = SupportTicket
         fields = ('id', 'user', 'order', 'issue_type', 'description', 'status', 'admin_response', 'created_at')
 
-
 class CustomerAddressInline(admin.StackedInline):
     model = CustomerAddress
     extra = 0
@@ -71,12 +65,10 @@ class CustomerAddressInline(admin.StackedInline):
     can_delete = False
 
     def address_summary_view(self, obj):
-        # Yahan object None ka check lagana zaroori hai
         if not obj or not obj.pk:
             return "-"
         return f"{obj.house_no}, {obj.apartment_name}, {obj.landmark} - {obj.google_address_text}"
     address_summary_view.short_description = "Full Address"
-
 
 @admin.register(CustomerProfile)
 class CustomerProfileAdmin(ImportExportModelAdmin):
@@ -123,6 +115,14 @@ class CustomerProfileAdmin(ImportExportModelAdmin):
         'total_orders', 'total_spent', 'support_tickets_count'
     )
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.annotate(
+            annotated_orders=Count('user__orders', distinct=True),
+            annotated_tickets=Count('user__supportticket', distinct=True),
+            annotated_spent=Sum('user__orders__total_amount', filter=Q(user__orders__status='delivered'))
+        )
+
     def user_phone(self, obj):
         return obj.user.phone
     user_phone.short_description = "Phone"
@@ -138,36 +138,30 @@ class CustomerProfileAdmin(ImportExportModelAdmin):
     user_email.short_description = "Email ID"
 
     def total_orders(self, obj):
-        # Handle both 'orders' or default 'order_set' relation
-        orders_relation = getattr(obj.user, 'orders', getattr(obj.user, 'order_set', None))
-        count = orders_relation.count() if orders_relation else 0
-        
+        count = getattr(obj, 'annotated_orders', 0)
         try:
             url = reverse('admin:orders_order_changelist') + f'?user__id__exact={obj.user.id}'
             return format_html('<a href="{}" style="font-weight: bold; color: #007bff;">{} Orders</a>', url, count)
         except Exception:
-            # Agar URL resolve na ho toh safe fallback
             return f"{count} Orders"
-            
     total_orders.short_description = "Total Orders"
+    total_orders.admin_order_field = 'annotated_orders'
 
     def total_spent(self, obj):
-        orders_relation = getattr(obj.user, 'orders', getattr(obj.user, 'order_set', None))
-        total = 0
-        if orders_relation:
-            total = orders_relation.filter(status='delivered').aggregate(
-                total=models.Sum('total_amount')
-            )['total'] or 0
-            
+        total = getattr(obj, 'annotated_spent', 0) or 0
         return format_html('<span style="color: green; font-weight: bold;">₹{:.2f}</span>', float(total))
-        
     total_spent.short_description = "Total Spent (Delivered)"
+    total_spent.admin_order_field = 'annotated_spent'
 
     def support_tickets_count(self, obj):
-        count = obj.user.supportticket_set.count()
-        url = reverse('admin:customers_supportticket_changelist') + f'?user__id__exact={obj.user.id}'
-        return format_html('<a href="{}" style="font-weight: bold; color: #dc3545;">{} Tickets</a>', url, count)
+        count = getattr(obj, 'annotated_tickets', 0)
+        try:
+            url = reverse('admin:customers_supportticket_changelist') + f'?user__id__exact={obj.user.id}'
+            return format_html('<a href="{}" style="font-weight: bold; color: #dc3545;">{} Tickets</a>', url, count)
+        except Exception:
+            return f"{count} Tickets"
     support_tickets_count.short_description = "Support Tickets"
+    support_tickets_count.admin_order_field = 'annotated_tickets'
 
     def created_at_date(self, obj):
         if hasattr(obj, 'created_at') and obj.created_at:
@@ -175,7 +169,6 @@ class CustomerProfileAdmin(ImportExportModelAdmin):
         return "N/A"
     created_at_date.short_description = "Joined Date"
     created_at_date.admin_order_field = 'created_at'
-
 
 @admin.register(CustomerAddress)
 class CustomerAddressAdmin(ImportExportModelAdmin):
@@ -297,7 +290,6 @@ class CustomerAddressAdmin(ImportExportModelAdmin):
     def restore_addresses(self, request, queryset):
         updated = queryset.update(is_deleted=False)
         self.message_user(request, f"{updated} addresses restored.")
-
 
 @admin.register(SupportTicket)
 class SupportTicketAdmin(ImportExportModelAdmin):

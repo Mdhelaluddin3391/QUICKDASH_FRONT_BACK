@@ -1,6 +1,8 @@
+from decimal import Decimal
 from django.contrib import admin
 from django.contrib.auth import get_user_model
-from django.db.models import Sum, Q
+from django.db.models import Sum, Q, OuterRef, Subquery
+from django.db.models.functions import Coalesce
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from import_export import resources, fields
@@ -11,7 +13,6 @@ from .models import RiderProfile, RiderDocument, RiderPayout, RiderEarning
 from apps.warehouse.models import Warehouse
 
 User = get_user_model()
-
 
 class RiderProfileResource(resources.ModelResource):
     user = fields.Field(
@@ -27,10 +28,8 @@ class RiderProfileResource(resources.ModelResource):
 
     class Meta:
         model = RiderProfile
-        # FIX: Removed 'is_kyc_verified' as it is a python @property, not a database field
         fields = ('id', 'user', 'is_active', 'is_available', 'current_warehouse', 'created_at')
         export_order = fields
-
 
 class RiderDocumentResource(resources.ModelResource):
     rider = fields.Field(
@@ -41,10 +40,8 @@ class RiderDocumentResource(resources.ModelResource):
 
     class Meta:
         model = RiderDocument
-        # FIX: Added 'file_key' so that the actual document links aren't lost in backup
         fields = ('id', 'rider', 'doc_type', 'file_key', 'status', 'admin_notes', 'updated_at')
         export_order = fields
-
 
 class RiderPayoutResource(resources.ModelResource):
     rider = fields.Field(
@@ -58,8 +55,6 @@ class RiderPayoutResource(resources.ModelResource):
         fields = ('id', 'rider', 'amount', 'status', 'transaction_ref', 'created_at', 'completed_at')
         export_order = fields
 
-
-# NEW: Added Resource for RiderEarning so financial logs can be safely backed up
 class RiderEarningResource(resources.ModelResource):
     rider = fields.Field(
         column_name='rider_phone',
@@ -77,7 +72,6 @@ class RiderEarningResource(resources.ModelResource):
         fields = ('id', 'rider', 'amount', 'reference', 'payout', 'created_at')
         export_order = fields
 
-
 class RiderDocumentInline(admin.TabularInline):
     model = RiderDocument
     extra = 0
@@ -85,7 +79,6 @@ class RiderDocumentInline(admin.TabularInline):
     fields = ('doc_type', 'file_key', 'status', 'admin_notes')
     can_delete = False
     show_change_link = False
-
 
 @admin.register(RiderProfile)
 class RiderProfileAdmin(ImportExportModelAdmin):
@@ -107,6 +100,22 @@ class RiderProfileAdmin(ImportExportModelAdmin):
 
     readonly_fields = ('created_at',)
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        
+        earnings_sq = RiderEarning.objects.filter(
+            rider=OuterRef('pk')
+        ).values('rider').annotate(total=Sum('amount')).values('total')
+        
+        payouts_sq = RiderPayout.objects.filter(
+            rider=OuterRef('pk'), status='completed'
+        ).values('rider').annotate(total=Sum('amount')).values('total')
+        
+        return qs.annotate(
+            annotated_earnings=Coalesce(Subquery(earnings_sq), Decimal('0.00')),
+            annotated_payouts=Coalesce(Subquery(payouts_sq), Decimal('0.00'))
+        )
+
     def rider_name(self, obj):
         name = f"{obj.user.first_name} {obj.user.last_name}".strip()
         return name or "N/A"
@@ -125,8 +134,8 @@ class RiderProfileAdmin(ImportExportModelAdmin):
     availability_status.short_description = "Status"
 
     def wallet_balance(self, obj):
-        total_earnings = obj.earnings.aggregate(total=Sum('amount'))['total'] or 0
-        total_payouts = obj.payouts.filter(status='completed').aggregate(total=Sum('amount'))['total'] or 0
+        total_earnings = getattr(obj, 'annotated_earnings', 0) or 0
+        total_payouts = getattr(obj, 'annotated_payouts', 0) or 0
         balance = total_earnings - total_payouts
         return f"₹{balance:.2f}"
     wallet_balance.short_description = "Wallet Balance"
@@ -147,7 +156,6 @@ class RiderProfileAdmin(ImportExportModelAdmin):
             return obj.created_at.strftime('%d/%m/%Y')
         return "N/A"
     created_at_date.short_description = "Joined"
-
 
 @admin.register(RiderPayout)
 class RiderPayoutAdmin(ImportExportModelAdmin):
@@ -181,8 +189,6 @@ class RiderPayoutAdmin(ImportExportModelAdmin):
         return "N/A"
     created_at_date.short_description = "Created"
 
-
-# NEW: Added Admin for RiderDocument so it can be exported independently
 @admin.register(RiderDocument)
 class RiderDocumentAdmin(ImportExportModelAdmin):
     resource_class = RiderDocumentResource
@@ -197,8 +203,6 @@ class RiderDocumentAdmin(ImportExportModelAdmin):
         return obj.rider.user.phone
     rider_phone.short_description = "Rider Phone"
 
-
-# NEW: Added Admin for RiderEarning to secure financial backups
 @admin.register(RiderEarning)
 class RiderEarningAdmin(ImportExportModelAdmin):
     resource_class = RiderEarningResource

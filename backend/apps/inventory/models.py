@@ -51,16 +51,17 @@ class InventoryItem(models.Model):
             raise ValidationError("Total stock cannot be less than reserved stock.")
 
     def save(self, *args, **kwargs):
-        from apps.catalog.models import Product
-        product = Product.objects.filter(sku=self.sku).first()
-        
-        if product:
-            if not self.product_name:
-                self.product_name = product.name
-            if self.price <= 0:
-                self.price = product.mrp
-            elif self.price > product.mrp:
-                self.price = product.mrp
+        if not self.pk or not self.product_name or self.price <= 0:
+            from apps.catalog.models import Product
+            product = Product.objects.filter(sku=self.sku).first()
+            
+            if product:
+                if not self.product_name:
+                    self.product_name = product.name
+                if self.price <= 0:
+                    self.price = product.mrp
+                elif self.price > product.mrp:
+                    self.price = product.mrp
 
         super().save(*args, **kwargs)
 

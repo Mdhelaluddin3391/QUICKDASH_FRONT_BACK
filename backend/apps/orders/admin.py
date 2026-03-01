@@ -7,7 +7,7 @@ from django.utils.timezone import localtime
 from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
-from django.db.models import Q 
+from django.db.models import Q, F
 
 from .models import Order, OrderItem, OrderConfiguration, OrderItemFulfillment
 from apps.catalog.models import Product
@@ -17,7 +17,6 @@ from apps.customers.models import CustomerAddress
 from apps.inventory.models import InventoryItem
 
 User = get_user_model()
-
 
 class OrderResource(resources.ModelResource):
     user = fields.Field(
@@ -45,7 +44,6 @@ class OrderResource(resources.ModelResource):
         )
         export_order = fields
 
-
 class OrderItemResource(resources.ModelResource):
     order = fields.Field(
         column_name='order_id',
@@ -55,12 +53,9 @@ class OrderItemResource(resources.ModelResource):
 
     class Meta:
         model = OrderItem
-        # FIX: Added 'status' and 'cancel_reason' to match the updated models.py
         fields = ('id', 'order', 'sku', 'product_name', 'quantity', 'price', 'status', 'cancel_reason')
         export_order = fields
 
-
-# NEW: Added Resource for OrderItemFulfillment for Full Backup
 class OrderItemFulfillmentResource(resources.ModelResource):
     order_item = fields.Field(
         column_name='order_item_id',
@@ -78,13 +73,11 @@ class OrderItemFulfillmentResource(resources.ModelResource):
         fields = ('id', 'order_item', 'inventory_batch', 'quantity_allocated', 'vendor_payable_amount', 'created_at')
         export_order = fields
 
-
 class OrderConfigurationResource(resources.ModelResource):
     class Meta:
         model = OrderConfiguration
         fields = ('id', 'delivery_fee', 'free_delivery_threshold')
         export_order = fields
-
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
@@ -93,6 +86,9 @@ class OrderItemInline(admin.TabularInline):
     can_delete = False
     fields = ('product_image', 'sku', 'product_name', 'quantity', 'price', 'subtotal', 'fulfillment_details', 'status', 'cancel_reason')
     show_change_link = False
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related('fulfillments__inventory_batch__owner')
 
     def product_image(self, obj):
         if obj.sku:
@@ -109,7 +105,7 @@ class OrderItemInline(admin.TabularInline):
 
     def fulfillment_details(self, obj):
         if not obj.pk: return "-"
-        fulfillments = obj.fulfillments.select_related('inventory_batch', 'inventory_batch__owner').all()
+        fulfillments = obj.fulfillments.all()
         if not fulfillments: return format_html('<span style="color:red;">Pending/No Batch</span>')
         
         details = []
@@ -118,7 +114,6 @@ class OrderItemInline(admin.TabularInline):
             details.append(f"<b>{f.quantity_allocated}x</b> (Batch {f.inventory_batch.id} - {owner})")
         return format_html("<br>".join(details))
     fulfillment_details.short_description = "Stock Source"
-
 
 @admin.register(Order)
 class OrderAdmin(ImportExportModelAdmin):
@@ -180,8 +175,9 @@ class OrderAdmin(ImportExportModelAdmin):
                     if old_status != 'cancelled' and new_status == 'cancelled':
                         item_total = instance.price * instance.quantity
                         order = instance.order
-                        order.total_amount -= item_total
+                        order.total_amount = F('total_amount') - item_total
                         order.save(update_fields=['total_amount'])
+                        order.refresh_from_db()
                         
                         if order.payment_method == 'online':
                             try:
@@ -257,8 +253,6 @@ class OrderAdmin(ImportExportModelAdmin):
         return format_html('<a style="background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block;" href="{}" target="_blank">📍 Directions</a>', url)
     Maps_link.short_description = "Map"
 
-
-# FIX: Added ImportExportModelAdmin to allow backup of fulfillments too
 @admin.register(OrderItemFulfillment)
 class OrderItemFulfillmentAdmin(ImportExportModelAdmin):
     resource_class = OrderItemFulfillmentResource
@@ -286,7 +280,6 @@ class OrderItemFulfillmentAdmin(ImportExportModelAdmin):
             return format_html('<span style="color: blue; font-weight: bold;">{}</span>', obj.inventory_batch.owner.phone)
         return format_html('<span style="color: green; font-weight: bold;">Company</span>')
     vendor_phone.short_description = "Vendor"
-
 
 @admin.register(OrderConfiguration)
 class OrderConfigurationAdmin(ImportExportModelAdmin):

@@ -7,7 +7,6 @@ from django.contrib import admin
 from django.contrib import messages
 from django.utils.html import format_html
 from django.utils.timezone import localtime
-from django.utils.translation import gettext_lazy as _
 from django.db import transaction
 from django.db.models import Sum, F, Value, CharField, Case, When
 from django.db.models.functions import Concat
@@ -139,60 +138,75 @@ class ProductAdmin(ImportExportModelAdmin):
             csv_data = io.StringIO(file_data)
             reader = csv.DictReader(csv_data)
             
+            processed_data = []
+            
+            for row in reader:
+                sku_val = row.get('sku', '').strip()
+                if not sku_val: continue 
+                
+                name_val = row.get('name', '').strip()
+                brand_name = row.get('brand', '').strip()
+                category_name = row.get('category', '').strip()
+                image_val = row.get('image', '').strip()
+                desc_val = row.get('description', '').strip()
+                mrp_val = row.get('mrp', 0.00)
+                unit_val = row.get('unit', '1 Unit')
+                is_active_val = str(row.get('is_active', 'TRUE')).strip().upper() == 'TRUE'
+
+                if not name_val:
+                    api_url = f"https://world.openfoodfacts.org/api/v0/product/{sku_val}.json"
+                    try:
+                        response = requests.get(api_url, timeout=5)
+                        data = response.json()
+                        
+                        if data.get('status') == 1:
+                            product_data = data.get('product', {})
+                            name_val = product_data.get('product_name', '')
+                            image_val = product_data.get('image_front_url', '')
+                            desc_val = product_data.get('ingredients_text', '') 
+                            
+                            if not brand_name and product_data.get('brands'):
+                                brand_name = product_data.get('brands').split(',')[0].strip()
+                                
+                            if not category_name and product_data.get('categories'):
+                                category_name = product_data.get('categories').split(',')[0].strip()
+                    except Exception:
+                        pass 
+
+                if not name_val: name_val = f"Unknown Product (SKU: {sku_val})"
+                if not category_name: category_name = "Uncategorized"
+
+                processed_data.append({
+                    'sku': sku_val,
+                    'name': name_val,
+                    'brand': brand_name,
+                    'category': category_name,
+                    'image': image_val,
+                    'description': desc_val,
+                    'mrp': mrp_val,
+                    'unit': unit_val,
+                    'is_active': is_active_val
+                })
+            
             count = 0
             try:
                 with transaction.atomic():
-                    for row in reader:
-                        sku_val = row.get('sku', '').strip()
-                        if not sku_val: continue 
-                        
-                        name_val = row.get('name', '').strip()
-                        brand_name = row.get('brand', '').strip()
-                        category_name = row.get('category', '').strip()
-                        image_val = row.get('image', '').strip()
-                        desc_val = row.get('description', '').strip()
-                        mrp_val = row.get('mrp', 0.00)
-
-                        if not name_val:
-                            api_url = f"https://world.openfoodfacts.org/api/v0/product/{sku_val}.json"
-                            try:
-                                response = requests.get(api_url, timeout=5)
-                                data = response.json()
-                                
-                                if data.get('status') == 1:
-                                    product_data = data.get('product', {})
-                                    name_val = product_data.get('product_name', '')
-                                    image_val = product_data.get('image_front_url', '')
-                                    desc_val = product_data.get('ingredients_text', '') 
-                                    
-                                    if not brand_name and product_data.get('brands'):
-                                        brand_name = product_data.get('brands').split(',')[0].strip()
-                                        
-                                    if not category_name and product_data.get('categories'):
-                                        category_name = product_data.get('categories').split(',')[0].strip()
-                            except Exception:
-                                pass 
-
-                        if not name_val: name_val = f"Unknown Product (SKU: {sku_val})"
-                        if not category_name: category_name = "Uncategorized"
-
+                    for item in processed_data:
                         category_obj, _ = Category.objects.get_or_create(
-                            name=category_name, defaults={'slug': category_name.lower().replace(" ", "-")}
+                            name=item['category'], defaults={'slug': item['category'].lower().replace(" ", "-")}
                         )
 
                         brand_obj = None
-                        if brand_name:
+                        if item['brand']:
                             brand_obj, _ = Brand.objects.get_or_create(
-                                name=brand_name, defaults={'slug': brand_name.lower().replace(" ", "-")}
+                                name=item['brand'], defaults={'slug': item['brand'].lower().replace(" ", "-")}
                             )
 
-                        is_active_val = str(row.get('is_active', 'TRUE')).strip().upper() == 'TRUE'
-
-                        obj, created = Product.objects.update_or_create(
-                            sku=sku_val,
+                        Product.objects.update_or_create(
+                            sku=item['sku'],
                             defaults={
-                                'name': name_val, 'description': desc_val, 'unit': row.get('unit', '1 Unit'),
-                                'image': image_val, 'mrp': mrp_val, 'is_active': is_active_val,
+                                'name': item['name'], 'description': item['description'], 'unit': item['unit'],
+                                'image': item['image'], 'mrp': item['mrp'], 'is_active': item['is_active'],
                                 'category': category_obj, 'brand': brand_obj,
                             }
                         )
@@ -250,7 +264,8 @@ class ProductAdmin(ImportExportModelAdmin):
 @admin.register(Category)
 class CategoryAdmin(ImportExportModelAdmin):
     resource_class = CategoryResource
-    list_display = ('name', 'icon_preview', 'icon', 'parent_name', 'view_subcategories', 'is_active', 'product_count')
+    # FIX: sort_order added to list_display to allow list_editable
+    list_display = ('name', 'icon_preview', 'icon', 'parent_name', 'view_subcategories', 'sort_order', 'is_active', 'product_count')
     list_filter = ('is_active', 'parent')
     search_fields = ('name', 'parent__name')
     list_select_related = ('parent',)

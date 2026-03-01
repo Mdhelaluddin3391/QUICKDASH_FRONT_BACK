@@ -37,7 +37,7 @@ class Order(models.Model):
     fulfillment_warehouse = models.ForeignKey('warehouse.Warehouse', on_delete=models.PROTECT, related_name="fulfilled_orders", null=True, blank=True)
     last_mile_warehouse = models.ForeignKey('warehouse.Warehouse', on_delete=models.PROTECT, related_name="last_mile_orders", null=True, blank=True)
 
-    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="created")
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="created", db_index=True)
     delivery_type = models.CharField(max_length=20, choices=DELIVERY_TYPE_CHOICES)
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default="COD")
 
@@ -51,6 +51,7 @@ class Order(models.Model):
         indexes = [
             models.Index(fields=['fulfillment_warehouse', 'status', 'created_at']),
             models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['status', 'created_at']),
         ]
 
     def __str__(self):
@@ -59,7 +60,7 @@ class Order(models.Model):
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.PROTECT, related_name="items")
     
-    sku = models.CharField(max_length=100)
+    sku = models.CharField(max_length=100, db_index=True)
     product_name = models.CharField(max_length=255)
     quantity = models.PositiveIntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
