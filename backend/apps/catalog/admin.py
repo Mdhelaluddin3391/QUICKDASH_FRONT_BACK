@@ -7,7 +7,11 @@ from django.contrib import messages
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
-from django.db.models import Sum
+
+# UPDATE: Naye Database imports add kiye gaye hain taaki dropdown text ke hisaab se sort ho sake
+from django.db.models import Sum, F, Value, CharField, Case, When
+from django.db.models.functions import Concat
+
 from import_export import resources, fields, widgets
 from import_export.admin import ImportExportModelAdmin
 from .models import Product, Category, Brand, Banner, FlashSale
@@ -100,7 +104,7 @@ class ProductAdmin(ImportExportModelAdmin):
     list_per_page = 25
     actions = ['activate_products', 'deactivate_products', 'mark_featured', 'unmark_featured']
     
-    # A to Z Ordering by Name for the product list itself
+    # Product List ko A-Z order me rakhne ke liye
     ordering = ['name']
 
     fieldsets = (
@@ -113,10 +117,18 @@ class ProductAdmin(ImportExportModelAdmin):
 
     readonly_fields = ('created_at', 'image_preview')
 
-    # UPDATE: Dropdown ke options ko A to Z arrange karne ke liye
+    # UPDATE: Dropdown ki A to Z sorting 'Parent > Child' text ke hisaab se karna
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "category":
-            kwargs["queryset"] = Category.objects.order_by('name')
+            # Is logic se pehle 'Parent' ka naam aur phir 'Child' ka naam judeaga 
+            # aur fir final string ke hisaab se perfectly A to Z sort hoga
+            kwargs["queryset"] = Category.objects.annotate(
+                full_display_name=Case(
+                    When(parent__isnull=False, then=Concat('parent__name', Value(' > '), 'name')),
+                    default=F('name'),
+                    output_field=CharField()
+                )
+            ).order_by('full_display_name')
         elif db_field.name == "brand":
             kwargs["queryset"] = Brand.objects.order_by('name')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
@@ -251,7 +263,6 @@ class ProductAdmin(ImportExportModelAdmin):
 @admin.register(Category)
 class CategoryAdmin(ImportExportModelAdmin):
     resource_class = CategoryResource
-    # UPDATE: 'view_subcategories' ko columns me add kiya
     list_display = ('name', 'icon_preview', 'icon', 'parent_name', 'view_subcategories', 'is_active', 'product_count')
     list_filter = ('is_active', 'parent')
     search_fields = ('name', 'parent__name')
@@ -262,7 +273,6 @@ class CategoryAdmin(ImportExportModelAdmin):
     list_per_page = 10000 
     actions = ['activate_categories', 'deactivate_categories']
     
-    # UPDATE: A to Z Arrange karna
     ordering = ['name']
 
     fieldsets = (
@@ -274,15 +284,12 @@ class CategoryAdmin(ImportExportModelAdmin):
     prepopulated_fields = {'slug': ('name',)}
     readonly_fields = ('icon_preview',)
 
-    # UPDATE: Sirf Root (Parent) Categories dikhane ke liye
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        # Agar user search nahi kar raha hai, aur koi parent filter applied nahi hai
         if not request.GET.get('q') and not request.GET.get('parent__id__exact'):
             qs = qs.filter(parent__isnull=True)
         return qs
 
-    # UPDATE: Child Categories open karne ka button
     def view_subcategories(self, obj):
         count = obj.subcategories.count()
         if count > 0:
@@ -317,7 +324,6 @@ class BrandAdmin(ImportExportModelAdmin):
     list_editable = ('is_active', 'logo') 
     list_per_page = 10000 
     
-    # UPDATE: A to Z Arrange karna
     ordering = ['name']
 
     fieldsets = (
