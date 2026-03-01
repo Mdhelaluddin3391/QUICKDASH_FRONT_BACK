@@ -217,41 +217,97 @@ window.LocationPicker = {
     // ---------------------------------------------------------
     
     async detectRealLocation(isSilent = false) {
-        if (!navigator.geolocation) {
-            if(!isSilent && window.Toast) Toast.error("Geolocation not supported.");
-            return;
-        }
-
         // 1. UI Feedback: Start Spinner
         const btn = document.getElementById('lp-gps-btn');
         const icon = btn ? btn.querySelector('i') : null;
         if (icon) icon.className = 'fas fa-circle-notch fa-spin text-primary';
 
         try {
-            // 2. Attempt 1: High Accuracy (GPS) with 15s Timeout
-            // (Increased from 5000 to 15000 for better mobile accuracy)
-            const position = await this._getPosition({ 
-                enableHighAccuracy: true, 
-                timeout: 15000, 
-                maximumAge: 0 
-            });
+            let position;
+
+            // --- NATIVE (APK) LOGIC ---
+            if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+                const { Geolocation } = window.Capacitor.Plugins;
+
+                const permissions = await Geolocation.checkPermissions();
+                if (permissions.location !== 'granted') {
+                    const request = await Geolocation.requestPermissions();
+                    if (request.location !== 'granted') {
+                        throw new Error("Permission Denied");
+                    }
+                }
+
+                position = await Geolocation.getCurrentPosition({
+                    enableHighAccuracy: true,
+                    timeout: 15000,
+                    maximumAge: 0
+                });
+            } else {
+                // --- BROWSER (WEB) LOGIC ---
+                if (!navigator.geolocation) {
+                    if(!isSilent && window.Toast) Toast.error("Geolocation not supported.");
+                    if (icon) icon.className = 'fas fa-crosshairs text-muted';
+                    return;
+                }
+                
+                position = await this._getPosition({ 
+                    enableHighAccuracy: true, 
+                    timeout: 15000, 
+                    maximumAge: 0 
+                });
+            }
+
             this._handleGpsSuccess(position, isSilent, icon);
 
         } catch (err) {
-            console.warn("High Accuracy GPS failed, switching to fallback...", err.message);
+            console.warn("High Accuracy GPS failed, switching to fallback...", err);
 
-            // 3. Attempt 2: Low Accuracy (Wifi/Network)
+            // Fallback (Low Accuracy)
             try {
-                const position = await this._getPosition({ 
-                    enableHighAccuracy: false, 
-                    timeout: 10000, 
-                    maximumAge: 0 
-                });
-                this._handleGpsSuccess(position, isSilent, icon);
+                let positionFallback;
+
+                if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+                    const { Geolocation } = window.Capacitor.Plugins;
+                    positionFallback = await Geolocation.getCurrentPosition({
+                        enableHighAccuracy: false,
+                        timeout: 10000,
+                        maximumAge: 0
+                    });
+                } else {
+                    positionFallback = await this._getPosition({ 
+                        enableHighAccuracy: false, 
+                        timeout: 10000, 
+                        maximumAge: 0 
+                    });
+                }
+                
+                this._handleGpsSuccess(positionFallback, isSilent, icon);
             } catch (err2) {
-                // 4. Final Failure
+                // Final Failure: Yahan naya error handler call hoga
                 this._handleGpsError(err2, isSilent, icon);
             }
+        }
+    },
+
+    _handleGpsError(err, isSilent, icon) {
+        console.error("GPS Final Error", err);
+        if (icon) icon.className = 'fas fa-crosshairs text-muted'; // Gray out icon
+        
+        if (!isSilent) {
+            let msg = "Could not detect location.";
+            
+            // 1. Agar user ne permission Deny ki ho (Web & APK)
+            if (err.code === 1 || err.message === "Permission Denied") {
+                msg = "Permission Denied. Please allow location access.";
+            } 
+            // 2. Agar user ka GPS/Location hardware se band ho (Web & APK)
+            else if (err.code === 2 || err.code === 3 || (err.message && err.message.toLowerCase().includes('location services'))) {
+                msg = "Please turn on your device location / GPS.";
+            }
+            
+            // Toast me error dikhayein
+            if (window.Toast) Toast.error(msg);
+            else alert(msg);
         }
     },
 
@@ -281,20 +337,7 @@ window.LocationPicker = {
         if (!isSilent && window.Toast) Toast.success("Location detected!");
     },
 
-    _handleGpsError(err, isSilent, icon) {
-        console.error("GPS Final Error", err);
-        if (icon) icon.className = 'fas fa-crosshairs text-muted'; // Gray out
-        
-        if (!isSilent) {
-            let msg = "Could not detect location.";
-            if (err.code === 1) msg = "Permission Denied. Please enable location.";
-            else if (err.code === 2) msg = "Location unavailable.";
-            else if (err.code === 3) msg = "Location request timed out (Signal weak).";
-            
-            if (window.Toast) Toast.error(msg);
-            else alert(msg);
-        }
-    },
+   
 
     // ---------------------------------------------------------
     // Confirm & Cleanup
