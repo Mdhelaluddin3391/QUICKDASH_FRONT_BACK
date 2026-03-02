@@ -3,7 +3,9 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from apps.warehouse.models import Bin
 from django.conf import settings
-
+from backend.apps.utils import logging
+import logging
+logger = logging.getLogger(__name__)
 User = settings.AUTH_USER_MODEL
 
 class InventoryItem(models.Model):
@@ -45,6 +47,31 @@ class InventoryItem(models.Model):
     @property
     def available_stock(self):
         return self.total_stock - self.reserved_stock
+    
+    @property
+    def delivery_eta(self):
+        """
+        Calculate Estimated Delivery Time based on Warehouse Type and Inventory Mode.
+        """
+        try:
+            w_type = self.warehouse.warehouse_type
+            
+            if w_type == 'dark_store':
+                if self.mode in ['owned', 'consignment']:
+                    return "20 mins"
+                elif self.mode == 'virtual':
+                    return "1 day"
+            
+            elif w_type == 'mega':
+                if self.mode in ['owned', 'consignment']:
+                    return "3 days"
+                elif self.mode == 'virtual':
+                    return "5 days"
+                    
+        except Exception as e:
+            logger.error(f"ETA calculation issue for InventoryItem ID {self.id}: {e}")
+            
+        return "2-3 Days"
 
     def clean(self):
         if self.total_stock < self.reserved_stock:

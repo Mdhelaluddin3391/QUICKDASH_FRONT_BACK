@@ -52,6 +52,7 @@ class HomeCategorySerializer(serializers.ModelSerializer):
 class ProductSerializer(serializers.ModelSerializer):
     sale_price = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
+    estimated_delivery = serializers.SerializerMethodField()
     
     effective_price = serializers.DecimalField(
         max_digits=10, 
@@ -65,9 +66,23 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = (
             "id", "name", "sku", "description", "mrp", 
-            "sale_price", "effective_price", "unit", "image_url", "is_active"
+            "sale_price", "effective_price", "unit", "image_url", "is_active","estimated_delivery"
         )
+    def get_estimated_delivery(self, obj):
+        """
+        Product ke liye sabse fast available stock ka ETA return karta hai.
+        """
+        # Hum check karte hain ki is product ka kaunsa stock available hai
+        inventory_item = InventoryItem.objects.filter(
+            sku=obj.sku, 
+            total_stock__gt=0  # Sirf wahi item lenge jo stock me ho
+        ).select_related('bin__rack__aisle__zone__warehouse').first()
 
+        if inventory_item:
+            return inventory_item.delivery_eta
+        
+        return "Out of Stock"
+    
     def get_image_url(self, obj):
         if not obj.image:
             return None
@@ -178,6 +193,7 @@ class StorefrontProductDocSerializer(serializers.Serializer):
     mrp = serializers.DecimalField(max_digits=10, decimal_places=2)
     selling_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     available_stock = serializers.IntegerField()
+    estimated_delivery = serializers.CharField(required=False, default="20 mins")
 
 class StorefrontCategoryDocSerializer(serializers.Serializer):
     id = serializers.IntegerField()
