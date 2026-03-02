@@ -3,16 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Dashboard - QuickDash Rider</title>
-    <link rel="icon" href="data:,">
-    
+    <title>Rider Dashboard - QuickDash</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
     <header class="app-header">
         <div class="header-left">
-            <h3>Dashboard</h3>
+            <h3>Rider Panel</h3>
             <span id="rider-status" class="badge-offline">Offline</span>
         </div>
         <div class="header-right">
@@ -28,25 +26,28 @@
         <div class="stats-row">
             <div class="stat-card">
                 <h2 id="today-earnings">₹0</h2>
-                <span>Earnings</span>
+                <span>Today's Earnings</span>
             </div>
             <div class="stat-card">
                 <h2 id="today-orders">0</h2>
-                <span>Orders</span>
+                <span>Orders Done</span>
             </div>
         </div>
 
-        <div id="active-job-area" class="job-container">
-            <div class="no-job">
-                <i class="fas fa-motorcycle"></i>
-                <p>Waiting for new orders...</p>
-                <small>Go online to receive jobs</small>
+        <div class="job-container">
+            <h4 style="margin-bottom: 15px; color: #666;">Active Tasks</h4>
+            <div id="active-job-area">
+                <div class="no-job">
+                    <i class="fas fa-motorcycle"></i>
+                    <p>Scanning for orders...</p>
+                    <div class="pulse-ring"></div>
+                </div>
             </div>
         </div>
     </main>
 
     <script src="assets/js/config.js"></script>
     <script src="assets/js/api.service.js"></script>
-    <script src="assets/js/pages/rider-dashboard.js?v=1.0.0" defer></script>
+    <script src="assets/js/pages/rider-dashboard.js" defer></script>
 </body>
 </html>
