@@ -203,12 +203,36 @@ async function handleVerifyAndLogin(e) {
 
 function startTimerLocal() {
     let time = 30;
+    const container = document.querySelector('.mt-4.text-muted.small'); 
+    
+    // Har baar jab timer start ho, toh wapas "Resend OTP in 30s" set karein
+    if (container) {
+        container.innerHTML = `Resend OTP in <span id="timer">${time}</span>s`;
+    }
+
     const el = document.getElementById('timer');
     if(!el) return;
+
     const interval = setInterval(() => {
         el.innerText = --time;
-        if(time <= 0) clearInterval(interval);
+        
+        if(time <= 0) {
+            clearInterval(interval);
+            // Jab time 0 ho jaye, toh isko clickable 'Resend OTP' link bana dein
+            if (container) {
+                container.innerHTML = `<span class="link-text text-primary" style="cursor: pointer; font-weight: bold;" onclick="triggerResend()">Resend OTP</span>`;
+            }
+        }
     }, 1000);
+}
+
+// Resend OTP par click karne se form ko dobara submit karega
+window.triggerResend = function() {
+    const phoneForm = document.getElementById('step-phone');
+    if (phoneForm) {
+        // Yeh wapas handleSendOtp function ko call kar dega
+        phoneForm.dispatchEvent(new Event('submit'));
+    }
 }
 
 window.resetForm = function() {
