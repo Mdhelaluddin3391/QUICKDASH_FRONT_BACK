@@ -94,9 +94,14 @@ function renderProduct(p) {
         }
         
         if (etaArea) {
-            const locType = window.LocationManager?.getLocationContext()?.type;
-            const eta = locType === 'L2' ? '10-15 mins' : '15-25 mins';
-            etaArea.innerHTML = `<i class="fas fa-bolt text-warning"></i> Get it in <strong>${eta}</strong>`;
+            // 🔥 FIX: Backend se aane wala dynamic ETA use karein
+            // Agar backend se ETA nahi aata toh fallback '15-25 mins' dikhayega
+            const eta = p.delivery_eta || '15-25 mins';
+            
+            // Icon change karein delivery type ke hisaab se (Optional enhancement)
+            const icon = p.delivery_type === 'dark_store' ? 'fa-bolt text-warning' : 'fa-truck text-primary';
+
+            etaArea.innerHTML = `<i class="fas ${icon}"></i> Get it in <strong>${eta}</strong>`;
             etaArea.classList.remove('text-muted');
         }
     } else {
@@ -155,7 +160,6 @@ async function addToCart() {
     }
 }
 
-// Replace this function in frontend/assets/js/pages/product.js
 async function loadRelatedProducts(mainProduct) {
     try {
         const endpoint = `/catalog/skus/?limit=10`;
@@ -165,7 +169,7 @@ async function loadRelatedProducts(mainProduct) {
         if (!Array.isArray(allProducts)) return;
 
         let filteredProducts = allProducts.filter(p => p.sku !== mainProduct.sku && p.id !== mainProduct.id);
-        const productsToShow = filteredProducts.slice(0, 6); // 6 dikhayen to 3 row completely bhar jayengi
+        const productsToShow = filteredProducts.slice(0, 6); 
 
         const section = document.getElementById('related-products-section');
         const grid = document.getElementById('related-products-grid');
@@ -173,7 +177,6 @@ async function loadRelatedProducts(mainProduct) {
         if (productsToShow.length > 0 && section && grid) {
             section.classList.remove('d-none');
             
-            // Standardized Cards - EXACTLY matching Catalog.js
             grid.innerHTML = productsToShow.map(p => {
                 const imageSrc = p.image_url || p.image || 'https://via.placeholder.com/150?text=No+Image';
                 const finalPrice = p.sale_price || p.price || 0;
@@ -220,7 +223,6 @@ async function loadRelatedProducts(mainProduct) {
     }
 }
 
-// Ensure global Add to cart function works on the web version as well
 window.addSuggestionToCart = async function(skuCode, btn) {
     if (!localStorage.getItem(window.APP_CONFIG.STORAGE_KEYS.TOKEN)) {
         window.Toast.warning("Login required");
