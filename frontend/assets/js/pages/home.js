@@ -9,7 +9,7 @@ let feedHasNext = true;
 let sfPage = 1;
 let sfLoading = false;
 let sfHasNext = true;
-
+let flashTimerId = null;
 let currentAbortController = null; // To cancel pending requests on location change
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -484,11 +484,16 @@ function startFlashTimer() {
     const display = document.getElementById('flash-timer');
     if(!display) return;
     
+    // 🔥 FIX: Purana timer agar chal raha hai toh use band karein taaki multiple timers na chalein (No Lag)
+    if (flashTimerId) {
+        clearInterval(flashTimerId);
+    }
+    
     // Set End time to End of Today (Demo Logic)
     const end = new Date();
     end.setHours(23, 59, 59, 999); 
     
-    setInterval(() => {
+    flashTimerId = setInterval(() => {
         const diff = end - new Date();
         if(diff <= 0) { display.innerText = "00:00:00"; return; }
         const h = Math.floor((diff / (1000 * 60 * 60)) % 24);

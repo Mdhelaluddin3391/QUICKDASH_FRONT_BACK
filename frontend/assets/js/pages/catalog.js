@@ -64,9 +64,29 @@ async function loadSubCategories() {
     if (!currentSlug || !container) return;
 
     try {
-        // 1. Fetch ALL Categories
-        const res = await ApiService.get('/catalog/categories/');
-        const allCats = res.results || res;
+        // 🔥 FIX: Categories fetch ko LocalStorage Cache mein daala gaya hai (1 Hour Expiry)
+        const CACHE_KEY = 'all_categories_full_cache';
+        let allCats = [];
+        const cachedStr = localStorage.getItem(CACHE_KEY);
+        
+        if (cachedStr) {
+            try {
+                const cached = JSON.parse(cachedStr);
+                if (cached && (Date.now() - cached.ts) < 3600000) { // 1 Hour
+                    allCats = cached.data;
+                }
+            } catch(e) { console.warn("Subcategory cache invalid"); }
+        }
+
+        // Agar Cache nahi mila, tabhi API Call karein
+        if (!allCats || allCats.length === 0) {
+            const res = await ApiService.get('/catalog/categories/');
+            allCats = res.results || res;
+            
+            if (Array.isArray(allCats)) {
+                localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: allCats }));
+            }
+        }
 
         // 2. Find Current Category
         const currentCat = allCats.find(c => c.slug === currentSlug);
@@ -80,14 +100,11 @@ async function loadSubCategories() {
         const isSubcategory = currentCat.parent !== null && currentCat.parent !== undefined;
 
         if (isSubcategory) {
-            // Agar Sub-category hai, toh uska Parent find karein
             const pId = typeof currentCat.parent === 'object' ? currentCat.parent.id : currentCat.parent;
             const parentObj = allCats.find(c => c.id === pId);
-            
             parentId = parentObj ? parentObj.id : pId;
             parentSlug = parentObj ? parentObj.slug : null;
         } else {
-            // Agar Parent hai, toh woh khud hi parentId hai
             parentId = currentCat.id;
             parentSlug = currentCat.slug;
         }
@@ -101,29 +118,22 @@ async function loadSubCategories() {
         // 5. Render Pills HTML
         if (children.length > 0 && parentSlug) {
             container.classList.remove('d-none'); 
-            
-            // "All" Button (Agar subcategory par nahi hai toh yahi active hoga)
             let html = `
                 <a href="./search_results.html?slug=${parentSlug}" 
                    class="pill-btn ${!isSubcategory ? 'active' : ''}">
                    All
                 </a>
             `;
-
-            // Sub-category Buttons (Jo slug URL mein hai, wo active hoga)
             html += children.map(child => `
                 <a href="./search_results.html?slug=${child.slug}" 
                    class="pill-btn ${currentSlug === child.slug ? 'active' : ''}">
                    ${child.name}
                 </a>
             `).join('');
-
             container.innerHTML = html;
         } else {
-            // Agar koi subcategory nahi hai (e.g. Single independent category), toh strip hide kardo
             container.classList.add('d-none');
         }
-
     } catch (e) {
         console.warn("Sub-categories load failed", e);
     }

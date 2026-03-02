@@ -434,17 +434,35 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function checkStoreStatus() {
+    // 🔥 FIX: Faltu API Calls Rokne Ke Liye 5 Minute Ka Cache Lagaya Hai
+    const CACHE_KEY = 'store_status_cache';
+    const cachedStr = sessionStorage.getItem(CACHE_KEY);
+    
+    if (cachedStr) {
+        try {
+            const cached = JSON.parse(cachedStr);
+            // Agar cache 5 minute (300000 ms) se purana nahi hai, toh wahi use karein
+            if (Date.now() - cached.ts < 300000) { 
+                if (cached.data.is_store_open === false) {
+                    showStoreOfflineUI(cached.data.store_closed_message);
+                }
+                return; // Yahan se return ho jayega, API call nahi hogi
+            }
+        } catch (e) {
+            console.warn("Store status cache invalid");
+        }
+    }
+
     try {
-        // FIX: APP_CONFIG.API_BASE_URL ka use karein
         const baseUrl = window.APP_CONFIG?.API_BASE_URL || 'https://quickdash-front-back.onrender.com/api/v1';
-        
-        // baseUrl ke sath /core/store-status/ lagayein
         const response = await fetch(`${baseUrl}/core/store-status/`);
         
         if (response.ok) {
             const data = await response.json();
             
-            // Agar store band hai
+            // Naya data aane par Cache mein save karein
+            sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: data }));
+            
             if (data.is_store_open === false) {
                 showStoreOfflineUI(data.store_closed_message);
             }
@@ -457,13 +475,9 @@ async function checkStoreStatus() {
 }
 
 function showStoreOfflineUI(message) {
-    // Body me class add karein taki scrolling band ho jaye
     document.body.classList.add('store-closed-mode');
-    
-    // UI elements create karein
     const overlay = document.createElement('div');
     overlay.className = 'store-offline-overlay';
-    
     const modal = document.createElement('div');
     modal.className = 'store-offline-modal';
     
@@ -471,9 +485,6 @@ function showStoreOfflineUI(message) {
         <h2>Store is Offline</h2>
         <p>${message}</p>
     `;
-    
     overlay.appendChild(modal);
-    
-    // Isko body main sabse aage add kar de
     document.body.appendChild(overlay);
 }
