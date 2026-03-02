@@ -100,8 +100,19 @@ async function handleSendOtp(e) {
                 Toast.success("OTP Sent successfully (Fallback Mode)");
             }
         } catch (localErr) {
-            console.error(localErr);
-            Toast.error(localErr.message || "Failed to send OTP completely");
+            console.error("Local Error Object:", localErr);
+            
+            // ✅ IMPROVED ERROR HANDLING FOR CLEAN TOAST
+            let errorMsg = "Failed to send OTP completely";
+            if (localErr.detail) {
+                errorMsg = localErr.detail; // Extract direct detail (for Rate Limit)
+            } else if (localErr.error) {
+                errorMsg = localErr.error;
+            } else if (localErr.message) {
+                errorMsg = typeof localErr.message === 'string' ? localErr.message : (localErr.message.detail || JSON.stringify(localErr.message));
+            }
+            
+            Toast.error(errorMsg); // Ab ganda JSON nahi aayega
         }
     } finally {
         btn.innerHTML = originalHtml;
@@ -165,8 +176,19 @@ async function handleVerifyAndLogin(e) {
         }
 
     } catch (err) {
-        console.error(err);
-        Toast.error(err.message || "Verification Failed! Wrong OTP.");
+        console.error("Verification Error Object:", err);
+        
+        // ✅ IMPROVED ERROR HANDLING FOR CLEAN TOAST
+        let errorMsg = "Verification Failed! Wrong OTP.";
+        if (err.detail) {
+            errorMsg = err.detail; // Extract direct detail
+        } else if (err.error) {
+            errorMsg = err.error;
+        } else if (err.message) {
+            errorMsg = typeof err.message === 'string' ? err.message : (err.message.detail || JSON.stringify(err.message));
+        }
+        
+        Toast.error(errorMsg); // Ab ganda JSON nahi aayega
         
         // Agar Firebase se fail hua toh reCAPTCHA reset karna padta hai
         if (isUsingFirebase && window.recaptchaVerifier) {
