@@ -75,7 +75,7 @@ class SkuListAPIView(generics.ListAPIView):
     
     filterset_fields = ['is_active'] 
     
-    search_fields = ['name', 'sku', 'description', 'category__name', 'category__parent__name']
+    search_fields = ['name', 'sku', 'description', 'category__name', 'category__parent__name','category__parent__parent__name']
     ordering_fields = ['effective_price', 'created_at']
 
     def get_queryset(self):
@@ -85,7 +85,8 @@ class SkuListAPIView(generics.ListAPIView):
         if category_slug:
             qs = qs.filter(
                 Q(category__slug=category_slug) | 
-                Q(category__parent__slug=category_slug)
+                Q(category__parent__slug=category_slug) |
+                Q(category__parent__parent__slug=category_slug)
             )
 
         brands = self.request.query_params.get('brand')
@@ -457,7 +458,8 @@ class GlobalSearchAPIView(APIView):
                     Q(sku__icontains=word) |
                     Q(description__icontains=word) |
                     Q(category__name__icontains=word) |
-                    Q(category__parent__name__icontains=word)
+                    Q(category__parent__name__icontains=word) |
+                    Q(category__parent__parent__name__icontains=word) 
                 )
             
             products = products.annotate(
@@ -469,7 +471,8 @@ class GlobalSearchAPIView(APIView):
                     When(description__icontains=query, then=Value(5)),
                     When(category__name__icontains=query, then=Value(6)),
                     When(category__parent__name__icontains=query, then=Value(7)),
-                    default=Value(8),
+                    When(category__parent__parent__name__icontains=query, then=Value(8)), # Naya level
+                    default=Value(9),
                     output_field=IntegerField()
                 )
             ).order_by('relevance', '-created_at')
@@ -496,6 +499,7 @@ class SearchSuggestAPIView(APIView):
                 Q(description__icontains=word) | 
                 Q(category__name__icontains=word) | 
                 Q(category__parent__name__icontains=word) | 
+                Q(category__parent__parent__name__icontains=word) |
                 Q(sku__icontains=word)
             )
             brand_results = brand_results.filter(name__icontains=word)
