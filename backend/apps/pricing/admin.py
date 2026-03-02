@@ -15,11 +15,12 @@ class SurgeRuleResource(resources.ModelResource):
     warehouse = fields.Field(
         column_name='warehouse_name',
         attribute='warehouse',
-        widget=ForeignKeyWidget(Warehouse, 'name')
+        widget=ForeignKeyWidget(Warehouse, 'code')
     )
 
     class Meta:
         model = SurgeRule
+        import_id_fields = ('id',)
         fields = ('id', 'warehouse', 'max_multiplier', 'base_factor', 'created_at')
         export_order = fields
 

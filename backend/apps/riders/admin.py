@@ -21,12 +21,13 @@ class RiderProfileResource(resources.ModelResource):
         widget=ForeignKeyWidget(User, 'phone')
     )
     current_warehouse = fields.Field(
-        column_name='warehouse_name',
+        column_name='warehouse_code', 
         attribute='current_warehouse',
-        widget=ForeignKeyWidget(Warehouse, 'name')
+        widget=ForeignKeyWidget(Warehouse, 'code') 
     )
 
     class Meta:
+        import_id_fields = ('id',)
         model = RiderProfile
         fields = ('id', 'user', 'is_active', 'is_available', 'current_warehouse', 'created_at')
         export_order = fields

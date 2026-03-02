@@ -27,6 +27,7 @@ class DeliveryResource(resources.ModelResource):
 
     class Meta:
         model = Delivery
+        import_id_fields = ('id',)
         fields = (
             'id', 
             'order', 

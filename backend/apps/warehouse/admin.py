@@ -14,6 +14,7 @@ from apps.inventory.models import InventoryItem
 class WarehouseResource(resources.ModelResource):
     class Meta:
         model = Warehouse
+        import_id_fields = ('id',)
         fields = (
             'id', 
             'name', 
@@ -75,7 +76,7 @@ class StorageZoneResource(resources.ModelResource):
     warehouse = fields.Field(
         column_name='warehouse_name',
         attribute='warehouse',
-        widget=ForeignKeyWidget(Warehouse, 'name')
+        widget=ForeignKeyWidget(Warehouse, 'code')
     )
 
     class Meta:

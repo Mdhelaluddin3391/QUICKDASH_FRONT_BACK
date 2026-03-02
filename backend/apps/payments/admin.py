@@ -20,6 +20,7 @@ class PaymentResource(resources.ModelResource):
 
     class Meta:
         model = Payment
+        import_id_fields = ('id',)
         fields = (
             'id', 
             'order', 
@@ -44,6 +45,7 @@ class RefundResource(resources.ModelResource):
 
     class Meta:
         model = Refund
+        import_id_fields = ('id',) 
         fields = (
             'id', 
             'payment', 
