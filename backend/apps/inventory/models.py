@@ -3,8 +3,8 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from apps.warehouse.models import Bin
 from django.conf import settings
-from backend.apps.utils import logging
 import logging
+
 logger = logging.getLogger(__name__)
 User = settings.AUTH_USER_MODEL
 
