@@ -12,7 +12,7 @@ from .models import GeoLocation
 User = get_user_model()
 
 class GeoLocationResource(resources.ModelResource):
-    # Linking user by phone number
+    # Linking user by phone number (Safe for migration)
     user = fields.Field(
         column_name='user_phone',
         attribute='user',
@@ -21,15 +21,11 @@ class GeoLocationResource(resources.ModelResource):
 
     class Meta:
         model = GeoLocation
+        # NAYA LOGIC: Multiple locations ho sakti hain, isliye ID ko identifier banaya
+        import_id_fields = ('id',)
         fields = (
-            'id', 
-            'user', 
-            'label', 
-            'address_text', 
-            'latitude', 
-            'longitude', 
-            'is_active', 
-            'created_at'
+            'id', 'user', 'label', 'address_text', 
+            'latitude', 'longitude', 'is_active', 'created_at'
         )
         export_order = fields
 

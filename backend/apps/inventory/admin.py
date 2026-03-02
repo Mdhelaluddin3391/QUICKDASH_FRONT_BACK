@@ -31,20 +31,12 @@ class InventoryItemResource(resources.ModelResource):
 
     class Meta:
         model = InventoryItem
+        # NAYA LOGIC: Batches ko ID se pehchanna hi safe hai kyunki ek SKU ke kai batches ho sakte hain
+        import_id_fields = ('id',) 
         fields = (
-            'id', 
-            'bin', 
-            'sku', 
-            'product_name', 
-            'price', 
-            'owner',
-            'cost_price',
-            'total_stock', 
-            'reserved_stock', 
-            'mode', 
-            'lead_time_hours', 
-            'created_at',
-            'updated_at'
+            'id', 'bin', 'sku', 'product_name', 'price', 'owner',
+            'cost_price', 'total_stock', 'reserved_stock', 'mode', 
+            'lead_time_hours', 'created_at', 'updated_at'
         )
         export_order = fields
 
@@ -58,13 +50,11 @@ class InventoryTransactionResource(resources.ModelResource):
 
     class Meta:
         model = InventoryTransaction
+        # NAYA LOGIC: Transactions ke liye hamesha ID hi identifier rahega
+        import_id_fields = ('id',)
         fields = (
-            'id', 
-            'inventory_item', 
-            'transaction_type', 
-            'quantity', 
-            'reference', 
-            'created_at'
+            'id', 'inventory_item', 'transaction_type', 'quantity', 
+            'reference', 'created_at'
         )
         export_order = fields
 
@@ -76,33 +66,15 @@ class InventoryItemAdmin(ImportExportModelAdmin):
         js = ('inventory/js/sku_lookup.js',)
 
     list_display = (
-        'id',
-        'sku',
-        'product_name',
-        'owner_status',
-        'cost_price',
-        'price', 
-        'warehouse_name',
-        'bin_location',
-        'total_stock',
-        'available_stock',
-        'reserved_stock',
-        'stock_status',
-        'mode_badge',
-        'updated_at_date'
+        'id', 'sku', 'product_name', 'owner_status', 'cost_price', 'price', 
+        'warehouse_name', 'bin_location', 'total_stock', 'available_stock',
+        'reserved_stock', 'stock_status', 'mode_badge', 'updated_at_date'
     )
     list_filter = (
-        'mode',
-        'owner',
-        'bin__rack__aisle__zone__warehouse',
-        'updated_at'
+        'mode', 'owner', 'bin__rack__aisle__zone__warehouse', 'updated_at'
     )
     search_fields = (
-        'sku',
-        'product_name',
-        'owner__phone',
-        'bin__bin_code',
-        'bin__rack__number'
+        'sku', 'product_name', 'owner__phone', 'bin__bin_code', 'bin__rack__number'
     )
     list_select_related = (
         'bin', 'owner', 'bin__rack', 'bin__rack__aisle', 
@@ -167,7 +139,7 @@ class InventoryItemAdmin(ImportExportModelAdmin):
     product_mrp_display.short_description = "Product Base MRP (Read Only)"
 
     def warehouse_name(self, obj):
-        return obj.warehouse.name
+        return obj.bin.rack.aisle.zone.warehouse.name
     warehouse_name.short_description = "Warehouse"
     warehouse_name.admin_order_field = 'bin__rack__aisle__zone__warehouse__name'
 
@@ -191,17 +163,9 @@ class InventoryItemAdmin(ImportExportModelAdmin):
     stock_status.short_description = "Status"
 
     def mode_badge(self, obj):
-        colors = {
-            'owned': '#28a745',
-            'consignment': '#ffc107',
-            'virtual': '#6c757d',
-        }
+        colors = {'owned': '#28a745', 'consignment': '#ffc107', 'virtual': '#6c757d'}
         color = colors.get(obj.mode, '#6c757d')
-        return format_html(
-            '<span style="background-color: {}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">{}</span>',
-            color,
-            obj.get_mode_display()
-        )
+        return format_html('<span style="background-color: {}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">{}</span>', color, obj.get_mode_display())
     mode_badge.short_description = "Mode"
 
     def updated_at_date(self, obj):
@@ -223,7 +187,6 @@ class InventoryItemAdmin(ImportExportModelAdmin):
 
     @admin.action(description='Update product details from catalog')
     def update_from_catalog(self, request, queryset):
-        from apps.catalog.models import Product
         updated = 0
         for item in queryset:
             product = Product.objects.filter(sku=item.sku).first()
@@ -239,34 +202,20 @@ class InventoryItemAdmin(ImportExportModelAdmin):
 class InventoryTransactionAdmin(ImportExportModelAdmin):
     resource_class = InventoryTransactionResource
     list_display = (
-        'inventory_item_info',
-        'transaction_type_badge',
-        'quantity_display',
-        'reference',
-        'warehouse_name',
-        'created_at_date'
+        'inventory_item_info', 'transaction_type_badge', 'quantity_display', 
+        'reference', 'warehouse_name', 'created_at_date'
     )
     list_filter = (
-        'transaction_type',
-        'created_at',
-        'inventory_item__bin__rack__aisle__zone__warehouse'
+        'transaction_type', 'created_at', 'inventory_item__bin__rack__aisle__zone__warehouse'
     )
-    search_fields = (
-        'inventory_item__sku',
-        'inventory_item__product_name',
-        'reference'
-    )
+    search_fields = ('inventory_item__sku', 'inventory_item__product_name', 'reference')
     list_select_related = (
-        'inventory_item',
-        'inventory_item__bin',
-        'inventory_item__bin__rack',
-        'inventory_item__bin__rack__aisle',
-        'inventory_item__bin__rack__aisle__zone',
+        'inventory_item', 'inventory_item__bin', 'inventory_item__bin__rack', 
+        'inventory_item__bin__rack__aisle', 'inventory_item__bin__rack__aisle__zone', 
         'inventory_item__bin__rack__aisle__zone__warehouse'
     )
     raw_id_fields = ('inventory_item',)
     list_per_page = 25
-
     readonly_fields = ('created_at',)
 
     def inventory_item_info(self, obj):
@@ -275,37 +224,22 @@ class InventoryTransactionAdmin(ImportExportModelAdmin):
     inventory_item_info.admin_order_field = 'inventory_item__sku'
 
     def transaction_type_badge(self, obj):
-        colors = {
-            'add': '#28a745',
-            'reserve': '#ffc107',
-            'release': '#17a2b8',
-            'commit': '#007bff',
-            'adjust': '#dc3545',
-        }
+        colors = {'add': '#28a745', 'reserve': '#ffc107', 'release': '#17a2b8', 'commit': '#007bff', 'adjust': '#dc3545'}
         color = colors.get(obj.transaction_type, '#6c757d')
-        return format_html(
-            '<span style="background-color: {}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">{}</span>',
-            color,
-            obj.get_transaction_type_display()
-        )
+        return format_html('<span style="background-color: {}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">{}</span>', color, obj.get_transaction_type_display())
     transaction_type_badge.short_description = "Type"
 
     def quantity_display(self, obj):
-        if obj.quantity > 0:
-            return format_html('<span style="color: green;">+{}</span>', obj.quantity)
-        else:
-            return format_html('<span style="color: red;">{}</span>', obj.quantity)
+        if obj.quantity > 0: return format_html('<span style="color: green;">+{}</span>', obj.quantity)
+        else: return format_html('<span style="color: red;">{}</span>', obj.quantity)
     quantity_display.short_description = "Quantity"
-    quantity_display.admin_order_field = 'quantity'
 
     def warehouse_name(self, obj):
-        return obj.inventory_item.warehouse.name
+        return obj.inventory_item.bin.rack.aisle.zone.warehouse.name
     warehouse_name.short_description = "Warehouse"
-    warehouse_name.admin_order_field = 'inventory_item__bin__rack__aisle__zone__warehouse__name'
 
     def created_at_date(self, obj):
         if hasattr(obj, 'created_at') and obj.created_at:
             return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
         return "N/A"
     created_at_date.short_description = "Created"
-    created_at_date.admin_order_field = 'created_at'

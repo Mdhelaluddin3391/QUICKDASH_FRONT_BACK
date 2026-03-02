@@ -1,6 +1,7 @@
 import csv
 from django.http import HttpResponse
 from django.contrib import admin
+from import_export import resources
 from import_export.admin import ImportExportModelAdmin
 from .models import StoreSettings
 
@@ -36,8 +37,18 @@ export_as_csv.short_description = "Export Selected to CSV"
 
 admin.site.add_action(export_as_csv, "export_as_csv")
 
+
+# Naya Logic: Store settings strictly ek hi hoti hai aur uski ID humesha 1 hoti hai
+class StoreSettingsResource(resources.ModelResource):
+    class Meta:
+        model = StoreSettings
+        import_id_fields = ('id',) # Yeh ensure karega ki ID 1 hi update ho, naya na bane
+        fields = ('id', 'is_store_open', 'store_closed_message')
+
+
 @admin.register(StoreSettings)
 class StoreSettingsAdmin(ImportExportModelAdmin):
+    resource_class = StoreSettingsResource  # Resource class ko admin se connect kiya
     list_display = ['is_store_open', 'store_closed_message']
     
     def has_add_permission(self, request):

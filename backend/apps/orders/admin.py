@@ -4,19 +4,19 @@ from django.contrib.auth import get_user_model
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import localtime
-from import_export import resources, fields
+from import_export import resources, fields, widgets
 from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
 from django.db.models import Q, F
 
-from .models import Order, OrderItem, OrderConfiguration, OrderItemFulfillment
+from .models import Order, OrderItem, OrderConfiguration, OrderItemFulfillment, OrderAbuseLog
 from apps.catalog.models import Product
 from apps.warehouse.models import Warehouse
-from apps.delivery.tasks import retry_auto_assign_rider
-from apps.customers.models import CustomerAddress 
 from apps.inventory.models import InventoryItem
 
 User = get_user_model()
+
+# --- Resources for Export/Import ---
 
 class OrderResource(resources.ModelResource):
     user = fields.Field(
@@ -37,6 +37,8 @@ class OrderResource(resources.ModelResource):
 
     class Meta:
         model = Order
+        # NAYA LOGIC: Orders strictly ID par depend karenge kyunki custom order_number nahi hai
+        import_id_fields = ('id',)
         fields = (
             'id', 'user', 'fulfillment_warehouse', 'last_mile_warehouse', 
             'status', 'delivery_type', 'payment_method', 'total_amount', 
@@ -53,6 +55,8 @@ class OrderItemResource(resources.ModelResource):
 
     class Meta:
         model = OrderItem
+        # NAYA LOGIC: Items ko unki unique ID se pehchanna zaroori hai
+        import_id_fields = ('id',)
         fields = ('id', 'order', 'sku', 'product_name', 'quantity', 'price', 'status', 'cancel_reason')
         export_order = fields
 
@@ -70,12 +74,15 @@ class OrderItemFulfillmentResource(resources.ModelResource):
 
     class Meta:
         model = OrderItemFulfillment
+        # NAYA LOGIC: Fulfillment records bohot deep relations hain, ID mapping zaroori hai
+        import_id_fields = ('id',)
         fields = ('id', 'order_item', 'inventory_batch', 'quantity_allocated', 'vendor_payable_amount', 'created_at')
         export_order = fields
 
 class OrderConfigurationResource(resources.ModelResource):
     class Meta:
         model = OrderConfiguration
+        import_id_fields = ('id',) # Singleton pattern, humesha ID 1 rahegi
         fields = ('id', 'delivery_fee', 'free_delivery_threshold')
         export_order = fields
 

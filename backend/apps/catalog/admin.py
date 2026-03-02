@@ -36,13 +36,13 @@ class CategoryResource(resources.ModelResource):
 
     class Meta:
         model = Category
-        import_id_fields = ('name',)
+        import_id_fields = ('slug',)  # 'name' ki jagah 'slug' use kiya kyunki ye model mein strictly unique hai
         fields = ('id', 'name', 'slug', 'parent', 'icon', 'is_active')
 
 class BrandResource(resources.ModelResource):
     class Meta:
         model = Brand
-        import_id_fields = ('name',)
+        import_id_fields = ('slug',)  # 'name' ki jagah 'slug' safe rahega
         fields = ('id', 'name', 'slug', 'logo', 'is_active')
 
 class ProductResource(resources.ModelResource):
@@ -65,6 +65,7 @@ class ProductResource(resources.ModelResource):
 class BannerResource(resources.ModelResource):
     class Meta:
         model = Banner
+        import_id_fields = ('title',) # Naya Logic: Banner ko title se unique banaya
         fields = ('id', 'title', 'image', 'target_url', 'position', 'bg_gradient', 'is_active')
 
 class FlashSaleResource(resources.ModelResource):
@@ -76,6 +77,7 @@ class FlashSaleResource(resources.ModelResource):
 
     class Meta:
         model = FlashSale
+        import_id_fields = ('product',) # Naya Logic: Product se unique banaya kyunki yeh OneToOne field hai
         fields = ('id', 'product', 'discount_percentage', 'end_time', 'is_active')
 
 @admin.register(Product)

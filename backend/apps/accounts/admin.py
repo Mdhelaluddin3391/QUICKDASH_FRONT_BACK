@@ -46,6 +46,8 @@ class UserRoleResource(resources.ModelResource):
 
     class Meta:
         model = UserRole
+        # NAYA LOGIC YAHAN HAI: User aur Role dono ko mila kar unique banaya gaya hai
+        import_id_fields = ('user', 'role') 
         fields = ('id', 'user', 'role')
 
 
@@ -59,6 +61,7 @@ class AddressResource(resources.ModelResource):
 
     class Meta:
         model = Address
+        # Note: Address ke liye ID hi pehchan rahegi, isliye import_id_fields nahi add kiya
         fields = ('id', 'user', 'address_type', 'street_address', 'city', 'pincode', 'is_default', 'created_at')
 
 

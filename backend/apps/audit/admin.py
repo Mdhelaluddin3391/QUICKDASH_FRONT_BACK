@@ -19,7 +19,21 @@ class AuditLogResource(resources.ModelResource):
 
     class Meta:
         model = AuditLog
+        import_id_fields = ('id',)  # Isko strictly ID par rakha hai kyunki log records unique nahi hote
         fields = ('id', 'action', 'reference_id', 'user', 'metadata', 'created_at')
+
+    def save_instance(self, instance, is_create, row, **kwargs):
+        """
+        Naya Logic: Kyunki models.py mein 'self.pk' hone par RuntimeError aata hai,
+        CSV import karte waqt jab ID pehle se set hogi toh system crash ho sakta tha.
+        Isliye hum bulk_create ka use kar rahe hain jo model ke save() method ko bypass kar dega.
+        """
+        if is_create:
+            # Sirf naye (create) records ko force insert karenge
+            AuditLog.objects.bulk_create([instance])
+        else:
+            # Audit logs immutable hain, toh koi bhi update ko hum ignore kar denge
+            pass
 
 
 @admin.register(AuditLog)

@@ -21,6 +21,8 @@ class CustomerProfileResource(resources.ModelResource):
 
     class Meta:
         model = CustomerProfile
+        # NAYA LOGIC: OneToOne relation hai, toh User khud iski unique pehchan hai
+        import_id_fields = ('user',) 
         fields = ('id', 'user', 'created_at')
 
 class CustomerAddressResource(resources.ModelResource):
@@ -32,6 +34,8 @@ class CustomerAddressResource(resources.ModelResource):
 
     class Meta:
         model = CustomerAddress
+        # NAYA LOGIC: Multiple addresses ho sakte hain isliye ID fix kar di
+        import_id_fields = ('id',) 
         fields = (
             'id', 'customer', 'label', 'house_no', 'floor_no', 
             'apartment_name', 'landmark', 'city', 'pincode', 
@@ -54,6 +58,8 @@ class SupportTicketResource(resources.ModelResource):
 
     class Meta:
         model = SupportTicket
+        # NAYA LOGIC: Tickets multiple ho sakti hain, toh isme bhi ID fix kar di
+        import_id_fields = ('id',) 
         fields = ('id', 'user', 'order', 'issue_type', 'description', 'status', 'admin_response', 'created_at')
 
 class CustomerAddressInline(admin.StackedInline):
