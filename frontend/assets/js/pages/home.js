@@ -126,10 +126,15 @@ async function loadStorefront(lat, lng, city, isInitial = false) {
         if (res.serviceable === false) {
             feedContainer.innerHTML = `
                 <div class="text-center py-5">
-                    <img src="/assets/images/empty-store.png" style="width:120px; opacity:0.6; margin-bottom:15px;" onerror="this.style.display='none'">
-                    <h4>Not Serviceable Area</h4>
+                    <img src="/assets/images/empty-store.png" style="width:120px; opacity:0.8; margin-bottom:15px;" onerror="this.style.display='none'">
+                    
+                    <h4 style="color: #dc3545; font-weight: 600;">Not Serviceable Area</h4>
+                    
                     <p class="text-muted">We don't deliver to <strong>${city || 'this location'}</strong> yet.</p>
-                    <button class="btn btn-outline-primary mt-2" onclick="window.LocationPicker.open('SERVICE')">
+                    
+                    <button class="btn mt-2" 
+                            style="background-color: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; box-shadow: 0 4px 6px rgba(220, 53, 69, 0.2);" 
+                            onclick="window.LocationPicker.open('SERVICE')">
                         Change Location
                     </button>
                 </div>

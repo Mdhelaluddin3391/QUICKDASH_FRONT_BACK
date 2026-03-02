@@ -1,3 +1,0 @@
-http://localhost:3000  forntend 
-http://localhost:8000 backend and 
-http://localhost:8000/admin/
