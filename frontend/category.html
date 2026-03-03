@@ -124,47 +124,118 @@
     <script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
 
     <script defer>
-        (async () => {
-            const grid = document.getElementById('cat-grid');
-            try {
-                // CHANGE 1: ApiService ki jagah direct fetch use karein
-                // Isse agar user ka token expired bhi hai, tab bhi categories load hongi
-                const baseUrl = window.APP_CONFIG ? window.APP_CONFIG.API_BASE_URL : "http://localhost:5000/api/v1";
-                const response = await fetch(`${baseUrl}/catalog/categories/`);
+        let currentPage = 1;
+        let isLoading = false;
+        let hasNext = true;
 
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCategories(true);
+        });
+
+        // --- Infinite Scroll Setup ---
+        function setupCatScroll() {
+            const grid = document.getElementById('cat-grid');
+            const oldSentinel = document.getElementById('cat-sentinel');
+            if(oldSentinel) oldSentinel.remove();
+
+            const sentinel = document.createElement('div');
+            sentinel.id = 'cat-sentinel';
+            sentinel.style.width = '100%';
+            sentinel.style.height = '20px';
+            sentinel.style.marginBottom = '50px';
+            grid.after(sentinel);
+
+            const observer = new IntersectionObserver((entries) => {
+                if(entries[0].isIntersecting && !isLoading && hasNext) {
+                    currentPage++;
+                    loadCategories(false);
+                }
+            }, { rootMargin: '200px' });
+            
+            observer.observe(sentinel);
+        }
+
+        function insertLoader() {
+            let loader = document.getElementById('scroll-loader');
+            if(!loader) {
+                loader = document.createElement('div');
+                loader.id = 'scroll-loader';
+                loader.className = 'text-center py-3 w-100';
+                loader.innerHTML = '<div class="loader-spinner" style="width:30px; height:30px; margin:auto;"></div>';
+                document.getElementById('cat-grid').after(loader);
+            }
+        }
+
+        function removeLoader() {
+            const loader = document.getElementById('scroll-loader');
+            if(loader) loader.remove();
+        }
+
+        // --- Fetch & Render Function ---
+        async function loadCategories(reset = false) {
+            if(isLoading) return;
+            isLoading = true;
+            
+            const grid = document.getElementById('cat-grid');
+
+            if(reset) {
+                currentPage = 1;
+                hasNext = true;
+                grid.innerHTML = '<div class="loader-spinner"></div>';
+            } else {
+                insertLoader();
+            }
+
+            try {
+                // Direct Fetch Approach jaisa aapne change kiya tha
+                const baseUrl = window.APP_CONFIG ? window.APP_CONFIG.API_BASE_URL : "http://localhost:5000/api/v1";
+                const response = await fetch(`${baseUrl}/catalog/categories/?page=${currentPage}`);
+                
                 if (!response.ok) {
                     throw new Error(`API Error: ${response.status}`);
                 }
-
                 const res = await response.json();
 
-                // CHANGE 2: Response ko sahi tarah se handle karein (Array ya Paginated Result)
+                // Response array hai ya paginated result us hisab se check karna
                 const categories = Array.isArray(res) ? res : (res && res.results ? res.results : []);
+                hasNext = !Array.isArray(res) && !!res.next;
 
-                // CHANGE 3: 'parent' filter hata diya hai kyunki model mein parent field nahi hai
+                if(reset) grid.innerHTML = '';
 
-                if (categories.length === 0) {
+                if(categories.length === 0 && currentPage === 1) {
                     grid.innerHTML = '<p class="text-center w-100 text-muted">No categories found.</p>';
-                    return;
+                    hasNext = false;
+                } else {
+                    const html = categories.map(c => `
+                        <div class="cat-card-lg fade-in" onclick="window.location.href='./search_results.html?slug=${c.slug}'">
+                            <img src="${c.icon_url || 'https://via.placeholder.com/80'}" class="cat-icon-lg" alt="${c.name}" loading="lazy">
+                            <div class="cat-title-lg">${c.name}</div>
+                        </div>
+                    `).join('');
+                    grid.insertAdjacentHTML('beforeend', html);
                 }
-
-                // Render Logic
-                grid.innerHTML = categories.map(c => `
-                    <div class="cat-card-lg" onclick="window.location.href='./search_results.html?slug=${c.slug}'">
-                        <img src="${c.icon_url || 'https://via.placeholder.com/80'}" class="cat-icon-lg" alt="${c.name}">
-                        <div class="cat-title-lg">${c.name}</div>
-                    </div>
-                `).join('');
 
             } catch (e) {
                 console.error("Category Load Error:", e);
-                grid.innerHTML = `
-                    <div class="text-center w-100">
-                        <p class="text-danger mb-2">Failed to load categories</p>
-                        <button class="btn btn-sm btn-outline-primary" onclick="location.reload()">Retry</button>
-                    </div>`;
+                if(reset) {
+                    grid.innerHTML = `
+                        <div class="text-center w-100">
+                            <p class="text-danger mb-2">Failed to load categories</p>
+                            <button class="btn btn-sm btn-outline-primary" onclick="location.reload()">Retry</button>
+                        </div>`;
+                }
+            } finally {
+                isLoading = false;
+                if(!reset) removeLoader();
+                
+                if(reset && hasNext) {
+                    setupCatScroll();
+                }
+                
+                const s = document.getElementById('cat-sentinel');
+                if(s) s.style.display = hasNext ? 'block' : 'none';
             }
-        })();
+        }
     </script>
 </body>
 

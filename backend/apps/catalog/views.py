@@ -28,7 +28,8 @@ from apps.warehouse.models import Warehouse
 
 class SkuPagination(PageNumberPagination):
     page_size = 12
-
+class CategoryBrandPagination(PageNumberPagination):
+    page_size = 20
 
 
 
@@ -556,7 +557,7 @@ class BrandListAPIView(generics.ListAPIView):
     authentication_classes = [] 
     serializer_class = BrandSerializer
     queryset = Brand.objects.filter(is_active=True)
-    pagination_class = None
+    pagination_class = CategoryBrandPagination
 
 class FlashSaleListAPIView(APIView):
     permission_classes = [AllowAny]
@@ -572,7 +573,7 @@ class CategoryListAPIView(generics.ListAPIView):
     permission_classes = [AllowAny]
     authentication_classes = [] 
     serializer_class = SimpleCategorySerializer 
-    pagination_class = None
+    pagination_class = CategoryBrandPagination
     
     
     def get_queryset(self):
