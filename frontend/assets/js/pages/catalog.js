@@ -11,17 +11,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadBrandFilters();
     await loadSubCategories();
     
-    // 2. Infinite Scroll setup karein
-    setupInfiniteScroll();
-    
-    // 3. First Load trigger karein
+    // 2. First Load trigger karein (Infinite scroll setup ab data aane ke baad hoga)
     applyFilters(true);
-
-    
 });
 
-// --- 1. Infinite Scroll Setup ---
-// --- 1. Infinite Scroll Setup ---
+// --- 1. Infinite Scroll Setup (UPDATED) ---
 function setupInfiniteScroll() {
     const list = document.getElementById('product-list');
     if (!list) return;
@@ -34,14 +28,10 @@ function setupInfiniteScroll() {
     const sentinel = document.createElement('div');
     sentinel.id = 'catalog-sentinel';
     sentinel.style.width = '100%';
-    sentinel.style.padding = '20px 0';
-    sentinel.style.marginTop = '10px';
-    sentinel.style.textAlign = 'center';
+    sentinel.style.height = '20px';
+    sentinel.style.marginBottom = '50px'; // Niche thoda space
     
-    // Yahan spinner ko home.js jaisa properly style kiya gaya hai
-    sentinel.innerHTML = '<div class="loader-spinner d-none" style="width:30px; height:30px; margin:auto;"></div>';
-    
-    list.parentNode.insertBefore(sentinel, list.nextSibling);
+    list.after(sentinel);
 
     const observer = new IntersectionObserver((entries) => {
         // Jab list ka end screen par aane wala ho, aur loading na ho rahi ho, aur aage data bacha ho
@@ -49,13 +39,31 @@ function setupInfiniteScroll() {
             currentPage++;
             loadProducts(false); // Naya data append karega (bina page clear kiye)
         }
-    }, { rootMargin: '300px' }); // 300px pehle hi backend se data mangna shuru kar dega (smoothness ke liye)
+    }, { rootMargin: '300px' }); // 300px pehle hi backend se data mangna shuru kar dega
 
     observer.observe(sentinel);
 }
 
+// Bottom Scroll Loader Functions
+function insertSentinelLoader() {
+    let loader = document.getElementById('scroll-loader');
+    if(!loader) {
+        loader = document.createElement('div');
+        loader.id = 'scroll-loader';
+        loader.className = 'text-center py-3 w-100';
+        loader.innerHTML = '<div class="loader-spinner" style="width:30px; height:30px; margin:auto;"></div>';
+        
+        const list = document.getElementById('product-list');
+        list.after(loader);
+    }
+}
 
+function removeSentinelLoader() {
+    const loader = document.getElementById('scroll-loader');
+    if(loader) loader.remove();
+}
 
+// --- 2. Sub Categories Logic (NO CHANGES) ---
 async function loadSubCategories() {
     const params = new URLSearchParams(window.location.search);
     const currentSlug = params.get('slug');
@@ -64,7 +72,7 @@ async function loadSubCategories() {
     if (!currentSlug || !container) return;
 
     try {
-        // 🔥 FIX: Categories fetch ko LocalStorage Cache mein daala gaya hai (1 Hour Expiry)
+        // Categories fetch ko LocalStorage Cache mein daala gaya hai (1 Hour Expiry)
         const CACHE_KEY = 'all_categories_full_cache';
         let allCats = [];
         const cachedStr = localStorage.getItem(CACHE_KEY);
@@ -139,9 +147,7 @@ async function loadSubCategories() {
     }
 }
 
-
-
-// --- 2. Build URL & Apply Filters (FIXED LOGIC) ---
+// --- 3. Build URL & Apply Filters ---
 window.applyFilters = async (reset = true) => {
     // URL Params
     const params = new URLSearchParams(window.location.search);
@@ -158,7 +164,7 @@ window.applyFilters = async (reset = true) => {
     // Checkboxes se selected brands nikalein
     const selectedBrands = Array.from(document.querySelectorAll('input[name="brand"]:checked')).map(cb => cb.value);
 
-    // --- LOGIC FIX: Sab filters ko combine karna ---
+    // --- Sab filters ko combine karna ---
     let queryParams = [];
     let title = 'All Products';
 
@@ -202,30 +208,34 @@ window.applyFilters = async (reset = true) => {
 
     // Load Data
     await loadProducts(reset);
+    
+    // 🔥 DATA LOAD HONE KE BAAD OBSERVER LAGAYEIN
+    if (reset) {
+        setupInfiniteScroll();
+    }
 };
 
 // Global handlers
 window.applySort = () => applyFilters(true);
 window.applyBrandFilter = () => applyFilters(true); // Checkbox click par ye call hoga
 
-// --- 3. Core Loading Logic ---
+// --- 4. Core Loading Logic (UPDATED) ---
 async function loadProducts(reset = false) {
     if (isLoading) return;
     
     isLoading = true;
     const list = document.getElementById('product-list');
-    const sentinelLoader = document.querySelector('#catalog-sentinel .loader-spinner');
     const emptyState = document.getElementById('empty-state');
     const countLabel = document.getElementById('result-count');
 
     if (reset) {
         currentPage = 1;
         hasNext = true;
-        list.innerHTML = '';
         list.innerHTML = '<div class="loader-spinner main-loader"></div>';
         if (emptyState) emptyState.classList.add('d-none');
     } else {
-        if (sentinelLoader) sentinelLoader.classList.remove('d-none');
+        // Niche scroll karte waqt spinner dikhana
+        insertSentinelLoader();
     }
 
     try {
@@ -261,7 +271,9 @@ async function loadProducts(reset = false) {
         }
     } finally {
         isLoading = false;
-        if (sentinelLoader) sentinelLoader.classList.add('d-none');
+        
+        // Data aane ke baad bottom spinner remove karein
+        if (!reset) removeSentinelLoader();
         
         const s = document.getElementById('catalog-sentinel');
         if (s) s.style.display = hasNext ? 'block' : 'none';
@@ -284,13 +296,11 @@ function renderProductCards(products, container) {
         let deliveryBadge = '';
         if (p.delivery_eta) {
             let badgeClass = p.delivery_type === 'dark_store' ? 'badge-instant' : 'badge-mega';
-// icon wali line yahan se hata di gayi hai
-deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:8px; right:8px; color:white; padding:3px 6px; border-radius:6px; font-size:0.65rem; font-weight:bold; z-index:2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${p.delivery_eta}</div>`; 
-// Upar HTML mein se ${icon} ko bhi hata diya gaya hai
+            deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:8px; right:8px; color:white; padding:3px 6px; border-radius:6px; font-size:0.65rem; font-weight:bold; z-index:2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${p.delivery_eta}</div>`; 
         }
 
         return `
-        <div class="card product-card">
+        <div class="card product-card fade-in">
             ${discountBadge}
             ${deliveryBadge}
             <a href="./product.html?code=${p.sku}" style="text-decoration:none; color:inherit;">
@@ -319,9 +329,8 @@ deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:8px; r
 // --- 5. Helper Functions ---
 
 async function loadBrandFilters() {
-    // Duplicate check remove kar diya hai taaki reload hone par bhi sahi chale
     const container = document.getElementById('brand-filter-container');
-    if (!container) return; // Agar sidebar html mein nahi hai to return
+    if (!container) return; 
 
     try {
         const res = await ApiService.get('/catalog/brands/');
