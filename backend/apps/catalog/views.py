@@ -24,13 +24,11 @@ from django.contrib.gis.geos import Point
 from apps.warehouse.models import Warehouse
 
 
-
-
 class SkuPagination(PageNumberPagination):
     page_size = 12
+
 class CategoryBrandPagination(PageNumberPagination):
     page_size = 20
-
 
 
 class NavbarCategoryAPIView(APIView):
@@ -62,6 +60,7 @@ class HomeCategoryAPIView(APIView):
 
         serializer = HomeCategorySerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
+
 
 class SkuListAPIView(generics.ListAPIView):
     """
@@ -197,13 +196,13 @@ class SkuListAPIView(generics.ListAPIView):
                 if exp_stock > 0:
                     item['available_stock'] = exp_stock
                     item['delivery_type'] = 'dark_store'
-                    item['delivery_eta'] = '10 Mins'
+                    item['delivery_eta'] = item.get('estimated_delivery', '10 Mins') # UPDATED HERE
                     item['sale_price'] = sku_info['sale_price']
                     item['has_more_in_mega'] = std_stock > 0 # Frontend me tag lagane ke liye (ex: "+ More in 1-2 Days")
                 elif std_stock > 0:
                     item['available_stock'] = std_stock
                     item['delivery_type'] = 'mega'
-                    item['delivery_eta'] = '1-2 Days'
+                    item['delivery_eta'] = item.get('estimated_delivery', '1-2 Days') # UPDATED HERE
                     item['sale_price'] = sku_info['sale_price']
                     item['has_more_in_mega'] = False
                 else:
@@ -215,6 +214,7 @@ class SkuListAPIView(generics.ListAPIView):
                 item['available_stock'] = 0
                 item['delivery_eta'] = 'Unavailable'
                 item['has_more_in_mega'] = False
+
 
 class SkuDetailAPIView(generics.RetrieveAPIView):
     """
@@ -232,8 +232,6 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
     def get_object(self):
         lookup_val = self.kwargs.get('id')
         queryset = self.get_queryset()
-        
-    
         
         obj = None
         
@@ -287,12 +285,12 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
         if express_stock > 0:
             data['available_stock'] = express_stock
             data['delivery_type'] = 'dark_store'
-            data['delivery_eta'] = '10 Mins'
+            data['delivery_eta'] = data.get('estimated_delivery', '10 Mins') # UPDATED HERE
             data['has_more_in_mega'] = standard_stock > 0
         elif standard_stock > 0:
             data['available_stock'] = standard_stock
             data['delivery_type'] = 'mega'
-            data['delivery_eta'] = '1-2 Days'
+            data['delivery_eta'] = data.get('estimated_delivery', '1-2 Days') # UPDATED HERE
             data['has_more_in_mega'] = False
         else:
             data['available_stock'] = 0
@@ -305,6 +303,7 @@ class SkuDetailAPIView(generics.RetrieveAPIView):
             data['effective_price'] = sale_price
 
         return Response(data)
+
 
 class StorefrontCatalogAPIView(APIView):
     """
@@ -404,12 +403,12 @@ class StorefrontCatalogAPIView(APIView):
                     if exp_stock > 0:
                         p['available_stock'] = exp_stock
                         p['delivery_type'] = 'dark_store'
-                        p['delivery_eta'] = '10 Mins'
+                        p['delivery_eta'] = p.get('estimated_delivery', '10 Mins') # UPDATED HERE
                         p['has_more_in_mega'] = std_stock > 0
                     elif std_stock > 0:
                         p['available_stock'] = std_stock
                         p['delivery_type'] = 'mega'
-                        p['delivery_eta'] = '1-2 Days'
+                        p['delivery_eta'] = p.get('estimated_delivery', '1-2 Days') # UPDATED HERE
                         p['has_more_in_mega'] = False
                     else:
                         p['available_stock'] = 0
@@ -434,6 +433,7 @@ class StorefrontCatalogAPIView(APIView):
             "categories": feed,
             "has_next": page_obj.has_next()
         })
+
 
 class GlobalSearchAPIView(APIView):
     permission_classes = [AllowAny]
@@ -480,6 +480,7 @@ class GlobalSearchAPIView(APIView):
 
         products = products[:40]
         return Response(ProductSerializer(products, many=True, context={'request': request}).data)
+
 
 class SearchSuggestAPIView(APIView):
     permission_classes = [AllowAny]
@@ -544,6 +545,7 @@ class SearchSuggestAPIView(APIView):
             })
             
         return Response(data)
+
 
 class BannerListAPIView(generics.ListAPIView):
     permission_classes = [AllowAny]
