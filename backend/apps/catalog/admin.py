@@ -1,14 +1,8 @@
-import csv
-import io
 import requests
-from django.shortcuts import render, redirect
-from django.urls import path
 from django.contrib import admin
-from django.contrib import messages
 from django.utils.html import format_html
 from django.utils.timezone import localtime
-from django.db import transaction
-from django.db.models import Sum, F, Value, CharField, Case, When
+from django.db.models import F, Value, CharField, Case, When
 from django.db.models.functions import Concat
 
 from import_export import resources, fields, widgets
@@ -36,13 +30,13 @@ class CategoryResource(resources.ModelResource):
 
     class Meta:
         model = Category
-        import_id_fields = ('slug',)  # 'name' ki jagah 'slug' use kiya kyunki ye model mein strictly unique hai
+        import_id_fields = ('slug',) 
         fields = ('id', 'name', 'slug', 'parent', 'icon', 'is_active')
 
 class BrandResource(resources.ModelResource):
     class Meta:
         model = Brand
-        import_id_fields = ('slug',)  # 'name' ki jagah 'slug' safe rahega
+        import_id_fields = ('slug',) 
         fields = ('id', 'name', 'slug', 'logo', 'is_active')
 
 class ProductResource(resources.ModelResource):
@@ -60,12 +54,60 @@ class ProductResource(resources.ModelResource):
     class Meta:
         model = Product
         import_id_fields = ('sku',) 
-        fields = ('id', 'name', 'sku', 'description', 'unit', 'mrp', 'image', 'is_active', 'category', 'brand', 'created_at')
+        fields = ('id', 'name', 'sku', 'description', 'unit', 'mrp', 'image', 'is_active', 'category', 'brand')
+
+    def before_import_row(self, row, **kwargs):
+        """
+        SMART IMPORT LOGIC: Naya system jo missing data ko API se fetch karega 
+        aur Brand/Category ko auto-create karega bina code tode.
+        """
+        sku_val = str(row.get('sku', '')).strip()
+        name_val = str(row.get('name', '')).strip()
+        brand_name = str(row.get('brand', '')).strip()
+        category_name = str(row.get('category', '')).strip()
+
+        # 1. API Fallback for missing names
+        if sku_val and not name_val:
+            try:
+                resp = requests.get(f"https://world.openfoodfacts.org/api/v0/product/{sku_val}.json", timeout=3)
+                data = resp.json()
+                if data.get('status') == 1:
+                    product_data = data.get('product', {})
+                    name_val = product_data.get('product_name', '')
+                    if not row.get('image'): row['image'] = product_data.get('image_front_url', '')
+                    if not row.get('description'): row['description'] = product_data.get('ingredients_text', '')
+                    if not brand_name and product_data.get('brands'):
+                        brand_name = product_data.get('brands').split(',')[0].strip()
+                    if not category_name and product_data.get('categories'):
+                        category_name = product_data.get('categories').split(',')[0].strip()
+            except Exception:
+                pass 
+
+        row['name'] = name_val if name_val else f"Unknown Product (SKU: {sku_val})"
+        category_name = category_name if category_name else "Uncategorized"
+
+        # 2. Auto-Create Category dynamically
+        cat_slug = category_name.lower().strip().replace(" ", "-")
+        Category.objects.get_or_create(slug=cat_slug, defaults={'name': category_name, 'is_active': True})
+        row['category'] = cat_slug 
+
+        # 3. Auto-Create Brand dynamically
+        if brand_name:
+            brand_slug = brand_name.lower().strip().replace(" ", "-")
+            Brand.objects.get_or_create(slug=brand_slug, defaults={'name': brand_name, 'is_active': True})
+            row['brand'] = brand_slug
+        else:
+            row['brand'] = None
+        
+        # Ensure numerical safety
+        if not row.get('mrp'): row['mrp'] = 0.00
+        if not row.get('unit'): row['unit'] = '1 Unit'
+
 
 class BannerResource(resources.ModelResource):
     class Meta:
         model = Banner
-        import_id_fields = ('title',) # Naya Logic: Banner ko title se unique banaya
+        import_id_fields = ('title',)
         fields = ('id', 'title', 'image', 'target_url', 'position', 'bg_gradient', 'is_active')
 
 class FlashSaleResource(resources.ModelResource):
@@ -77,35 +119,50 @@ class FlashSaleResource(resources.ModelResource):
 
     class Meta:
         model = FlashSale
-        import_id_fields = ('product',) # Naya Logic: Product se unique banaya kyunki yeh OneToOne field hai
+        import_id_fields = ('product',) 
         fields = ('id', 'product', 'discount_percentage', 'end_time', 'is_active')
 
 @admin.register(Product)
 class ProductAdmin(ImportExportModelAdmin):
     resource_class = ProductResource
-    change_list_template = "admin/catalog/product/change_list.html"
+    
+    # Optional: Keep custom templates only if needed for extra buttons, otherwise native is fine
+    # change_list_template = "admin/catalog/product/change_list.html"
 
     list_display = (
-        'name', 'sku', 'image_preview', 'image', 'category',
-        'mrp', 'stock_status', 'is_active', 'created_at_date'
+        'name', 'sku', 'image_preview', 'category',
+        'mrp', 'is_active', 'created_at_date'
     )
-    list_filter = ('is_active', 'category', 'brand', 'created_at')
+    list_filter = ('is_active', 'category', 'brand')
     search_fields = ('name', 'sku', 'description', 'category__name', 'brand__name')
     list_select_related = ('category', 'brand')
     raw_id_fields = ('brand',)
     
-    list_editable = ('mrp', 'is_active', 'image', 'category')
+    list_editable = ('mrp', 'is_active')
     list_per_page = 25
-    actions = ['activate_products', 'deactivate_products', 'mark_featured', 'unmark_featured']
+    actions = ['activate_products', 'deactivate_products']
     
     ordering = ['name']
 
+    # UPGRADED: Professional Section-Based Form Layout
     fieldsets = (
-        ('Basic Information', {'fields': ('name', 'sku', 'description', 'unit')}),
-        ('Shop by Store', {'fields': ('category', 'brand')}),
-        ('Pricing & Inventory', {'fields': ('mrp', 'is_active')}),
-        ('Media', {'fields': ('image', 'image_preview'), 'classes': ('collapse',)}),
-        ('Timestamps', {'fields': ('created_at',), 'classes': ('collapse',)}),
+        ('Basic Details', {
+            'fields': ('name', 'sku', 'description', 'unit', 'is_active')
+        }),
+        ('Categorization', {
+            'fields': ('category', 'brand')
+        }),
+        ('Pricing', {
+            'fields': ('mrp',)
+        }),
+        ('Media & Display', {
+            'fields': ('image', 'image_preview'),
+            'classes': ('collapse',)
+        }),
+        ('Timestamps', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
     )
 
     readonly_fields = ('created_at', 'image_preview')
@@ -123,165 +180,29 @@ class ProductAdmin(ImportExportModelAdmin):
             kwargs["queryset"] = Brand.objects.order_by('name')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
-    def get_urls(self):
-        urls = super().get_urls()
-        new_urls = [path('import-csv/', self.import_csv)]
-        return new_urls + urls
-
-    def import_csv(self, request):
-        if request.method == "POST":
-            csv_file = request.FILES["csv_file"]
-            
-            if not csv_file.name.endswith('.csv'):
-                messages.warning(request, 'The wrong file type was uploaded. Please upload a CSV file.')
-                return redirect("..")
-            
-            file_data = csv_file.read().decode("utf-8")
-            csv_data = io.StringIO(file_data)
-            reader = csv.DictReader(csv_data)
-            
-            processed_data = []
-            
-            for row in reader:
-                sku_val = row.get('sku', '').strip()
-                if not sku_val: continue 
-                
-                name_val = row.get('name', '').strip()
-                brand_name = row.get('brand', '').strip()
-                category_name = row.get('category', '').strip()
-                image_val = row.get('image', '').strip()
-                desc_val = row.get('description', '').strip()
-                mrp_val = row.get('mrp', 0.00)
-                unit_val = row.get('unit', '1 Unit')
-                is_active_val = str(row.get('is_active', 'TRUE')).strip().upper() == 'TRUE'
-
-                if not name_val:
-                    api_url = f"https://world.openfoodfacts.org/api/v0/product/{sku_val}.json"
-                    try:
-                        response = requests.get(api_url, timeout=5)
-                        data = response.json()
-                        
-                        if data.get('status') == 1:
-                            product_data = data.get('product', {})
-                            name_val = product_data.get('product_name', '')
-                            image_val = product_data.get('image_front_url', '')
-                            desc_val = product_data.get('ingredients_text', '') 
-                            
-                            if not brand_name and product_data.get('brands'):
-                                brand_name = product_data.get('brands').split(',')[0].strip()
-                                
-                            if not category_name and product_data.get('categories'):
-                                category_name = product_data.get('categories').split(',')[0].strip()
-                    except Exception:
-                        pass 
-
-                if not name_val: name_val = f"Unknown Product (SKU: {sku_val})"
-                if not category_name: category_name = "Uncategorized"
-
-                processed_data.append({
-                    'sku': sku_val,
-                    'name': name_val,
-                    'brand': brand_name,
-                    'category': category_name,
-                    'image': image_val,
-                    'description': desc_val,
-                    'mrp': mrp_val,
-                    'unit': unit_val,
-                    'is_active': is_active_val
-                })
-            
-            count = 0
-            try:
-                with transaction.atomic():
-                    for item in processed_data:
-                        
-                        # LOGIC UPDATE: Ab slug se dhundhega, agar mil gai toh usko hi use karega, 
-                        # nahi mili toh us slug aur name ke sath nayi auto-create kar dega.
-                        cat_slug = item['category'].lower().strip().replace(" ", "-")
-                        category_obj, _ = Category.objects.get_or_create(
-                            slug=cat_slug,
-                            defaults={'name': item['category']}
-                        )
-
-                        # Brand ke liye bhi same logic auto-create with safe slug
-                        brand_obj = None
-                        if item['brand']:
-                            brand_slug = item['brand'].lower().strip().replace(" ", "-")
-                            brand_obj, _ = Brand.objects.get_or_create(
-                                slug=brand_slug, 
-                                defaults={'name': item['brand']}
-                            )
-
-                        Product.objects.update_or_create(
-                            sku=item['sku'],
-                            defaults={
-                                'name': item['name'], 'description': item['description'], 'unit': item['unit'],
-                                'image': item['image'], 'mrp': item['mrp'], 'is_active': item['is_active'],
-                                'category': category_obj, 'brand': brand_obj,
-                            }
-                        )
-                        count += 1
-
-                self.message_user(request, f"{count} products imported successfully.")
-            except Exception as e:
-                messages.error(request, f"Import failed and was rolled back! Error: {e}")
-                
-            return redirect("..")
-            
-        return render(request, "admin/csv_form.html", {"form": {}})
-
     def image_preview(self, obj):
         if obj.image:
             return format_html('<img src="{}" style="max-height: 50px; max-width: 50px; border-radius: 5px; object-fit: cover;" />', obj.image)
         return format_html('<span style="color: gray;">No Image</span>')
     image_preview.short_description = "Preview"
 
-    def mrp_display(self, obj):
-        return f"₹{obj.mrp:.2f}"
-    mrp_display.short_description = "MRP"
-    mrp_display.admin_order_field = 'mrp'
-
-    def stock_status(self, obj):
-        from apps.inventory.models import InventoryItem
-        stock_data = InventoryItem.objects.filter(sku=obj.sku).aggregate(
-            t_stock=Sum('total_stock'), r_stock=Sum('reserved_stock')
-        )
-        
-        t_stock = stock_data['t_stock'] or 0
-        r_stock = stock_data['r_stock'] or 0
-        available_stock = t_stock - r_stock
-
-        if available_stock > 10:
-            return format_html('<span style="color: green;">{} in stock</span>', available_stock)
-        elif available_stock > 0:
-            return format_html('<span style="color: orange;">{} low stock</span>', available_stock)
-        else:
-            return format_html('<span style="color: red;">Out of stock</span>')
-    stock_status.short_description = "Stock Status"
-
-    def is_active_badge(self, obj):
-        if obj.is_active: return format_html('<span style="color: green; font-weight: bold;">✓ Active</span>')
-        else: return format_html('<span style="color: red; font-weight: bold;">✗ Inactive</span>')
-    is_active_badge.short_description = "Status"
-
     def created_at_date(self, obj):
         if hasattr(obj, 'created_at') and obj.created_at:
             return localtime(obj.created_at).strftime('%d/%m/%Y')
         return "N/A"
     created_at_date.short_description = "Created"
-    created_at_date.admin_order_field = 'created_at'
+
 
 @admin.register(Category)
 class CategoryAdmin(ImportExportModelAdmin):
     resource_class = CategoryResource
-    list_display = ('name', 'icon_preview', 'icon', 'parent_name', 'view_subcategories', 'sort_order', 'is_active', 'product_count')
+    list_display = ('name', 'icon_preview', 'parent_name', 'view_subcategories', 'sort_order', 'is_active')
     list_filter = ('is_active', 'parent')
     search_fields = ('name', 'parent__name')
     list_select_related = ('parent',)
     raw_id_fields = ('parent',)
-    list_editable = ('is_active', 'sort_order', 'icon') 
+    list_editable = ('is_active', 'sort_order') 
     list_per_page = 100 
-    actions = ['activate_categories', 'deactivate_categories']
     
     ordering = ['sort_order', 'name']
 
@@ -293,12 +214,6 @@ class CategoryAdmin(ImportExportModelAdmin):
 
     prepopulated_fields = {'slug': ('name',)}
     readonly_fields = ('icon_preview',)
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if not request.GET.get('q') and not request.GET.get('parent__id__exact'):
-            qs = qs.filter(parent__isnull=True)
-        return qs
 
     def view_subcategories(self, obj):
         count = obj.subcategories.count()
@@ -317,22 +232,16 @@ class CategoryAdmin(ImportExportModelAdmin):
     def parent_name(self, obj):
         return obj.parent.name if obj.parent else "Root"
     parent_name.short_description = "Parent"
-    parent_name.admin_order_field = 'parent__name'
 
-    def product_count(self, obj):
-        return obj.products.count()
-    product_count.short_description = "Products"
 
 @admin.register(Brand)
 class BrandAdmin(ImportExportModelAdmin):
     resource_class = BrandResource
-    list_display = ('name', 'logo_preview', 'logo', 'is_active', 'product_count')
+    list_display = ('name', 'logo_preview', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('name',)
-    
-    list_editable = ('is_active', 'logo') 
+    list_editable = ('is_active',) 
     list_per_page = 100 
-    
     ordering = ['name']
 
     fieldsets = (
@@ -350,9 +259,6 @@ class BrandAdmin(ImportExportModelAdmin):
         return "-"
     logo_preview.short_description = "Logo"
 
-    def product_count(self, obj):
-        return obj.products.count()
-    product_count.short_description = "Products"
 
 @admin.register(Banner)
 class BannerAdmin(ImportExportModelAdmin):
@@ -367,14 +273,13 @@ class BannerAdmin(ImportExportModelAdmin):
         ('Content', {'fields': ('title', 'image', 'image_preview', 'target_url')}),
         ('Display Settings', {'fields': ('position', 'bg_gradient', 'is_active')}),
     )
-
     readonly_fields = ('image_preview',)
 
     def image_preview(self, obj):
         if obj.image:
             return format_html('<img src="{}" style="max-height: 60px; max-width: 120px; border-radius: 5px; object-fit: cover;" />', obj.image)
         return "-"
-    image_preview.short_description = "Banner Preview"
+    image_preview.short_description = "Preview"
 
 @admin.register(FlashSale)
 class FlashSaleAdmin(ImportExportModelAdmin):
@@ -387,14 +292,9 @@ class FlashSaleAdmin(ImportExportModelAdmin):
     list_editable = ('is_active',)
     list_per_page = 25
 
-    fieldsets = (
-        ('Sale Details', {'fields': ('product', 'discount_percentage', 'end_time', 'is_active')}),
-    )
-
     def product_name(self, obj):
         return obj.product.name
     product_name.short_description = "Product"
-    product_name.admin_order_field = 'product__name'
 
     def discount_percentage_display(self, obj):
         return f"{obj.discount_percentage}% OFF"

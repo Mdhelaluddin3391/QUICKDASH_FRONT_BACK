@@ -6,6 +6,8 @@ from django.http import JsonResponse
 from django.core.cache import cache
 from django.contrib.gis.geos import Point
 from django.conf import settings
+from django.shortcuts import redirect
+from django.urls import reverse
 
 logger = logging.getLogger(__name__)
 
@@ -127,3 +129,34 @@ class LocationContextMiddleware(MiddlewareMixin):
                 return fallback
         
         return None
+
+class AdminWarehouseRequirementMiddleware:
+    """
+    Enterprise Security: Forces admin staff to select a working warehouse.
+    If an admin accesses the dashboard without a selected warehouse in their session,
+    they are intercepted and redirected to the Warehouse Selection screen.
+    """
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        path = request.path_info
+        
+        # Check if it's an admin request and user is authenticated as staff
+        if path.startswith('/admin/') and request.user.is_authenticated and request.user.is_staff:
+            
+            # Ignore auth paths and auxiliary paths so we don't get stuck in a redirect loop
+            if any(x in path for x in ['/login/', '/logout/', '/password_change/', '/jsi18n/']):
+                return self.get_response(request)
+            
+            # If the session doesn't have a selected warehouse, enforce selection
+            if not request.session.get('selected_warehouse_id'):
+                try:
+                    select_url = reverse('admin_select_warehouse')
+                    # If they are not already on the selection or set URL, redirect them
+                    if path != select_url and 'admin-set-warehouse' not in path:
+                        return redirect('admin_select_warehouse')
+                except Exception as e:
+                    logger.error(f"Middleware Error Reversing Warehouse URL: {e}")
+
+        return self.get_response(request)

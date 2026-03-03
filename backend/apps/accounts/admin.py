@@ -4,8 +4,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
-from import_export import resources, fields, widgets
-from import_export.admin import ImportExportModelAdmin, ImportExportMixin
+
 from .models import User, UserRole, Address
 
 class CustomUserCreationForm(forms.ModelForm):
@@ -29,45 +28,8 @@ class UserRoleInline(admin.TabularInline):
     show_change_link = False
 
 
-class UserResource(resources.ModelResource):
-    class Meta:
-        model = User
-        import_id_fields = ('phone',)  # Phone ko unique identifier banaya hai
-        fields = ('id', 'phone', 'first_name', 'last_name', 'email', 'is_active', 'is_staff', 'is_superuser', 'created_at')
-
-
-class UserRoleResource(resources.ModelResource):
-    # ForeignKey linking with phone
-    user = fields.Field(
-        column_name='user',
-        attribute='user',
-        widget=widgets.ForeignKeyWidget(User, 'phone')
-    )
-
-    class Meta:
-        model = UserRole
-        # NAYA LOGIC YAHAN HAI: User aur Role dono ko mila kar unique banaya gaya hai
-        import_id_fields = ('user', 'role') 
-        fields = ('id', 'user', 'role')
-
-
-class AddressResource(resources.ModelResource):
-    # ForeignKey linking with phone
-    user = fields.Field(
-        column_name='user',
-        attribute='user',
-        widget=widgets.ForeignKeyWidget(User, 'phone')
-    )
-
-    class Meta:
-        model = Address
-        # Note: Address ke liye ID hi pehchan rahegi, isliye import_id_fields nahi add kiya
-        fields = ('id', 'user', 'address_type', 'street_address', 'city', 'pincode', 'is_default', 'created_at')
-
-
 @admin.register(User)
-class CustomUserAdmin(ImportExportMixin, UserAdmin):
-    resource_class = UserResource
+class CustomUserAdmin(UserAdmin):
     add_form = CustomUserCreationForm
 
     list_display = (
@@ -186,8 +148,7 @@ class CustomUserAdmin(ImportExportMixin, UserAdmin):
 
 
 @admin.register(UserRole)
-class UserRoleAdmin(ImportExportModelAdmin):
-    resource_class = UserRoleResource
+class UserRoleAdmin(admin.ModelAdmin):
     list_display = ('user_phone', 'user_name', 'role_badge')
     list_filter = ('role',)
     search_fields = ('user__phone', 'user__first_name', 'user__last_name')
@@ -228,8 +189,7 @@ class UserRoleAdmin(ImportExportModelAdmin):
 
 
 @admin.register(Address)
-class AddressAdmin(ImportExportModelAdmin):
-    resource_class = AddressResource
+class AddressAdmin(admin.ModelAdmin):
     list_display = ('user_phone', 'address_type', 'city', 'pincode', 'is_default_badge', 'created_at_date')
     list_filter = ('address_type', 'city', 'is_default', 'created_at')
     search_fields = ('user__phone', 'street_address', 'city', 'pincode')

@@ -3,42 +3,14 @@ from django.contrib.auth import get_user_model
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
-from import_export import resources, fields, widgets
-from import_export.admin import ImportExportModelAdmin
+
 from .models import AuditLog
 
 User = get_user_model()
 
-class AuditLogResource(resources.ModelResource):
-    # ForeignKey linking with phone
-    user = fields.Field(
-        column_name='user',
-        attribute='user',
-        widget=widgets.ForeignKeyWidget(User, 'phone')
-    )
-
-    class Meta:
-        model = AuditLog
-        import_id_fields = ('id',)  # Isko strictly ID par rakha hai kyunki log records unique nahi hote
-        fields = ('id', 'action', 'reference_id', 'user', 'metadata', 'created_at')
-
-    def save_instance(self, instance, is_create, row, **kwargs):
-        """
-        Naya Logic: Kyunki models.py mein 'self.pk' hone par RuntimeError aata hai,
-        CSV import karte waqt jab ID pehle se set hogi toh system crash ho sakta tha.
-        Isliye hum bulk_create ka use kar rahe hain jo model ke save() method ko bypass kar dega.
-        """
-        if is_create:
-            # Sirf naye (create) records ko force insert karenge
-            AuditLog.objects.bulk_create([instance])
-        else:
-            # Audit logs immutable hain, toh koi bhi update ko hum ignore kar denge
-            pass
-
 
 @admin.register(AuditLog)
-class AuditLogAdmin(ImportExportModelAdmin):
-    resource_class = AuditLogResource
+class AuditLogAdmin(admin.ModelAdmin):
     list_display = (
         'action_badge',
         'reference_id',

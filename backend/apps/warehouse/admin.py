@@ -11,126 +11,62 @@ from .models import Warehouse, PickingTask, PackingTask, StorageZone, Aisle, Rac
 from apps.orders.models import Order
 from apps.inventory.models import InventoryItem
 
+
 class WarehouseResource(resources.ModelResource):
     class Meta:
         model = Warehouse
         import_id_fields = ('id',)
-        fields = (
-            'id', 
-            'name', 
-            'code', 
-            'warehouse_type', 
-            'city', 
-            'state', 
-            'location', 
-            'delivery_zone', 
-            'is_active', 
-            'created_at'
-        )
-        export_order = fields
-
+        fields = ('id', 'name', 'code', 'warehouse_type', 'city', 'state', 'location', 'delivery_zone', 'is_active', 'created_at')
 
 class PickingTaskResource(resources.ModelResource):
-    order = fields.Field(
-        column_name='order_id',
-        attribute='order',
-        widget=ForeignKeyWidget(Order, 'id')
-    )
-    # FIX: target_bin renamed to target_inventory_batch to match model
-    target_inventory_batch = fields.Field(
-        column_name='target_batch_id',
-        attribute='target_inventory_batch',
-        widget=ForeignKeyWidget(InventoryItem, 'id')
-    )
-    picker = fields.Field(
-        column_name='picker_phone',
-        attribute='picker',
-        widget=ForeignKeyWidget(PickingTask._meta.get_field('picker').related_model, 'phone')
-    )
-
+    order = fields.Field(column_name='order_id', attribute='order', widget=ForeignKeyWidget(Order, 'id'))
+    target_inventory_batch = fields.Field(column_name='target_batch_id', attribute='target_inventory_batch', widget=ForeignKeyWidget(InventoryItem, 'id'))
+    
     class Meta:
         model = PickingTask
         fields = ('id', 'order', 'item_sku', 'quantity_to_pick', 'picker', 'target_inventory_batch', 'status', 'picked_at')
-        export_order = fields
-
 
 class PackingTaskResource(resources.ModelResource):
-    order = fields.Field(
-        column_name='order_id',
-        attribute='order',
-        widget=ForeignKeyWidget(Order, 'id')
-    )
-    packer = fields.Field(
-        column_name='packer_phone',
-        attribute='packer',
-        widget=ForeignKeyWidget(PackingTask._meta.get_field('packer').related_model, 'phone')
-    )
-
+    order = fields.Field(column_name='order_id', attribute='order', widget=ForeignKeyWidget(Order, 'id'))
+    
     class Meta:
         model = PackingTask
         fields = ('id', 'order', 'packer', 'is_completed', 'created_at')
-        export_order = fields
-
 
 class StorageZoneResource(resources.ModelResource):
-    warehouse = fields.Field(
-        column_name='warehouse_name',
-        attribute='warehouse',
-        widget=ForeignKeyWidget(Warehouse, 'code')
-    )
-
+    warehouse = fields.Field(column_name='warehouse_name', attribute='warehouse', widget=ForeignKeyWidget(Warehouse, 'code'))
     class Meta:
         model = StorageZone
         fields = ('id', 'warehouse', 'name')
-        export_order = fields
-
 
 class AisleResource(resources.ModelResource):
-    zone = fields.Field(
-        column_name='zone_name',
-        attribute='zone',
-        widget=ForeignKeyWidget(StorageZone, 'name')
-    )
-
+    zone = fields.Field(column_name='zone_name', attribute='zone', widget=ForeignKeyWidget(StorageZone, 'name'))
     class Meta:
         model = Aisle
         fields = ('id', 'zone', 'number')
-        export_order = fields
-
 
 class RackResource(resources.ModelResource):
-    aisle = fields.Field(
-        column_name='aisle_id',
-        attribute='aisle',
-        widget=ForeignKeyWidget(Aisle, 'id')
-    )
-
+    aisle = fields.Field(column_name='aisle_id', attribute='aisle', widget=ForeignKeyWidget(Aisle, 'id'))
     class Meta:
         model = Rack
         fields = ('id', 'aisle', 'number')
-        export_order = fields
-
 
 class BinResource(resources.ModelResource):
-    rack = fields.Field(
-        column_name='rack_id',
-        attribute='rack',
-        widget=ForeignKeyWidget(Rack, 'id')
-    )
-
+    rack = fields.Field(column_name='rack_id', attribute='rack', widget=ForeignKeyWidget(Rack, 'id'))
     class Meta:
         model = Bin
         fields = ('id', 'rack', 'bin_code', 'capacity_units')
-        export_order = fields
 
+
+# ==========================================
+# ENTERPRISE WAREHOUSE ADMINS (STRICT ISOLATION)
+# ==========================================
 
 @admin.register(Warehouse)
 class WarehouseAdmin(ImportExportModelAdmin, LeafletGeoAdmin):
     resource_class = WarehouseResource
-    list_display = (
-        'name', 'code', 'warehouse_type_display', 'city', 'is_active_badge', 'created_at_date'
-    )
-    list_filter = ('warehouse_type', 'city', 'state', 'is_active', 'created_at')
+    list_display = ('name', 'code', 'warehouse_type_display', 'city', 'is_active_badge', 'created_at_date')
+    list_filter = ('warehouse_type', 'city', 'state', 'is_active')
     search_fields = ('name', 'code', 'city', 'state')
     list_per_page = 25
     actions = ['activate_warehouses', 'deactivate_warehouses']
@@ -141,9 +77,14 @@ class WarehouseAdmin(ImportExportModelAdmin, LeafletGeoAdmin):
         ('Geographic Data', {'fields': ('location', 'delivery_zone'), 'classes': ('collapse',)}),
         ('Timestamps', {'fields': ('created_at',), 'classes': ('collapse',)}),
     )
-
     readonly_fields = ('created_at',)
     settings_overrides = {'DEFAULT_CENTER': (20.5937, 78.9629), 'DEFAULT_ZOOM': 5}
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id: return qs.filter(id=wh_id)
+        return qs.none()
 
     def warehouse_type_display(self, obj):
         type_colors = {'dark_store': '#28a745', 'mega': '#007bff'}
@@ -162,21 +103,121 @@ class WarehouseAdmin(ImportExportModelAdmin, LeafletGeoAdmin):
     created_at_date.short_description = "Created"
 
 
+@admin.register(StorageZone)
+class StorageZoneAdmin(ImportExportModelAdmin):
+    resource_class = StorageZoneResource
+    list_display = ('name', 'warehouse_code')
+    search_fields = ('name',)
+    list_select_related = ('warehouse',)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id: return qs.filter(warehouse_id=wh_id)
+        return qs.none()
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        wh_id = request.session.get('selected_warehouse_id')
+        if db_field.name == "warehouse" and wh_id:
+            kwargs["queryset"] = Warehouse.objects.filter(id=wh_id)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def warehouse_code(self, obj): return obj.warehouse.code
+    warehouse_code.short_description = "Warehouse"
+
+
+@admin.register(Aisle)
+class AisleAdmin(ImportExportModelAdmin):
+    resource_class = AisleResource
+    list_display = ('number', 'zone_name', 'warehouse_info')
+    list_select_related = ('zone', 'zone__warehouse')
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id: return qs.filter(zone__warehouse_id=wh_id)
+        return qs.none()
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        wh_id = request.session.get('selected_warehouse_id')
+        if db_field.name == "zone" and wh_id:
+            kwargs["queryset"] = StorageZone.objects.filter(warehouse_id=wh_id)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def zone_name(self, obj): return obj.zone.name
+    zone_name.short_description = "Zone"
+    
+    def warehouse_info(self, obj): return obj.zone.warehouse.code
+    warehouse_info.short_description = "Warehouse"
+
+
+@admin.register(Rack)
+class RackAdmin(ImportExportModelAdmin):
+    resource_class = RackResource
+    list_display = ('number', 'aisle_info', 'warehouse_info')
+    list_select_related = ('aisle', 'aisle__zone', 'aisle__zone__warehouse')
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id: return qs.filter(aisle__zone__warehouse_id=wh_id)
+        return qs.none()
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        wh_id = request.session.get('selected_warehouse_id')
+        if db_field.name == "aisle" and wh_id:
+            kwargs["queryset"] = Aisle.objects.filter(zone__warehouse_id=wh_id)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def aisle_info(self, obj): return f"{obj.aisle.zone.name} - Aisle {obj.aisle.number}"
+    aisle_info.short_description = "Aisle/Zone"
+    
+    def warehouse_info(self, obj): return obj.aisle.zone.warehouse.code
+    warehouse_info.short_description = "Warehouse"
+
+
+@admin.register(Bin)
+class BinAdmin(ImportExportModelAdmin):
+    resource_class = BinResource
+    list_display = ('bin_code', 'capacity_units', 'rack_info')
+    search_fields = ('bin_code',)
+    list_select_related = ('rack', 'rack__aisle', 'rack__aisle__zone', 'rack__aisle__zone__warehouse')
+    list_editable = ('capacity_units',)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id: return qs.filter(rack__aisle__zone__warehouse_id=wh_id)
+        return qs.none()
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        wh_id = request.session.get('selected_warehouse_id')
+        if db_field.name == "rack" and wh_id:
+            kwargs["queryset"] = Rack.objects.filter(aisle__zone__warehouse_id=wh_id)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def rack_info(self, obj):
+        return f"{obj.rack.aisle.zone.name} - A{obj.rack.aisle.number} - R{obj.rack.number}"
+    rack_info.short_description = "Location"
+
+
 @admin.register(PickingTask)
 class PickingTaskAdmin(ImportExportModelAdmin):
     resource_class = PickingTaskResource
-    # FIX: target_bin renamed to target_inventory_batch
     list_display = ("order_id", "item_sku", "quantity_to_pick", "status_badge", "picker_info", "picked_at", "target_inventory_batch")
     list_filter = ("status", "picked_at")
-    search_fields = ("order__id", "item_sku", "picker__phone", "picker__first_name")
-    # FIX: target_bin renamed to target_inventory_batch
+    search_fields = ("order__id", "item_sku", "picker__phone")
     list_select_related = ('order', 'picker', 'target_inventory_batch')
-    # FIX: target_bin renamed to target_inventory_batch
     raw_id_fields = ["order", "picker", "target_inventory_batch"]
     list_per_page = 25
     actions = ["reset_to_pending", "mark_as_completed"]
-
     readonly_fields = ('picked_at',)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id: return qs.filter(order__fulfillment_warehouse_id=wh_id)
+        return qs.none()
 
     def order_id(self, obj): return f"#{obj.order.id}"
     order_id.short_description = "Order ID"
@@ -188,7 +229,7 @@ class PickingTaskAdmin(ImportExportModelAdmin):
     status_badge.short_description = "Status"
 
     def picker_info(self, obj):
-        return f"{obj.picker.phone}" if obj.picker else "Unassigned"
+        return f"{obj.picker.user.phone}" if obj.picker else "Unassigned"
     picker_info.short_description = "Picker"
 
     @admin.action(description="Reset selected tasks to pending")
@@ -206,13 +247,16 @@ class PackingTaskAdmin(ImportExportModelAdmin):
     resource_class = PackingTaskResource
     list_display = ("order_id", "is_completed_badge", "packer_info", "created_at_date")
     list_filter = ("is_completed", "created_at")
-    search_fields = ("order__id", "packer__phone", "packer__first_name")
+    search_fields = ("order__id", "packer__phone")
     list_select_related = ('order', 'packer')
     raw_id_fields = ["order", "packer"]
     list_per_page = 25
-    actions = ["mark_completed", "mark_incomplete"]
 
-    readonly_fields = ('created_at',)
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id: return qs.filter(order__fulfillment_warehouse_id=wh_id)
+        return qs.none()
 
     def order_id(self, obj): return f"#{obj.order.id}"
     order_id.short_description = "Order ID"
@@ -223,46 +267,10 @@ class PackingTaskAdmin(ImportExportModelAdmin):
     is_completed_badge.short_description = "Status"
 
     def packer_info(self, obj):
-        return f"{obj.packer.phone}" if obj.packer else "Unassigned"
+        return f"{obj.packer.user.phone}" if obj.packer else "Unassigned"
     packer_info.short_description = "Packer"
 
     def created_at_date(self, obj):
         if hasattr(obj, 'created_at') and obj.created_at: return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
         return "N/A"
     created_at_date.short_description = "Created"
-
-
-@admin.register(StorageZone)
-class StorageZoneAdmin(ImportExportModelAdmin):
-    resource_class = StorageZoneResource
-    list_display = ('warehouse_code', 'name')
-    list_filter = ('warehouse',)
-    search_fields = ('warehouse__name', 'warehouse__code', 'name')
-    list_select_related = ('warehouse',)
-
-    def warehouse_code(self, obj): return obj.warehouse.code
-    warehouse_code.short_description = "Warehouse"
-
-
-@admin.register(Aisle)
-class AisleAdmin(ImportExportModelAdmin):
-    resource_class = AisleResource
-
-
-@admin.register(Rack)
-class RackAdmin(ImportExportModelAdmin):
-    resource_class = RackResource
-
-
-@admin.register(Bin)
-class BinAdmin(ImportExportModelAdmin):
-    resource_class = BinResource
-    list_display = ('bin_code', 'rack_info', 'capacity_units')
-    list_filter = ('rack__aisle__zone__warehouse',)
-    search_fields = ('bin_code',)
-    list_select_related = ('rack__aisle__zone__warehouse',)
-
-    def rack_info(self, obj):
-        return f"{obj.rack.aisle.zone.warehouse.code} - {obj.rack.aisle.zone.name} - A{obj.rack.aisle.number} - R{obj.rack.number}"
-    rack_info.short_description = "Location"
-    rack_info.admin_order_field = 'rack__aisle__zone__warehouse__code'

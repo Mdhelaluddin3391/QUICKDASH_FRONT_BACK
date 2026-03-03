@@ -5,62 +5,13 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import localtime
 from django.db.models import Count, Sum, Q
 from django.urls import reverse
-from import_export import resources, fields, widgets
-from import_export.admin import ImportExportModelAdmin
+
 from apps.orders.models import Order
+from apps.core.admin_mixins import WarehouseScopedAdmin
 from .models import CustomerProfile, CustomerAddress, SupportTicket
 
 User = get_user_model()
 
-class CustomerProfileResource(resources.ModelResource):
-    user = fields.Field(
-        column_name='user',
-        attribute='user',
-        widget=widgets.ForeignKeyWidget(User, 'phone')
-    )
-
-    class Meta:
-        model = CustomerProfile
-        # NAYA LOGIC: OneToOne relation hai, toh User khud iski unique pehchan hai
-        import_id_fields = ('user',) 
-        fields = ('id', 'user', 'created_at')
-
-class CustomerAddressResource(resources.ModelResource):
-    customer = fields.Field(
-        column_name='customer',
-        attribute='customer',
-        widget=widgets.ForeignKeyWidget(CustomerProfile, 'user__phone')
-    )
-
-    class Meta:
-        model = CustomerAddress
-        # NAYA LOGIC: Multiple addresses ho sakte hain isliye ID fix kar di
-        import_id_fields = ('id',) 
-        fields = (
-            'id', 'customer', 'label', 'house_no', 'floor_no', 
-            'apartment_name', 'landmark', 'city', 'pincode', 
-            'latitude', 'longitude', 'google_address_text', 
-            'receiver_name', 'receiver_phone', 'is_default', 
-            'is_deleted', 'created_at'
-        )
-
-class SupportTicketResource(resources.ModelResource):
-    user = fields.Field(
-        column_name='user',
-        attribute='user',
-        widget=widgets.ForeignKeyWidget(User, 'phone')
-    )
-    order = fields.Field(
-        column_name='order',
-        attribute='order',
-        widget=widgets.ForeignKeyWidget(Order, 'id')
-    )
-
-    class Meta:
-        model = SupportTicket
-        # NAYA LOGIC: Tickets multiple ho sakti hain, toh isme bhi ID fix kar di
-        import_id_fields = ('id',) 
-        fields = ('id', 'user', 'order', 'issue_type', 'description', 'status', 'admin_response', 'created_at')
 
 class CustomerAddressInline(admin.StackedInline):
     model = CustomerAddress
@@ -76,9 +27,9 @@ class CustomerAddressInline(admin.StackedInline):
         return f"{obj.house_no}, {obj.apartment_name}, {obj.landmark} - {obj.google_address_text}"
     address_summary_view.short_description = "Full Address"
 
+
 @admin.register(CustomerProfile)
-class CustomerProfileAdmin(ImportExportModelAdmin):
-    resource_class = CustomerProfileResource
+class CustomerProfileAdmin(WarehouseScopedAdmin):
     list_display = (
         'user_phone',
         'user_name',
@@ -123,6 +74,14 @@ class CustomerProfileAdmin(ImportExportModelAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
+        wh_id = request.session.get('selected_warehouse_id')
+        
+        # Enterprise Rule: Only show customers who interacted with THIS warehouse
+        if wh_id:
+            qs = qs.filter(user__orders__fulfillment_warehouse_id=wh_id).distinct()
+        else:
+            return qs.none()
+
         return qs.annotate(
             annotated_orders=Count('user__orders', distinct=True),
             annotated_tickets=Count('user__supportticket', distinct=True),
@@ -176,9 +135,9 @@ class CustomerProfileAdmin(ImportExportModelAdmin):
     created_at_date.short_description = "Joined Date"
     created_at_date.admin_order_field = 'created_at'
 
+
 @admin.register(CustomerAddress)
-class CustomerAddressAdmin(ImportExportModelAdmin):
-    resource_class = CustomerAddressResource
+class CustomerAddressAdmin(WarehouseScopedAdmin):
     list_display = (
         'customer_phone',
         'label_badge',
@@ -230,6 +189,13 @@ class CustomerAddressAdmin(ImportExportModelAdmin):
     )
 
     readonly_fields = ('created_at',)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id:
+            return qs.filter(customer__user__orders__fulfillment_warehouse_id=wh_id).distinct()
+        return qs.none()
 
     def customer_phone(self, obj):
         return obj.customer.user.phone
@@ -297,9 +263,9 @@ class CustomerAddressAdmin(ImportExportModelAdmin):
         updated = queryset.update(is_deleted=False)
         self.message_user(request, f"{updated} addresses restored.")
 
+
 @admin.register(SupportTicket)
-class SupportTicketAdmin(ImportExportModelAdmin):
-    resource_class = SupportTicketResource
+class SupportTicketAdmin(WarehouseScopedAdmin):
     list_display = (
         'id',
         'customer_phone',
@@ -340,6 +306,13 @@ class SupportTicketAdmin(ImportExportModelAdmin):
     )
 
     readonly_fields = ('created_at',)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id:
+            return qs.filter(order__fulfillment_warehouse_id=wh_id)
+        return qs.none()
 
     def customer_phone(self, obj):
         return obj.user.phone

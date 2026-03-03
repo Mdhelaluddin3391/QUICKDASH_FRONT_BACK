@@ -4,87 +4,15 @@ from django.contrib.auth import get_user_model
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import localtime
-from import_export import resources, fields, widgets
-from import_export.widgets import ForeignKeyWidget
-from import_export.admin import ImportExportModelAdmin
 from django.db.models import Q, F
 
+from apps.core.admin_mixins import WarehouseScopedAdmin
 from .models import Order, OrderItem, OrderConfiguration, OrderItemFulfillment, OrderAbuseLog
 from apps.catalog.models import Product
 from apps.warehouse.models import Warehouse
-from apps.inventory.models import InventoryItem
 
 User = get_user_model()
 
-# --- Resources for Export/Import ---
-
-class OrderResource(resources.ModelResource):
-    user = fields.Field(
-        column_name='user_phone',
-        attribute='user',
-        widget=ForeignKeyWidget(User, 'phone')
-    )
-    fulfillment_warehouse = fields.Field(
-        column_name='fulfillment_warehouse_name',
-        attribute='fulfillment_warehouse',
-        widget=ForeignKeyWidget(Warehouse, 'name')
-    )
-    last_mile_warehouse = fields.Field(
-        column_name='last_mile_warehouse_name',
-        attribute='last_mile_warehouse',
-        widget=ForeignKeyWidget(Warehouse, 'name')
-    )
-
-    class Meta:
-        model = Order
-        # NAYA LOGIC: Orders strictly ID par depend karenge kyunki custom order_number nahi hai
-        import_id_fields = ('id',)
-        fields = (
-            'id', 'user', 'fulfillment_warehouse', 'last_mile_warehouse', 
-            'status', 'delivery_type', 'payment_method', 'total_amount', 
-            'delivery_address_json', 'created_at', 'updated_at'
-        )
-        export_order = fields
-
-class OrderItemResource(resources.ModelResource):
-    order = fields.Field(
-        column_name='order_id',
-        attribute='order',
-        widget=ForeignKeyWidget(Order, 'id')
-    )
-
-    class Meta:
-        model = OrderItem
-        # NAYA LOGIC: Items ko unki unique ID se pehchanna zaroori hai
-        import_id_fields = ('id',)
-        fields = ('id', 'order', 'sku', 'product_name', 'quantity', 'price', 'status', 'cancel_reason')
-        export_order = fields
-
-class OrderItemFulfillmentResource(resources.ModelResource):
-    order_item = fields.Field(
-        column_name='order_item_id',
-        attribute='order_item',
-        widget=ForeignKeyWidget(OrderItem, 'id')
-    )
-    inventory_batch = fields.Field(
-        column_name='inventory_batch_id',
-        attribute='inventory_batch',
-        widget=ForeignKeyWidget(InventoryItem, 'id')
-    )
-
-    class Meta:
-        model = OrderItemFulfillment
-        # NAYA LOGIC: Fulfillment records bohot deep relations hain, ID mapping zaroori hai
-        import_id_fields = ('id',)
-        fields = ('id', 'order_item', 'inventory_batch', 'quantity_allocated', 'vendor_payable_amount', 'created_at')
-        export_order = fields
-
-class OrderConfigurationResource(resources.ModelResource):
-    class Meta:
-        model = OrderConfiguration
-        import_id_fields = ('id',) # Singleton pattern, humesha ID 1 rahegi
-        fields = ('id', 'delivery_fee', 'free_delivery_threshold')
-        export_order = fields
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
@@ -122,18 +50,17 @@ class OrderItemInline(admin.TabularInline):
         return format_html("<br>".join(details))
     fulfillment_details.short_description = "Stock Source"
 
+
 @admin.register(Order)
-class OrderAdmin(ImportExportModelAdmin):
-    resource_class = OrderResource
+class OrderAdmin(WarehouseScopedAdmin):
     list_display = (
         'id', 'customer_phone', 'fulfillment_warehouse', 'transit_route', 
         'status_badge', 'payment_method', 'total_amount_display', 
         'delivery_type', 'delivery_name', 'delivery_phone', 'Maps_link', 'created_at_date'
     )
-    list_filter = ('status', 'fulfillment_warehouse', 'last_mile_warehouse', 'created_at', 'payment_method', 'delivery_type')
+    list_filter = ('status', 'created_at', 'payment_method', 'delivery_type')
     search_fields = (
-        'id', 'user__phone', 'user__first_name', 'user__last_name',
-        'fulfillment_warehouse__name', 'fulfillment_warehouse__code', 'last_mile_warehouse__name'
+        'id', 'user__phone', 'user__first_name', 'user__last_name'
     )
     list_select_related = ('user', 'fulfillment_warehouse', 'last_mile_warehouse')
     raw_id_fields = ('user', 'fulfillment_warehouse', 'last_mile_warehouse')
@@ -154,14 +81,25 @@ class OrderAdmin(ImportExportModelAdmin):
 
     readonly_fields = ('id', 'created_at', 'updated_at', 'total_amount', 'delivery_name', 'delivery_phone', 'full_delivery_address', 'Maps_link')
 
+    # ==========================================
+    # ENTERPRISE WAREHOUSE ISOLATION LOGIC
+    # ==========================================
     def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.is_superuser:
-            return qs
-        if hasattr(request.user, 'warehouse') and request.user.warehouse:
-            user_wh = request.user.warehouse
-            return qs.filter(Q(fulfillment_warehouse=user_wh) | Q(last_mile_warehouse=user_wh))
-        return qs
+        """Strictly filter orders to show only those routed through the selected warehouse."""
+        qs = super(admin.ModelAdmin, self).get_queryset(request)
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id:
+            return qs.filter(Q(fulfillment_warehouse_id=wh_id) | Q(last_mile_warehouse_id=wh_id))
+        return qs.none()
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Only allow assigning this order to the currently selected active warehouse."""
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id:
+            if db_field.name in ['fulfillment_warehouse', 'last_mile_warehouse']:
+                kwargs["queryset"] = Warehouse.objects.filter(id=wh_id)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    # ==========================================
 
     def transit_route(self, obj):
         if obj.fulfillment_warehouse and obj.last_mile_warehouse:
@@ -260,15 +198,23 @@ class OrderAdmin(ImportExportModelAdmin):
         return format_html('<a style="background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block;" href="{}" target="_blank">📍 Directions</a>', url)
     Maps_link.short_description = "Map"
 
+
 @admin.register(OrderItemFulfillment)
-class OrderItemFulfillmentAdmin(ImportExportModelAdmin):
-    resource_class = OrderItemFulfillmentResource
+class OrderItemFulfillmentAdmin(WarehouseScopedAdmin):
     list_display = ('id', 'order_id_link', 'sku_link', 'batch_id', 'vendor_phone', 'quantity_allocated', 'vendor_payable_amount', 'created_at')
-    list_filter = ('inventory_batch__owner', 'created_at')
+    list_filter = ('created_at',)
     search_fields = ('order_item__order__id', 'inventory_batch__owner__phone', 'order_item__sku')
     list_select_related = ('order_item', 'order_item__order', 'inventory_batch', 'inventory_batch__owner')
     readonly_fields = ('order_item', 'inventory_batch', 'quantity_allocated', 'vendor_payable_amount')
     list_per_page = 50
+
+    def get_queryset(self, request):
+        """Only show item fulfillments originating from the current warehouse session."""
+        qs = super(admin.ModelAdmin, self).get_queryset(request)
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id:
+            return qs.filter(order_item__order__fulfillment_warehouse_id=wh_id)
+        return qs.none()
 
     def order_id_link(self, obj):
         return f"Order #{obj.order_item.order.id}"
@@ -288,8 +234,8 @@ class OrderItemFulfillmentAdmin(ImportExportModelAdmin):
         return format_html('<span style="color: green; font-weight: bold;">Company</span>')
     vendor_phone.short_description = "Vendor"
 
+
 @admin.register(OrderConfiguration)
-class OrderConfigurationAdmin(ImportExportModelAdmin):
-    resource_class = OrderConfigurationResource
+class OrderConfigurationAdmin(admin.ModelAdmin):
     list_display = ['delivery_fee', 'free_delivery_threshold']
     list_per_page = 25

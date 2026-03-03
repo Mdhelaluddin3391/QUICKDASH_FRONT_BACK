@@ -2,32 +2,14 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
-from import_export import resources, fields
-from import_export.widgets import ForeignKeyWidget
-from import_export.admin import ImportExportModelAdmin
 
+from apps.core.admin_mixins import WarehouseScopedAdmin
 from .models import SurgeRule
 from apps.warehouse.models import Warehouse
 
 
-class SurgeRuleResource(resources.ModelResource):
-    # Linking Warehouse by name
-    warehouse = fields.Field(
-        column_name='warehouse_name',
-        attribute='warehouse',
-        widget=ForeignKeyWidget(Warehouse, 'code')
-    )
-
-    class Meta:
-        model = SurgeRule
-        import_id_fields = ('id',)
-        fields = ('id', 'warehouse', 'max_multiplier', 'base_factor', 'created_at')
-        export_order = fields
-
-
 @admin.register(SurgeRule)
-class SurgeRuleAdmin(ImportExportModelAdmin):
-    resource_class = SurgeRuleResource
+class SurgeRuleAdmin(WarehouseScopedAdmin):
     list_display = (
         'warehouse_info',
         'max_multiplier_display',
@@ -59,6 +41,25 @@ class SurgeRuleAdmin(ImportExportModelAdmin):
     )
 
     readonly_fields = ('created_at',)
+
+    # ==========================================
+    # ENTERPRISE WAREHOUSE ISOLATION LOGIC
+    # ==========================================
+    def get_queryset(self, request):
+        """Strictly isolate Surge Rules to the Admin's selected session Warehouse."""
+        qs = super().get_queryset(request)
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id:
+            return qs.filter(warehouse_id=wh_id)
+        return qs.none()
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Only allow selecting the Warehouse currently in session."""
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id and db_field.name == "warehouse":
+            kwargs["queryset"] = Warehouse.objects.filter(id=wh_id)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    # ==========================================
 
     def warehouse_info(self, obj):
         return f"{obj.warehouse.name} ({obj.warehouse.code})"

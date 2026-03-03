@@ -7,7 +7,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from django.conf import settings
+from django.views.generic import TemplateView, View
+from django.shortcuts import redirect
+from django.contrib.auth.mixins import UserPassesTestMixin
+from django.contrib import messages
+
 from .models import StoreSettings
+from apps.warehouse.models import Warehouse
 
 logger = logging.getLogger(__name__)
 
@@ -92,14 +98,48 @@ class AppConfigAPIView(APIView):
         })
     
 
-
-
 class StoreStatusAPIView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        settings, created = StoreSettings.objects.get_or_create(pk=1)
+        settings_obj, created = StoreSettings.objects.get_or_create(pk=1)
         return Response({
-            'is_store_open': settings.is_store_open,
-            'store_closed_message': settings.store_closed_message
+            'is_store_open': settings_obj.is_store_open,
+            'store_closed_message': settings_obj.store_closed_message
         })
+
+
+# --- ENTERPRISE ADMIN WAREHOUSE SELECTION VIEWS ---
+
+class AdminWarehouseSelectView(UserPassesTestMixin, TemplateView):
+    """Renders the UI for the Admin to choose their operational store."""
+    template_name = 'admin/select_warehouse.html'
+
+    def test_func(self):
+        # Only allow staff/admin users
+        return self.request.user.is_authenticated and self.request.user.is_staff
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Fetch only active warehouses to show on the screen
+        context['warehouses'] = Warehouse.objects.filter(is_active=True).order_by('warehouse_type', 'name')
+        return context
+
+
+class SetAdminWarehouseView(UserPassesTestMixin, View):
+    """Processes the admin's selection, locks it into the session, and redirects to the dashboard."""
+    def test_func(self):
+        return self.request.user.is_authenticated and self.request.user.is_staff
+
+    def get(self, request, warehouse_id, *args, **kwargs):
+        try:
+            warehouse = Warehouse.objects.get(id=warehouse_id, is_active=True)
+            # Lock the selection in the session securely
+            request.session['selected_warehouse_id'] = warehouse.id
+            request.session['selected_warehouse_name'] = warehouse.name
+            messages.success(request, f"Operational Command switched to: {warehouse.name}")
+        except Warehouse.DoesNotExist:
+            messages.error(request, "Selected warehouse is invalid or inactive.")
+        
+        # Redirect back to the main admin dashboard
+        return redirect('admin:index')

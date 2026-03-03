@@ -1,11 +1,8 @@
-import csv
-import io
 from django.contrib import admin, messages
-from django.shortcuts import render, redirect
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import localtime
-from django.db import models, transaction
+from django.db import models
 from django.urls import path            
 from django.http import JsonResponse    
 from import_export import resources, fields
@@ -34,14 +31,21 @@ class InventoryItemResource(resources.ModelResource):
 
     class Meta:
         model = InventoryItem
-        import_id_fields = ('id',) 
+        import_id_fields = ('sku', 'bin') # Update based on Batch identification
         fields = (
             'id', 'bin', 'sku', 'product_name', 'price', 'owner',
             'cost_price', 'total_stock', 'reserved_stock', 'mode', 
-            'lead_time_hours', 'created_at', 'updated_at'
+            'lead_time_hours'
         )
-        export_order = fields
 
+    def before_import_row(self, row, **kwargs):
+        """Unified import logic: auto-fills defaults to prevent DB crashes."""
+        if not row.get('price'): row['price'] = 0
+        if not row.get('cost_price'): row['cost_price'] = 0.0
+        if not row.get('total_stock'): row['total_stock'] = 0
+        if not row.get('reserved_stock'): row['reserved_stock'] = 0
+        if not row.get('mode'): row['mode'] = 'owned'
+        if not row.get('lead_time_hours'): row['lead_time_hours'] = 0
 
 class InventoryTransactionResource(resources.ModelResource):
     inventory_item = fields.Field(
@@ -57,28 +61,25 @@ class InventoryTransactionResource(resources.ModelResource):
             'id', 'inventory_item', 'transaction_type', 'quantity', 
             'reference', 'created_at'
         )
-        export_order = fields
 
 
 @admin.register(InventoryItem)
 class InventoryItemAdmin(ImportExportModelAdmin):
     resource_class = InventoryItemResource
     
-    change_list_template = "admin/inventory/inventoryitem/change_list.html"
-    
     class Media:
         js = ('inventory/js/sku_lookup.js',)
 
     list_display = (
-        'id', 'sku', 'product_name', 'owner_status', 'cost_price', 'price', 
+        'sku', 'product_name', 'owner_status', 'cost_price', 'price', 
         'warehouse_name', 'bin_location', 'total_stock', 'available_stock',
-        'reserved_stock', 'stock_status', 'mode_badge', 'updated_at_date'
+        'stock_status', 'mode_badge', 'updated_at_date'
     )
     list_filter = (
-        'mode', 'owner', 'bin__rack__aisle__zone__warehouse', 'updated_at'
+        'mode', 'owner', 'updated_at'
     )
     search_fields = (
-        'sku', 'product_name', 'owner__phone', 'bin__bin_code', 'bin__rack__number'
+        'sku', 'product_name', 'owner__phone', 'bin__bin_code'
     )
     list_select_related = (
         'bin', 'owner', 'bin__rack', 'bin__rack__aisle', 
@@ -87,7 +88,7 @@ class InventoryItemAdmin(ImportExportModelAdmin):
     raw_id_fields = ('bin', 'owner')
     list_per_page = 25
     
-    list_editable = ('total_stock', 'reserved_stock', 'price', 'cost_price')
+    list_editable = ('total_stock', 'price', 'cost_price')
     actions = ['mark_low_stock', 'clear_reservations', 'update_from_catalog']
 
     fieldsets = (
@@ -108,76 +109,39 @@ class InventoryItemAdmin(ImportExportModelAdmin):
 
     readonly_fields = ('created_at', 'updated_at', 'product_mrp_display')
 
+    # ==========================================
+    # ENTERPRISE WAREHOUSE ISOLATION LOGIC
+    # ==========================================
+    def get_queryset(self, request):
+        """Strictly isolate Inventory to the Admin's selected session Warehouse."""
+        qs = super().get_queryset(request)
+        selected_warehouse_id = request.session.get('selected_warehouse_id')
+        if selected_warehouse_id:
+            return qs.filter(bin__rack__aisle__zone__warehouse_id=selected_warehouse_id)
+        # Fallback to none if they somehow bypass middleware
+        return qs.none()
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Only allow selecting Bins that belong to the current Warehouse."""
+        if db_field.name == "bin":
+            selected_warehouse_id = request.session.get('selected_warehouse_id')
+            if selected_warehouse_id:
+                kwargs["queryset"] = Bin.objects.filter(rack__aisle__zone__warehouse_id=selected_warehouse_id)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    # ==========================================
+
     def owner_status(self, obj):
         if hasattr(obj, 'owner') and obj.owner:
             return format_html('<span style="color: blue; font-weight: bold;">Vendor: {}</span>', obj.owner.phone)
-        return format_html('<span style="color: green; font-weight: bold;">Company Owned</span>')
+        return format_html('<span style="color: green; font-weight: bold;">Company</span>')
     owner_status.short_description = "Owner"
 
     def get_urls(self):
         urls = super().get_urls()
         my_urls = [
             path('lookup-product-data/', self.admin_site.admin_view(self.lookup_product_data), name='inventory-product-lookup'),
-            path('import-csv/', self.admin_site.admin_view(self.import_csv), name='inventory-import-csv'),
         ]
         return my_urls + urls
-
-    def import_csv(self, request):
-        if request.method == "POST":
-            csv_file = request.FILES.get("csv_file")
-            
-            if not csv_file or not csv_file.name.endswith('.csv'):
-                messages.warning(request, 'Kripya ek valid CSV file upload karein.')
-                return redirect("..")
-            
-            file_data = csv_file.read().decode("utf-8")
-            csv_data = io.StringIO(file_data)
-            reader = csv.DictReader(csv_data)
-            
-            count = 0
-            try:
-                with transaction.atomic():
-                    for row in reader:
-                        sku_val = row.get('sku', '').strip()
-                        bin_code = row.get('bin_code', '').strip()
-                        
-                        if not sku_val or not bin_code: 
-                            continue 
-                        
-                        bin_obj = Bin.objects.filter(bin_code=bin_code).first()
-                        if not bin_obj:
-                            raise Exception(f"Bin '{bin_code}' database mein nahi mili. Pehle is Bin ko 'Warehouse' section me banayein!")
-
-                        owner_phone = row.get('owner_phone', '').strip()
-                        owner_obj = None
-                        if owner_phone:
-                            owner_obj = User.objects.filter(phone=owner_phone).first()
-
-                        total_stock = int(row.get('total_stock', 0) or 0)
-                        cost_price = float(row.get('cost_price', 0.00) or 0.00)
-                        mode = row.get('mode', 'owned').strip().lower()
-                        lead_time = int(row.get('lead_time_hours', 0) or 0)
-
-                        InventoryItem.objects.create(
-                            sku=sku_val,
-                            bin=bin_obj,
-                            owner=owner_obj,
-                            total_stock=total_stock,
-                            cost_price=cost_price,
-                            price=0,  # <-- FIX: Yahan explicit price=0 (integer) bheja gaya hai taaki TypeError na aaye
-                            mode=mode,
-                            lead_time_hours=lead_time
-                        )
-                        count += 1
-
-                self.message_user(request, f"{count} naye inventory items (batches) successfully add ho gaye.")
-                return redirect("..")
-                
-            except Exception as e:
-                messages.error(request, f"Import fail ho gaya! Koi data save nahi hua. Error: {e}")
-                return redirect("..")
-            
-        return render(request, "admin/csv_form.html", {"opts": self.model._meta})
 
     def lookup_product_data(self, request):
         sku = request.GET.get('sku')
@@ -198,30 +162,28 @@ class InventoryItemAdmin(ImportExportModelAdmin):
             if product:
                 return f"₹ {product.mrp}"
         return "Not Found in Catalog"
-    product_mrp_display.short_description = "Product Base MRP (Read Only)"
+    product_mrp_display.short_description = "Product Base MRP"
 
     def warehouse_name(self, obj):
         return obj.bin.rack.aisle.zone.warehouse.name
     warehouse_name.short_description = "Warehouse"
-    warehouse_name.admin_order_field = 'bin__rack__aisle__zone__warehouse__name'
 
     def bin_location(self, obj):
-        return f"{obj.bin.rack.aisle.zone.name} - A{obj.bin.rack.aisle.number} - R{obj.bin.rack.number} - B{obj.bin.bin_code}"
+        return f"{obj.bin.rack.aisle.zone.name} - B{obj.bin.bin_code}"
     bin_location.short_description = "Bin Location"
 
     def available_stock(self, obj):
         return obj.available_stock
     available_stock.short_description = "Available"
-    available_stock.admin_order_field = 'total_stock'
 
     def stock_status(self, obj):
         available = obj.available_stock
         if available <= 0:
             return format_html('<span style="color: red; font-weight: bold;">OUT OF STOCK</span>')
         elif available <= 10:
-            return format_html('<span style="color: orange; font-weight: bold;">LOW STOCK ({})</span>', available)
+            return format_html('<span style="color: orange; font-weight: bold;">LOW ({})</span>', available)
         else:
-            return format_html('<span style="color: green;">IN STOCK ({})</span>', available)
+            return format_html('<span style="color: green;">GOOD ({})</span>', available)
     stock_status.short_description = "Status"
 
     def mode_badge(self, obj):
@@ -235,29 +197,6 @@ class InventoryItemAdmin(ImportExportModelAdmin):
             return localtime(obj.updated_at).strftime('%d/%m/%Y %H:%M')
         return "N/A"
     updated_at_date.short_description = "Updated"
-    updated_at_date.admin_order_field = 'updated_at'
-
-    @admin.action(description='Mark selected items as low stock (set reserved to total)')
-    def mark_low_stock(self, request, queryset):
-        updated = queryset.update(reserved_stock=models.F('total_stock'))
-        self.message_user(request, f"{updated} items marked as low stock.")
-
-    @admin.action(description='Clear all reservations for selected items')
-    def clear_reservations(self, request, queryset):
-        updated = queryset.update(reserved_stock=0)
-        self.message_user(request, f"Reservations cleared for {updated} items.")
-
-    @admin.action(description='Update product details from catalog')
-    def update_from_catalog(self, request, queryset):
-        updated = 0
-        for item in queryset:
-            product = Product.objects.filter(sku=item.sku).first()
-            if product:
-                item.product_name = product.name
-                item.price = product.mrp
-                item.save()
-                updated += 1
-        self.message_user(request, f"Updated {updated} items from catalog.")
 
 
 @admin.register(InventoryTransaction)
@@ -268,7 +207,7 @@ class InventoryTransactionAdmin(ImportExportModelAdmin):
         'reference', 'warehouse_name', 'created_at_date'
     )
     list_filter = (
-        'transaction_type', 'created_at', 'inventory_item__bin__rack__aisle__zone__warehouse'
+        'transaction_type', 'created_at'
     )
     search_fields = ('inventory_item__sku', 'inventory_item__product_name', 'reference')
     list_select_related = (
@@ -280,10 +219,20 @@ class InventoryTransactionAdmin(ImportExportModelAdmin):
     list_per_page = 25
     readonly_fields = ('created_at',)
 
+    # ==========================================
+    # ENTERPRISE WAREHOUSE ISOLATION LOGIC
+    # ==========================================
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        selected_warehouse_id = request.session.get('selected_warehouse_id')
+        if selected_warehouse_id:
+            return qs.filter(inventory_item__bin__rack__aisle__zone__warehouse_id=selected_warehouse_id)
+        return qs.none()
+    # ==========================================
+
     def inventory_item_info(self, obj):
         return f"{obj.inventory_item.sku} - {obj.inventory_item.product_name}"
     inventory_item_info.short_description = "Item"
-    inventory_item_info.admin_order_field = 'inventory_item__sku'
 
     def transaction_type_badge(self, obj):
         colors = {'add': '#28a745', 'reserve': '#ffc107', 'release': '#17a2b8', 'commit': '#007bff', 'adjust': '#dc3545'}

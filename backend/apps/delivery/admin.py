@@ -1,52 +1,14 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
-from import_export import resources, fields
-from import_export.widgets import ForeignKeyWidget
-from import_export.admin import ImportExportModelAdmin
+
+from apps.core.admin_mixins import WarehouseScopedAdmin
 from .models import Delivery
 from apps.orders.models import Order
 from apps.riders.models import RiderProfile
 
-
-
-class DeliveryResource(resources.ModelResource):
-    # Linking order by id
-    order = fields.Field(
-        column_name='order_id',
-        attribute='order',
-        widget=ForeignKeyWidget(Order, 'id')
-    )
-    
-    # Linking rider by user's phone number
-    rider = fields.Field(
-        column_name='rider_phone',
-        attribute='rider',
-        widget=ForeignKeyWidget(RiderProfile, 'user__phone')
-    )
-
-    class Meta:
-        model = Delivery
-        import_id_fields = ('id',)
-        fields = (
-            'id', 
-            'order', 
-            'rider', 
-            'status', 
-            'job_status', 
-            'otp', 
-            'proof_image', 
-            'dispatch_location', 
-            'created_at', 
-            'updated_at'
-        )
-        export_order = fields
-
-
 @admin.register(Delivery)
-class DeliveryAdmin(ImportExportModelAdmin):
-    resource_class = DeliveryResource
-    
+class DeliveryAdmin(WarehouseScopedAdmin):
     list_display = (
         'order_id_display',
         'rider_info',
@@ -93,6 +55,22 @@ class DeliveryAdmin(ImportExportModelAdmin):
     )
 
     readonly_fields = ('created_at', 'updated_at', 'otp')
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id:
+            return qs.filter(order__fulfillment_warehouse_id=wh_id)
+        return qs.none()
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        wh_id = request.session.get('selected_warehouse_id')
+        if wh_id:
+            if db_field.name == "order":
+                kwargs["queryset"] = Order.objects.filter(fulfillment_warehouse_id=wh_id)
+            elif db_field.name == "rider":
+                kwargs["queryset"] = RiderProfile.objects.filter(current_warehouse_id=wh_id)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def order_id_display(self, obj):
         return f"#{obj.order.id}"
