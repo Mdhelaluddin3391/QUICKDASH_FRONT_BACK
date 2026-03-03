@@ -194,17 +194,19 @@ class ProductAdmin(ImportExportModelAdmin):
             try:
                 with transaction.atomic():
                     for item in processed_data:
-                        # Naya Logic: Slug se dhundhna, aur agar nahi mili to specific error throw karna
-                        cat_slug = item['category'].lower().strip().replace(" ", "-")
-                        category_obj = Category.objects.filter(slug=cat_slug).first()
                         
-                        if not category_obj:
-                            raise Exception(f"Category '{item['category']}' database mein nahi mili. Kripya pehle isko admin panel mein banayein!")
+                        # LOGIC UPDATE: Ab slug se dhundhega, agar mil gai toh usko hi use karega, 
+                        # nahi mili toh us slug aur name ke sath nayi auto-create kar dega.
+                        cat_slug = item['category'].lower().strip().replace(" ", "-")
+                        category_obj, _ = Category.objects.get_or_create(
+                            slug=cat_slug,
+                            defaults={'name': item['category']}
+                        )
 
+                        # Brand ke liye bhi same logic auto-create with safe slug
                         brand_obj = None
                         if item['brand']:
                             brand_slug = item['brand'].lower().strip().replace(" ", "-")
-                            # Brand ko bhi get_or_create with slug banaya gaya taaki issue na aaye
                             brand_obj, _ = Brand.objects.get_or_create(
                                 slug=brand_slug, 
                                 defaults={'name': item['brand']}
