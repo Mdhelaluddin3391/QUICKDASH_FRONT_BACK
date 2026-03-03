@@ -194,14 +194,20 @@ class ProductAdmin(ImportExportModelAdmin):
             try:
                 with transaction.atomic():
                     for item in processed_data:
-                        category_obj, _ = Category.objects.get_or_create(
-                            name=item['category'], defaults={'slug': item['category'].lower().replace(" ", "-")}
-                        )
+                        # Naya Logic: Slug se dhundhna, aur agar nahi mili to specific error throw karna
+                        cat_slug = item['category'].lower().strip().replace(" ", "-")
+                        category_obj = Category.objects.filter(slug=cat_slug).first()
+                        
+                        if not category_obj:
+                            raise Exception(f"Category '{item['category']}' database mein nahi mili. Kripya pehle isko admin panel mein banayein!")
 
                         brand_obj = None
                         if item['brand']:
+                            brand_slug = item['brand'].lower().strip().replace(" ", "-")
+                            # Brand ko bhi get_or_create with slug banaya gaya taaki issue na aaye
                             brand_obj, _ = Brand.objects.get_or_create(
-                                name=item['brand'], defaults={'slug': item['brand'].lower().replace(" ", "-")}
+                                slug=brand_slug, 
+                                defaults={'name': item['brand']}
                             )
 
                         Product.objects.update_or_create(
