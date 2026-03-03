@@ -1,8 +1,11 @@
-from django.contrib import admin
+import csv
+import io
+from django.contrib import admin, messages
+from django.shortcuts import render, redirect
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import localtime
-from django.db import models
+from django.db import models, transaction
 from django.urls import path            
 from django.http import JsonResponse    
 from import_export import resources, fields
@@ -31,7 +34,6 @@ class InventoryItemResource(resources.ModelResource):
 
     class Meta:
         model = InventoryItem
-        # NAYA LOGIC: Batches ko ID se pehchanna hi safe hai kyunki ek SKU ke kai batches ho sakte hain
         import_id_fields = ('id',) 
         fields = (
             'id', 'bin', 'sku', 'product_name', 'price', 'owner',
@@ -50,7 +52,6 @@ class InventoryTransactionResource(resources.ModelResource):
 
     class Meta:
         model = InventoryTransaction
-        # NAYA LOGIC: Transactions ke liye hamesha ID hi identifier rahega
         import_id_fields = ('id',)
         fields = (
             'id', 'inventory_item', 'transaction_type', 'quantity', 
@@ -62,6 +63,10 @@ class InventoryTransactionResource(resources.ModelResource):
 @admin.register(InventoryItem)
 class InventoryItemAdmin(ImportExportModelAdmin):
     resource_class = InventoryItemResource
+    
+    # NAYA: Custom button dikhane ke liye template add kiya hai
+    change_list_template = "admin/inventory/inventoryitem/change_list.html"
+    
     class Media:
         js = ('inventory/js/sku_lookup.js',)
 
@@ -114,8 +119,68 @@ class InventoryItemAdmin(ImportExportModelAdmin):
         urls = super().get_urls()
         my_urls = [
             path('lookup-product-data/', self.admin_site.admin_view(self.lookup_product_data), name='inventory-product-lookup'),
+            # NAYA: Import CSV ka rasta yaha se banega
+            path('import-csv/', self.admin_site.admin_view(self.import_csv), name='inventory-import-csv'),
         ]
         return my_urls + urls
+
+    # ---- NAYA: Import CSV Function ----
+    def import_csv(self, request):
+        if request.method == "POST":
+            csv_file = request.FILES.get("csv_file")
+            
+            if not csv_file or not csv_file.name.endswith('.csv'):
+                messages.warning(request, 'Kripya ek valid CSV file upload karein.')
+                return redirect("..")
+            
+            file_data = csv_file.read().decode("utf-8")
+            csv_data = io.StringIO(file_data)
+            reader = csv.DictReader(csv_data)
+            
+            count = 0
+            try:
+                with transaction.atomic():
+                    for row in reader:
+                        sku_val = row.get('sku', '').strip()
+                        bin_code = row.get('bin_code', '').strip()
+                        
+                        if not sku_val or not bin_code: 
+                            continue 
+                        
+                        bin_obj = Bin.objects.filter(bin_code=bin_code).first()
+                        if not bin_obj:
+                            raise Exception(f"Bin '{bin_code}' database mein nahi mili. Pehle Bin create karein!")
+
+                        owner_phone = row.get('owner_phone', '').strip()
+                        owner_obj = None
+                        if owner_phone:
+                            owner_obj = User.objects.filter(phone=owner_phone).first()
+
+                        total_stock = int(row.get('total_stock', 0) or 0)
+                        cost_price = float(row.get('cost_price', 0.00) or 0.00)
+                        mode = row.get('mode', 'owned').strip().lower()
+                        lead_time = int(row.get('lead_time_hours', 0) or 0)
+
+                        InventoryItem.objects.create(
+                            sku=sku_val,
+                            bin=bin_obj,
+                            owner=owner_obj,
+                            total_stock=total_stock,
+                            cost_price=cost_price,
+                            mode=mode,
+                            lead_time_hours=lead_time
+                        )
+                        count += 1
+
+                self.message_user(request, f"{count} naye inventory items (batches) successfully add ho gaye.")
+                return redirect("..")
+                
+            except Exception as e:
+                messages.error(request, f"Import failed and was rolled back! Error: {e}")
+                return redirect("..")
+            
+        return render(request, "admin/csv_form.html", {"opts": self.model._meta})
+    # -----------------------------------
 
     def lookup_product_data(self, request):
         sku = request.GET.get('sku')
