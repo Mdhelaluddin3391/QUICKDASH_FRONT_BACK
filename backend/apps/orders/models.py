@@ -23,8 +23,8 @@ class Order(models.Model):
     )
 
     DELIVERY_TYPE_CHOICES = (
-        ("express", "10 Minutes"),
-        ("standard", "1–2 Days"),
+        ("express", "Express Delivery"),
+        ("standard", "Standard Delivery"), 
     )
     
     PAYMENT_METHOD_CHOICES = (
