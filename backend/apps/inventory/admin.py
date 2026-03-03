@@ -64,7 +64,6 @@ class InventoryTransactionResource(resources.ModelResource):
 class InventoryItemAdmin(ImportExportModelAdmin):
     resource_class = InventoryItemResource
     
-    # Custom button dikhane ke liye template add kiya gaya hai
     change_list_template = "admin/inventory/inventoryitem/change_list.html"
     
     class Media:
@@ -119,12 +118,10 @@ class InventoryItemAdmin(ImportExportModelAdmin):
         urls = super().get_urls()
         my_urls = [
             path('lookup-product-data/', self.admin_site.admin_view(self.lookup_product_data), name='inventory-product-lookup'),
-            # NAYA PATH: Import CSV ke liye
             path('import-csv/', self.admin_site.admin_view(self.import_csv), name='inventory-import-csv'),
         ]
         return my_urls + urls
 
-    # ---- NAYA LOGIC: Bulk Add Items (Import CSV) ----
     def import_csv(self, request):
         if request.method == "POST":
             csv_file = request.FILES.get("csv_file")
@@ -167,6 +164,7 @@ class InventoryItemAdmin(ImportExportModelAdmin):
                             owner=owner_obj,
                             total_stock=total_stock,
                             cost_price=cost_price,
+                            price=0,  # <-- FIX: Yahan explicit price=0 (integer) bheja gaya hai taaki TypeError na aaye
                             mode=mode,
                             lead_time_hours=lead_time
                         )
@@ -180,7 +178,6 @@ class InventoryItemAdmin(ImportExportModelAdmin):
                 return redirect("..")
             
         return render(request, "admin/csv_form.html", {"opts": self.model._meta})
-    # -------------------------------------------------
 
     def lookup_product_data(self, request):
         sku = request.GET.get('sku')
