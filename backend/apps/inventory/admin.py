@@ -64,7 +64,7 @@ class InventoryTransactionResource(resources.ModelResource):
 class InventoryItemAdmin(ImportExportModelAdmin):
     resource_class = InventoryItemResource
     
-    # NAYA: Custom button dikhane ke liye template add kiya hai
+    # Custom button dikhane ke liye template add kiya gaya hai
     change_list_template = "admin/inventory/inventoryitem/change_list.html"
     
     class Media:
@@ -119,12 +119,12 @@ class InventoryItemAdmin(ImportExportModelAdmin):
         urls = super().get_urls()
         my_urls = [
             path('lookup-product-data/', self.admin_site.admin_view(self.lookup_product_data), name='inventory-product-lookup'),
-            # NAYA: Import CSV ka rasta yaha se banega
+            # NAYA PATH: Import CSV ke liye
             path('import-csv/', self.admin_site.admin_view(self.import_csv), name='inventory-import-csv'),
         ]
         return my_urls + urls
 
-    # ---- NAYA: Import CSV Function ----
+    # ---- NAYA LOGIC: Bulk Add Items (Import CSV) ----
     def import_csv(self, request):
         if request.method == "POST":
             csv_file = request.FILES.get("csv_file")
@@ -149,7 +149,7 @@ class InventoryItemAdmin(ImportExportModelAdmin):
                         
                         bin_obj = Bin.objects.filter(bin_code=bin_code).first()
                         if not bin_obj:
-                            raise Exception(f"Bin '{bin_code}' database mein nahi mili. Pehle Bin create karein!")
+                            raise Exception(f"Bin '{bin_code}' database mein nahi mili. Pehle is Bin ko 'Warehouse' section me banayein!")
 
                         owner_phone = row.get('owner_phone', '').strip()
                         owner_obj = None
@@ -176,11 +176,11 @@ class InventoryItemAdmin(ImportExportModelAdmin):
                 return redirect("..")
                 
             except Exception as e:
-                messages.error(request, f"Import failed and was rolled back! Error: {e}")
+                messages.error(request, f"Import fail ho gaya! Koi data save nahi hua. Error: {e}")
                 return redirect("..")
             
         return render(request, "admin/csv_form.html", {"opts": self.model._meta})
-    # -----------------------------------
+    # -------------------------------------------------
 
     def lookup_product_data(self, request):
         sku = request.GET.get('sku')
