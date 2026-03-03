@@ -87,11 +87,27 @@ window.LocationPicker = {
             const mapEl = document.getElementById('lp-map');
             if (!mapEl) return;
 
+            // ✅ Premium Light/Silver Theme Array added here
+            const silverMapStyles = [
+                { "featureType": "all", "elementType": "geometry.fill", "stylers": [{"weight": "2.00"}] },
+                { "featureType": "all", "elementType": "geometry.stroke", "stylers": [{"color": "#9c9c9c"}] },
+                { "featureType": "all", "elementType": "labels.text", "stylers": [{"visibility": "on"}] },
+                { "featureType": "landscape", "elementType": "all", "stylers": [{"color": "#f2f2f2"}] },
+                { "featureType": "landscape", "elementType": "geometry.fill", "stylers": [{"color": "#ffffff"}] },
+                { "featureType": "poi", "elementType": "all", "stylers": [{"visibility": "off"}] },
+                { "featureType": "road", "elementType": "all", "stylers": [{"saturation": -100}, {"lightness": 45}] },
+                { "featureType": "road", "elementType": "geometry.fill", "stylers": [{"color": "#eeeeee"}] },
+                { "featureType": "road", "elementType": "labels.text.fill", "stylers": [{"color": "#7b7b7b"}] },
+                { "featureType": "road", "elementType": "labels.text.stroke", "stylers": [{"color": "#ffffff"}] },
+                { "featureType": "water", "elementType": "all", "stylers": [{"color": "#e9e9e9"}, {"visibility": "on"}] }
+            ];
+
             this.googleMap = new google.maps.Map(mapEl, {
                 center: this.tempCoords,
                 zoom: 17,
                 disableDefaultUI: true,
-                gestureHandling: 'greedy'
+                gestureHandling: 'greedy',
+                styles: silverMapStyles // ✅ Theme Applied
             });
 
             this.geocoder = new google.maps.Geocoder();
@@ -120,8 +136,11 @@ window.LocationPicker = {
             17
         );
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
+        // ✅ Replaced OSM default with CartoDB Premium Light TileLayer
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors, &copy; CARTO',
+            subdomains: 'abcd',
+            maxZoom: 20
         }).addTo(this.leafletMap);
 
         this.leafletMap.on('moveend', () => {
