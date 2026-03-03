@@ -66,8 +66,13 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = (
             "id", "name", "sku", "description", "mrp", 
-            "sale_price", "effective_price", "unit", "image_url", "is_active","estimated_delivery"
+            "sale_price", "effective_price", "unit", "image_url", "is_active","estimated_delivery",
+            # Naye Enterprise Fields Add Kiye
+            "dietary_preference", "allergens", "shelf_life", "nutri_score", 
+            "eco_score", "weight_in_grams", "packaging_type", 
+            "is_returnable", "max_order_quantity", "tax_rate"
         )
+        
     def get_estimated_delivery(self, obj):
         """
         Product ke liye sabse fast available stock ka ETA return karta hai.
@@ -97,6 +102,7 @@ class ProductSerializer(serializers.ModelSerializer):
         if hasattr(obj, 'effective_price') and obj.effective_price is not None:
             return obj.effective_price
         return obj.mrp
+
 
 class CategorySerializer(serializers.ModelSerializer):
     """
@@ -194,6 +200,12 @@ class StorefrontProductDocSerializer(serializers.Serializer):
     selling_price = serializers.DecimalField(max_digits=10, decimal_places=2)
     available_stock = serializers.IntegerField()
     estimated_delivery = serializers.CharField(required=False, default="20 mins")
+    
+    # Storefront Documentation (Swagger/Docs) ko bhi update kar diya
+    dietary_preference = serializers.CharField()
+    is_returnable = serializers.BooleanField()
+    max_order_quantity = serializers.IntegerField()
+
 
 class StorefrontCategoryDocSerializer(serializers.Serializer):
     id = serializers.IntegerField()

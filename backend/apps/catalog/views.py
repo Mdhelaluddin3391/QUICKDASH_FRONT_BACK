@@ -66,6 +66,7 @@ class SkuListAPIView(generics.ListAPIView):
     """
     Listing Page (Search/Category).
     Supports sorting by Price which requires Warehouse Context.
+    Also supports filtering by dietary preference (e.g. ?dietary=VEG).
     """
     permission_classes = [AllowAny]
     authentication_classes = [] 
@@ -73,9 +74,9 @@ class SkuListAPIView(generics.ListAPIView):
     pagination_class = SkuPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     
-    filterset_fields = ['is_active'] 
+    filterset_fields = ['is_active', 'is_returnable'] 
     
-    search_fields = ['name', 'sku', 'description', 'category__name', 'category__parent__name','category__parent__parent__name']
+    search_fields = ['name', 'sku', 'description', 'category__name', 'category__parent__name','category__parent__parent__name', 'search_tags']
     ordering_fields = ['effective_price', 'created_at']
 
     def get_queryset(self):
@@ -94,6 +95,11 @@ class SkuListAPIView(generics.ListAPIView):
             brand_ids = [b for b in brands.split(',') if b.strip().isdigit()]
             if brand_ids:
                 qs = qs.filter(brand_id__in=brand_ids)
+
+        # NEW: Filter by dietary preference
+        dietary = self.request.query_params.get('dietary')
+        if dietary:
+            qs = qs.filter(dietary_preference=dietary.upper())
 
         ordering = self.request.query_params.get('ordering')
         
@@ -442,14 +448,18 @@ class GlobalSearchAPIView(APIView):
     def get(self, request):
         query = request.query_params.get("q", "").strip() or request.query_params.get("search", "").strip()
         brand_id = request.query_params.get("brand") 
+        dietary = request.query_params.get("dietary") # NEW: Support for dietary filter
         
-        if len(query) < 2 and not brand_id:
+        if len(query) < 2 and not brand_id and not dietary:
             return Response([])
 
         products = Product.objects.filter(is_active=True).select_related('category')
 
         if brand_id:
             products = products.filter(brand_id=brand_id)
+            
+        if dietary:
+            products = products.filter(dietary_preference=dietary.upper())
         
         if query:
             words = re.findall(r'\w+', query)
@@ -460,7 +470,8 @@ class GlobalSearchAPIView(APIView):
                     Q(description__icontains=word) |
                     Q(category__name__icontains=word) |
                     Q(category__parent__name__icontains=word) |
-                    Q(category__parent__parent__name__icontains=word) 
+                    Q(category__parent__parent__name__icontains=word) |
+                    Q(search_tags__icontains=word) # NEW: Searching inside tags too
                 )
             
             products = products.annotate(
@@ -469,11 +480,12 @@ class GlobalSearchAPIView(APIView):
                     When(sku__iexact=query, then=Value(2)),
                     When(name__istartswith=query, then=Value(3)),
                     When(name__icontains=query, then=Value(4)),
-                    When(description__icontains=query, then=Value(5)),
-                    When(category__name__icontains=query, then=Value(6)),
-                    When(category__parent__name__icontains=query, then=Value(7)),
-                    When(category__parent__parent__name__icontains=query, then=Value(8)), # Naya level
-                    default=Value(9),
+                    When(search_tags__icontains=query, then=Value(5)), # High priority for direct tag matches
+                    When(description__icontains=query, then=Value(6)),
+                    When(category__name__icontains=query, then=Value(7)),
+                    When(category__parent__name__icontains=query, then=Value(8)),
+                    When(category__parent__parent__name__icontains=query, then=Value(9)),
+                    default=Value(10),
                     output_field=IntegerField()
                 )
             ).order_by('relevance', '-created_at')
@@ -499,6 +511,7 @@ class SearchSuggestAPIView(APIView):
             product_results = product_results.filter(
                 Q(name__icontains=word) | 
                 Q(description__icontains=word) | 
+                Q(search_tags__icontains=word) | # Included search tags
                 Q(category__name__icontains=word) | 
                 Q(category__parent__name__icontains=word) | 
                 Q(category__parent__parent__name__icontains=word) |
@@ -510,8 +523,9 @@ class SearchSuggestAPIView(APIView):
             relevance=Case(
                 When(name__istartswith=query, then=Value(1)), 
                 When(name__icontains=query, then=Value(2)),
-                When(description__icontains=query, then=Value(3)), 
-                default=Value(4), 
+                When(search_tags__icontains=query, then=Value(3)),
+                When(description__icontains=query, then=Value(4)), 
+                default=Value(5), 
                 output_field=IntegerField()
             )
         ).order_by('relevance')[:5]
@@ -532,9 +546,7 @@ class SearchSuggestAPIView(APIView):
         for p in product_results:
             image_url = None
             if hasattr(p, 'image') and p.image:
-                image_url = request.build_absolute_uri(p.image.url)
-            elif hasattr(p, 'images') and p.images.exists() and p.images.first().image:
-                image_url = request.build_absolute_uri(p.images.first().image.url)
+                image_url = request.build_absolute_uri(p.image)
                 
             data.append({
                 "text": p.name, 
@@ -554,12 +566,14 @@ class BannerListAPIView(generics.ListAPIView):
     queryset = Banner.objects.filter(is_active=True)
     pagination_class = None
 
+
 class BrandListAPIView(generics.ListAPIView):
     permission_classes = [AllowAny]
     authentication_classes = [] 
     serializer_class = BrandSerializer
     queryset = Brand.objects.filter(is_active=True)
     pagination_class = CategoryBrandPagination
+
 
 class FlashSaleListAPIView(APIView):
     permission_classes = [AllowAny]
@@ -576,7 +590,6 @@ class CategoryListAPIView(generics.ListAPIView):
     authentication_classes = [] 
     serializer_class = SimpleCategorySerializer 
     pagination_class = CategoryBrandPagination
-    
     
     def get_queryset(self):
         return Category.objects.filter(is_active=True).order_by('sort_order', 'name')
