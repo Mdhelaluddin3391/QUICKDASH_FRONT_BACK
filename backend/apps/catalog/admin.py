@@ -43,12 +43,17 @@ class ProductResource(resources.ModelResource):
         UPGRADED OPEN FOOD FACTS API LOGIC
         CSV mein agar sirf SKU ho, toh baaki saari details API se automatically aa jayengi!
         """
+        # 1. ID Clash Protection
         if 'id' in row:
             del row['id']
+            
         sku_val = str(row.get('sku', '')).strip()
         name_val = str(row.get('name', '')).strip()
         brand_name = str(row.get('brand', '')).strip()
         category_name = str(row.get('category', '')).strip()
+
+        # Initialize product_data safely so it's always available for Unit fallback
+        product_data = {}
 
         if sku_val:
             try:
@@ -67,15 +72,22 @@ class ProductResource(resources.ModelResource):
                         
                         # 2. Auto Categories & Brands
                         if not brand_name and product_data.get('brands'): 
-                            brand_name = product_data.get('brands').split(',')[0].strip()
+                            brand_name = str(product_data.get('brands')).split(',')[0].strip()
                         if not category_name and product_data.get('categories'): 
-                            category_name = product_data.get('categories').split(',')[0].strip()
+                            category_name = str(product_data.get('categories')).split(',')[0].strip()
                         
-                        # 3. Health & Packaging
-                        if not row.get('allergens'): row['allergens'] = product_data.get('allergens_from_ingredients', '').replace('en:', '')
-                        if not row.get('nutri_score'): row['nutri_score'] = product_data.get('nutriscore_grade', '').upper()
-                        if not row.get('eco_score'): row['eco_score'] = product_data.get('ecoscore_grade', '').upper()
-                        if not row.get('packaging_type'): row['packaging_type'] = product_data.get('packaging', '')
+                        # 3. Health & Packaging (DATABASE CRASH-PROOF FIX APPLIED)
+                        if not row.get('allergens'): 
+                            row['allergens'] = str(product_data.get('allergens_from_ingredients', '')).replace('en:', '')
+                            
+                        if not row.get('nutri_score'): 
+                            row['nutri_score'] = str(product_data.get('nutriscore_grade', '')).upper()[:5]  # Limits to 5 chars max
+                            
+                        if not row.get('eco_score'): 
+                            row['eco_score'] = str(product_data.get('ecoscore_grade', '')).upper()[:5]      # Limits to 5 chars max
+                            
+                        if not row.get('packaging_type'): 
+                            row['packaging_type'] = str(product_data.get('packaging', ''))
                         
                         # 4. Dietary Check (Veg/Vegan)
                         if not row.get('dietary_preference') or row.get('dietary_preference') == 'NONE':
@@ -86,7 +98,7 @@ class ProductResource(resources.ModelResource):
                                 elif 'en:non-vegetarian' in tags: row['dietary_preference'] = 'NON_VEG'
 
             except Exception as e:
-                pass # API fail hone par import nahi rukega
+                pass # API fail hone par import nahi rukega, CSV wala data save ho jayega
 
         # Set Fallbacks
         row['name'] = row.get('name') or name_val or f"Unknown Product (SKU: {sku_val})"
@@ -105,14 +117,13 @@ class ProductResource(resources.ModelResource):
         else:
             row['brand'] = None
         
+        # 5. Prevent empty MRP crash
         if not row.get('mrp'): 
             row['mrp'] = 0.00
             
-        # 6. Auto-fetch Unit from API
+        # 6. Auto-fetch Unit safely
         if not row.get('unit'): 
-            # Check if API gave us a quantity string (like "400 g" or "1 L")
-            api_quantity = product_data.get('quantity', '').strip() if 'product_data' in locals() else ''
-            
+            api_quantity = str(product_data.get('quantity', '')).strip()
             if api_quantity:
                 row['unit'] = api_quantity
             else:
