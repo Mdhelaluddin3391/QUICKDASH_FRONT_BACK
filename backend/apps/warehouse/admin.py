@@ -3,6 +3,8 @@ from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import localtime
 from leaflet.admin import LeafletGeoAdmin
+
+# Import Export Magic for Master Admin
 from import_export import resources, fields
 from import_export.widgets import ForeignKeyWidget
 from import_export.admin import ImportExportModelAdmin
@@ -11,6 +13,9 @@ from .models import Warehouse, PickingTask, PackingTask, StorageZone, Aisle, Rac
 from apps.orders.models import Order
 from apps.inventory.models import InventoryItem
 
+# ==========================================
+# 1. CSV IMPORT / EXPORT RESOURCES
+# ==========================================
 
 class WarehouseResource(resources.ModelResource):
     class Meta:
@@ -59,13 +64,14 @@ class BinResource(resources.ModelResource):
 
 
 # ==========================================
-# ENTERPRISE WAREHOUSE ADMINS (STRICT ISOLATION)
+# 2. MASTER ADMIN VIEWS (GLOBAL ACCESS)
 # ==========================================
 
 @admin.register(Warehouse)
 class WarehouseAdmin(ImportExportModelAdmin, LeafletGeoAdmin):
     resource_class = WarehouseResource
-    list_display = ('name', 'code', 'warehouse_type_display', 'city', 'is_active_badge', 'created_at_date')
+    list_display = ('id', 'name', 'code', 'warehouse_type_display', 'city', 'is_active_badge', 'created_at_date')
+    list_display_links = ('id', 'name')
     list_filter = ('warehouse_type', 'city', 'state', 'is_active')
     search_fields = ('name', 'code', 'city', 'state')
     list_per_page = 25
@@ -80,16 +86,10 @@ class WarehouseAdmin(ImportExportModelAdmin, LeafletGeoAdmin):
     readonly_fields = ('created_at',)
     settings_overrides = {'DEFAULT_CENTER': (20.5937, 78.9629), 'DEFAULT_ZOOM': 5}
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        wh_id = request.session.get('selected_warehouse_id')
-        if wh_id: return qs.filter(id=wh_id)
-        return qs.none()
-
     def warehouse_type_display(self, obj):
         type_colors = {'dark_store': '#28a745', 'mega': '#007bff'}
         color = type_colors.get(obj.warehouse_type, '#6c757d')
-        return format_html('<span style="background-color: {}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">{}</span>', color, obj.get_warehouse_type_display())
+        return format_html('<span style="background-color: {}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em; font-weight: bold;">{}</span>', color, obj.get_warehouse_type_display().upper())
     warehouse_type_display.short_description = "Type"
 
     def is_active_badge(self, obj):
@@ -98,168 +98,145 @@ class WarehouseAdmin(ImportExportModelAdmin, LeafletGeoAdmin):
     is_active_badge.short_description = "Status"
 
     def created_at_date(self, obj):
-        if hasattr(obj, 'created_at') and obj.created_at: return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+        if hasattr(obj, 'created_at') and obj.created_at: return localtime(obj.created_at).strftime('%d %b %Y, %H:%M')
         return "N/A"
     created_at_date.short_description = "Created"
+
+    @admin.action(description="🟢 Activate Selected Warehouses")
+    def activate_warehouses(self, request, queryset):
+        queryset.update(is_active=True)
+
+    @admin.action(description="🔴 Deactivate Selected Warehouses")
+    def deactivate_warehouses(self, request, queryset):
+        queryset.update(is_active=False)
 
 
 @admin.register(StorageZone)
 class StorageZoneAdmin(ImportExportModelAdmin):
     resource_class = StorageZoneResource
-    list_display = ('name', 'warehouse_code')
-    search_fields = ('name',)
+    list_display = ('id', 'name', 'warehouse_code')
+    list_display_links = ('id', 'name')
+    list_filter = ('warehouse',) # Global filter added
+    search_fields = ('name', 'warehouse__code', 'warehouse__name')
     list_select_related = ('warehouse',)
+    raw_id_fields = ('warehouse',) # Faster loading
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        wh_id = request.session.get('selected_warehouse_id')
-        if wh_id: return qs.filter(warehouse_id=wh_id)
-        return qs.none()
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        wh_id = request.session.get('selected_warehouse_id')
-        if db_field.name == "warehouse" and wh_id:
-            kwargs["queryset"] = Warehouse.objects.filter(id=wh_id)
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
-    def warehouse_code(self, obj): return obj.warehouse.code
+    def warehouse_code(self, obj): return obj.warehouse.name
     warehouse_code.short_description = "Warehouse"
 
 
 @admin.register(Aisle)
 class AisleAdmin(ImportExportModelAdmin):
     resource_class = AisleResource
-    list_display = ('number', 'zone_name', 'warehouse_info')
+    list_display = ('id', 'number', 'zone_name', 'warehouse_info')
+    list_filter = ('zone__warehouse', 'zone')
+    search_fields = ('number', 'zone__name', 'zone__warehouse__code')
     list_select_related = ('zone', 'zone__warehouse')
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        wh_id = request.session.get('selected_warehouse_id')
-        if wh_id: return qs.filter(zone__warehouse_id=wh_id)
-        return qs.none()
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        wh_id = request.session.get('selected_warehouse_id')
-        if db_field.name == "zone" and wh_id:
-            kwargs["queryset"] = StorageZone.objects.filter(warehouse_id=wh_id)
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    raw_id_fields = ('zone',)
 
     def zone_name(self, obj): return obj.zone.name
     zone_name.short_description = "Zone"
     
-    def warehouse_info(self, obj): return obj.zone.warehouse.code
+    def warehouse_info(self, obj): return obj.zone.warehouse.name
     warehouse_info.short_description = "Warehouse"
 
 
 @admin.register(Rack)
 class RackAdmin(ImportExportModelAdmin):
     resource_class = RackResource
-    list_display = ('number', 'aisle_info', 'warehouse_info')
+    list_display = ('id', 'number', 'aisle_info', 'warehouse_info')
+    list_filter = ('aisle__zone__warehouse', 'aisle__zone')
+    search_fields = ('number', 'aisle__number', 'aisle__zone__warehouse__code')
     list_select_related = ('aisle', 'aisle__zone', 'aisle__zone__warehouse')
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        wh_id = request.session.get('selected_warehouse_id')
-        if wh_id: return qs.filter(aisle__zone__warehouse_id=wh_id)
-        return qs.none()
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        wh_id = request.session.get('selected_warehouse_id')
-        if db_field.name == "aisle" and wh_id:
-            kwargs["queryset"] = Aisle.objects.filter(zone__warehouse_id=wh_id)
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    raw_id_fields = ('aisle',)
 
     def aisle_info(self, obj): return f"{obj.aisle.zone.name} - Aisle {obj.aisle.number}"
     aisle_info.short_description = "Aisle/Zone"
     
-    def warehouse_info(self, obj): return obj.aisle.zone.warehouse.code
+    def warehouse_info(self, obj): return obj.aisle.zone.warehouse.name
     warehouse_info.short_description = "Warehouse"
 
 
 @admin.register(Bin)
 class BinAdmin(ImportExportModelAdmin):
     resource_class = BinResource
-    list_display = ('bin_code', 'capacity_units', 'rack_info')
-    search_fields = ('bin_code',)
+    list_display = ('id', 'bin_code', 'capacity_units', 'rack_info', 'warehouse_info')
+    list_filter = ('rack__aisle__zone__warehouse',)
+    search_fields = ('bin_code', 'rack__number', 'rack__aisle__zone__warehouse__code')
     list_select_related = ('rack', 'rack__aisle', 'rack__aisle__zone', 'rack__aisle__zone__warehouse')
+    raw_id_fields = ('rack',)
     list_editable = ('capacity_units',)
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        wh_id = request.session.get('selected_warehouse_id')
-        if wh_id: return qs.filter(rack__aisle__zone__warehouse_id=wh_id)
-        return qs.none()
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        wh_id = request.session.get('selected_warehouse_id')
-        if db_field.name == "rack" and wh_id:
-            kwargs["queryset"] = Rack.objects.filter(aisle__zone__warehouse_id=wh_id)
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    list_per_page = 50
 
     def rack_info(self, obj):
-        return f"{obj.rack.aisle.zone.name} - A{obj.rack.aisle.number} - R{obj.rack.number}"
-    rack_info.short_description = "Location"
+        return f"Zone: {obj.rack.aisle.zone.name} | A:{obj.rack.aisle.number} | R:{obj.rack.number}"
+    rack_info.short_description = "Internal Location"
+
+    def warehouse_info(self, obj): return obj.rack.aisle.zone.warehouse.name
+    warehouse_info.short_description = "Warehouse"
 
 
 @admin.register(PickingTask)
 class PickingTaskAdmin(ImportExportModelAdmin):
     resource_class = PickingTaskResource
-    list_display = ("order_id", "item_sku", "quantity_to_pick", "status_badge", "picker_info", "picked_at", "target_inventory_batch")
-    list_filter = ("status", "picked_at")
-    search_fields = ("order__id", "item_sku", "picker__phone")
-    list_select_related = ('order', 'picker', 'target_inventory_batch')
+    list_display = ("id", "order_id", "warehouse_info", "item_sku", "quantity_to_pick", "status_badge", "picker_info", "picked_at")
+    list_filter = ("status", "order__fulfillment_warehouse", "picked_at")
+    search_fields = ("order__id", "item_sku", "picker__phone", "picker__first_name")
+    list_select_related = ('order', 'order__fulfillment_warehouse', 'picker', 'target_inventory_batch')
     raw_id_fields = ["order", "picker", "target_inventory_batch"]
-    list_per_page = 25
+    list_per_page = 50
     actions = ["reset_to_pending", "mark_as_completed"]
     readonly_fields = ('picked_at',)
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        wh_id = request.session.get('selected_warehouse_id')
-        if wh_id: return qs.filter(order__fulfillment_warehouse_id=wh_id)
-        return qs.none()
+    date_hierarchy = 'picked_at'
 
     def order_id(self, obj): return f"#{obj.order.id}"
-    order_id.short_description = "Order ID"
+    order_id.short_description = "Order"
+
+    def warehouse_info(self, obj): 
+        return obj.order.fulfillment_warehouse.name if obj.order.fulfillment_warehouse else "N/A"
+    warehouse_info.short_description = "Warehouse"
 
     def status_badge(self, obj):
         colors = {'pending': '#ffc107', 'in_progress': '#007bff', 'picked': '#28a745', 'failed': '#dc3545'}
         color = colors.get(obj.status, '#6c757d')
-        return format_html('<span style="background-color: {}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">{}</span>', color, obj.get_status_display())
+        return format_html('<span style="background-color: {}; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold;">{}</span>', color, obj.get_status_display().upper())
     status_badge.short_description = "Status"
 
     def picker_info(self, obj):
-        return f"{obj.picker.user.phone}" if obj.picker else "Unassigned"
+        if obj.picker:
+            return format_html('<b style="color:blue;">{}</b>', obj.picker.phone)
+        return format_html('<span style="color:red;">Unassigned</span>')
     picker_info.short_description = "Picker"
 
-    @admin.action(description="Reset selected tasks to pending")
+    @admin.action(description="🔄 Reset selected tasks to Pending")
     def reset_to_pending(self, request, queryset):
-        queryset.update(status="pending", picker=None, picked_at=None)
+        updated = queryset.update(status="pending", picker=None, picked_at=None)
+        self.message_user(request, f"{updated} tasks reset to Pending.")
 
-    @admin.action(description="Mark selected tasks as completed")
+    @admin.action(description="✅ Mark selected tasks as Picked")
     def mark_as_completed(self, request, queryset):
         from django.utils import timezone
-        queryset.filter(status__in=['pending', 'in_progress']).update(status="picked", picked_at=timezone.now())
+        updated = queryset.filter(status__in=['pending', 'in_progress']).update(status="picked", picked_at=timezone.now())
+        self.message_user(request, f"{updated} tasks marked as Picked.")
 
 
 @admin.register(PackingTask)
 class PackingTaskAdmin(ImportExportModelAdmin):
     resource_class = PackingTaskResource
-    list_display = ("order_id", "is_completed_badge", "packer_info", "created_at_date")
-    list_filter = ("is_completed", "created_at")
-    search_fields = ("order__id", "packer__phone")
-    list_select_related = ('order', 'packer')
+    list_display = ("id", "order_id", "warehouse_info", "is_completed_badge", "packer_info", "created_at_date")
+    list_filter = ("is_completed", "order__fulfillment_warehouse", "created_at")
+    search_fields = ("order__id", "packer__phone", "packer__first_name")
+    list_select_related = ('order', 'order__fulfillment_warehouse', 'packer')
     raw_id_fields = ["order", "packer"]
-    list_per_page = 25
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        wh_id = request.session.get('selected_warehouse_id')
-        if wh_id: return qs.filter(order__fulfillment_warehouse_id=wh_id)
-        return qs.none()
+    list_per_page = 50
+    date_hierarchy = 'created_at'
 
     def order_id(self, obj): return f"#{obj.order.id}"
-    order_id.short_description = "Order ID"
+    order_id.short_description = "Order"
+
+    def warehouse_info(self, obj): 
+        return obj.order.fulfillment_warehouse.name if obj.order.fulfillment_warehouse else "N/A"
+    warehouse_info.short_description = "Warehouse"
 
     def is_completed_badge(self, obj):
         if obj.is_completed: return format_html('<span style="color: green; font-weight: bold;">✓ Completed</span>')
@@ -267,10 +244,12 @@ class PackingTaskAdmin(ImportExportModelAdmin):
     is_completed_badge.short_description = "Status"
 
     def packer_info(self, obj):
-        return f"{obj.packer.user.phone}" if obj.packer else "Unassigned"
+        if obj.packer:
+            return format_html('<b style="color:blue;">{}</b>', obj.packer.phone)
+        return format_html('<span style="color:red;">Unassigned</span>')
     packer_info.short_description = "Packer"
 
     def created_at_date(self, obj):
-        if hasattr(obj, 'created_at') and obj.created_at: return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+        if hasattr(obj, 'created_at') and obj.created_at: return localtime(obj.created_at).strftime('%d %b %Y, %H:%M')
         return "N/A"
     created_at_date.short_description = "Created"

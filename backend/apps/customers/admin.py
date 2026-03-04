@@ -6,12 +6,40 @@ from django.utils.timezone import localtime
 from django.db.models import Count, Sum, Q
 from django.urls import reverse
 
-from apps.orders.models import Order
-from apps.core.admin_mixins import WarehouseScopedAdmin
+# Import Export for Master Admin Analytics
+from import_export import resources, fields, widgets
+from import_export.admin import ImportExportModelAdmin
+
 from .models import CustomerProfile, CustomerAddress, SupportTicket
 
 User = get_user_model()
 
+# ==========================================
+# 1. CSV EXPORT RESOURCES
+# ==========================================
+
+class CustomerProfileResource(resources.ModelResource):
+    user_phone = fields.Field(column_name='Phone', attribute='user', widget=widgets.ForeignKeyWidget(User, 'phone'))
+    user_name = fields.Field(column_name='Name')
+
+    class Meta:
+        model = CustomerProfile
+        fields = ('id', 'user_phone', 'user_name', 'created_at')
+
+    def dehydrate_user_name(self, obj):
+        return f"{obj.user.first_name} {obj.user.last_name}".strip()
+
+class SupportTicketResource(resources.ModelResource):
+    user_phone = fields.Field(column_name='Customer Phone', attribute='user', widget=widgets.ForeignKeyWidget(User, 'phone'))
+    
+    class Meta:
+        model = SupportTicket
+        fields = ('id', 'user_phone', 'order_id', 'issue_type', 'status', 'description', 'created_at')
+
+
+# ==========================================
+# 2. MASTER ADMIN VIEWS
+# ==========================================
 
 class CustomerAddressInline(admin.StackedInline):
     model = CustomerAddress
@@ -29,8 +57,12 @@ class CustomerAddressInline(admin.StackedInline):
 
 
 @admin.register(CustomerProfile)
-class CustomerProfileAdmin(WarehouseScopedAdmin):
+class CustomerProfileAdmin(ImportExportModelAdmin):
+    """UPGRADED: Full Access to Master Admin, No Warehouse Scoping"""
+    resource_class = CustomerProfileResource
+    
     list_display = (
+        'id',
         'user_phone',
         'user_name',
         'total_orders',
@@ -38,6 +70,7 @@ class CustomerProfileAdmin(WarehouseScopedAdmin):
         'support_tickets_count',
         'created_at_date'
     )
+    list_display_links = ('id', 'user_phone')
     list_filter = ('created_at',)
     search_fields = (
         'user__phone',
@@ -47,7 +80,7 @@ class CustomerProfileAdmin(WarehouseScopedAdmin):
     )
     list_select_related = ('user',)
     raw_id_fields = ('user',)
-    list_per_page = 25
+    list_per_page = 50
 
     inlines = [CustomerAddressInline]
 
@@ -73,15 +106,8 @@ class CustomerProfileAdmin(WarehouseScopedAdmin):
     )
 
     def get_queryset(self, request):
+        """Enterprise Rule: Master admin gets ALL data directly!"""
         qs = super().get_queryset(request)
-        wh_id = request.session.get('selected_warehouse_id')
-        
-        # Enterprise Rule: Only show customers who interacted with THIS warehouse
-        if wh_id:
-            qs = qs.filter(user__orders__fulfillment_warehouse_id=wh_id).distinct()
-        else:
-            return qs.none()
-
         return qs.annotate(
             annotated_orders=Count('user__orders', distinct=True),
             annotated_tickets=Count('user__supportticket', distinct=True),
@@ -115,7 +141,7 @@ class CustomerProfileAdmin(WarehouseScopedAdmin):
     def total_spent(self, obj):
         total = getattr(obj, 'annotated_spent', 0) or 0
         return format_html('<span style="color: green; font-weight: bold;">₹{:.2f}</span>', float(total))
-    total_spent.short_description = "Total Spent (Delivered)"
+    total_spent.short_description = "Total Spent"
     total_spent.admin_order_field = 'annotated_spent'
 
     def support_tickets_count(self, obj):
@@ -130,15 +156,17 @@ class CustomerProfileAdmin(WarehouseScopedAdmin):
 
     def created_at_date(self, obj):
         if hasattr(obj, 'created_at') and obj.created_at:
-            return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+            return localtime(obj.created_at).strftime('%d %b %Y, %H:%M')
         return "N/A"
-    created_at_date.short_description = "Joined Date"
+    created_at_date.short_description = "Joined"
     created_at_date.admin_order_field = 'created_at'
 
 
 @admin.register(CustomerAddress)
-class CustomerAddressAdmin(WarehouseScopedAdmin):
+class CustomerAddressAdmin(admin.ModelAdmin):
+    """UPGRADED: Manage Customer Addresses Global View"""
     list_display = (
+        'id',
         'customer_phone',
         'label_badge',
         'address_summary',
@@ -147,13 +175,8 @@ class CustomerAddressAdmin(WarehouseScopedAdmin):
         'is_deleted_badge',
         'created_at_date'
     )
-    list_filter = (
-        'label',
-        'is_default',
-        'is_deleted',
-        'city',
-        'created_at'
-    )
+    list_display_links = ('id', 'customer_phone')
+    list_filter = ('label', 'is_default', 'is_deleted', 'city', 'created_at')
     search_fields = (
         'customer__user__phone',
         'house_no',
@@ -165,11 +188,11 @@ class CustomerAddressAdmin(WarehouseScopedAdmin):
     )
     list_select_related = ('customer', 'customer__user')
     raw_id_fields = ('customer',)
-    list_per_page = 25
+    list_per_page = 50
     actions = ['mark_as_default', 'mark_as_deleted', 'restore_addresses']
 
     fieldsets = (
-        ('Customer', {
+        ('Customer Info', {
             'fields': ('customer',)
         }),
         ('Address Details', {
@@ -190,16 +213,9 @@ class CustomerAddressAdmin(WarehouseScopedAdmin):
 
     readonly_fields = ('created_at',)
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        wh_id = request.session.get('selected_warehouse_id')
-        if wh_id:
-            return qs.filter(customer__user__orders__fulfillment_warehouse_id=wh_id).distinct()
-        return qs.none()
-
     def customer_phone(self, obj):
         return obj.customer.user.phone
-    customer_phone.short_description = "Customer"
+    customer_phone.short_description = "Customer Phone"
     customer_phone.admin_order_field = 'customer__user__phone'
 
     def label_badge(self, obj):
@@ -210,7 +226,7 @@ class CustomerAddressAdmin(WarehouseScopedAdmin):
         }
         color = colors.get(obj.label, '#6c757d')
         return format_html(
-            '<span style="background-color: {}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em;">{}</span>',
+            '<span style="background-color: {}; color: white; padding: 2px 6px; border-radius: 3px; font-size: 0.8em; font-weight:bold;">{}</span>',
             color,
             obj.get_label_display()
         )
@@ -226,24 +242,24 @@ class CustomerAddressAdmin(WarehouseScopedAdmin):
 
     def is_default_badge(self, obj):
         if obj.is_default:
-            return format_html('<span style="color: green; font-weight: bold;">✓ Default</span>')
+            return format_html('<span style="color: green; font-weight: bold;">⭐ Default</span>')
         return ""
     is_default_badge.short_description = "Default"
 
     def is_deleted_badge(self, obj):
         if obj.is_deleted:
-            return format_html('<span style="color: red; font-weight: bold;">✗ Deleted</span>')
+            return format_html('<span style="color: red; font-weight: bold;">❌ Deleted</span>')
         return ""
     is_deleted_badge.short_description = "Status"
 
     def created_at_date(self, obj):
         if hasattr(obj, 'created_at') and obj.created_at:
-            return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+            return localtime(obj.created_at).strftime('%d %b %Y')
         return "N/A"
     created_at_date.short_description = "Created"
-    created_at_date.admin_order_field = 'created_at'
 
-    @admin.action(description='Mark selected addresses as default')
+
+    @admin.action(description='⭐ Mark selected addresses as default')
     def mark_as_default(self, request, queryset):
         for address in queryset:
             CustomerAddress.objects.filter(
@@ -253,28 +269,32 @@ class CustomerAddressAdmin(WarehouseScopedAdmin):
         updated = queryset.update(is_default=True)
         self.message_user(request, f"{updated} addresses marked as default.")
 
-    @admin.action(description='Mark selected addresses as deleted')
+    @admin.action(description='❌ Mark selected as deleted')
     def mark_as_deleted(self, request, queryset):
         updated = queryset.update(is_deleted=True)
         self.message_user(request, f"{updated} addresses marked as deleted.")
 
-    @admin.action(description='Restore selected addresses')
+    @admin.action(description='🔄 Restore selected addresses')
     def restore_addresses(self, request, queryset):
         updated = queryset.update(is_deleted=False)
         self.message_user(request, f"{updated} addresses restored.")
 
 
 @admin.register(SupportTicket)
-class SupportTicketAdmin(WarehouseScopedAdmin):
+class SupportTicketAdmin(ImportExportModelAdmin):
+    """UPGRADED: Global View for Support Tickets"""
+    resource_class = SupportTicketResource
+    
     list_display = (
         'id',
         'customer_phone',
-        'order_id',
+        'order_id_link',
         'issue_type_badge',
         'status_badge',
         'description_preview',
         'created_at_date'
     )
+    list_display_links = ('id', 'customer_phone')
     list_filter = (
         'issue_type',
         'status',
@@ -289,7 +309,7 @@ class SupportTicketAdmin(WarehouseScopedAdmin):
     )
     list_select_related = ('user', 'order')
     raw_id_fields = ('user', 'order')
-    list_per_page = 25
+    list_per_page = 50
     actions = ['resolve_tickets', 'reject_tickets', 'reopen_tickets']
 
     fieldsets = (
@@ -307,22 +327,20 @@ class SupportTicketAdmin(WarehouseScopedAdmin):
 
     readonly_fields = ('created_at',)
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        wh_id = request.session.get('selected_warehouse_id')
-        if wh_id:
-            return qs.filter(order__fulfillment_warehouse_id=wh_id)
-        return qs.none()
-
     def customer_phone(self, obj):
-        return obj.user.phone
-    customer_phone.short_description = "Customer"
+        if obj.user:
+            return obj.user.phone
+        return "N/A"
+    customer_phone.short_description = "Customer Phone"
     customer_phone.admin_order_field = 'user__phone'
 
-    def order_id(self, obj):
-        return f"#{obj.order.id}"
-    order_id.short_description = "Order ID"
-    order_id.admin_order_field = 'order__id'
+    def order_id_link(self, obj):
+        if obj.order:
+            url = reverse('admin:orders_order_change', args=[obj.order.id])
+            return format_html('<a href="{}" target="_blank" style="font-weight:bold; color:#007bff;">#{}</a>', url, obj.order.id)
+        return "N/A"
+    order_id_link.short_description = "Order ID"
+    order_id_link.admin_order_field = 'order__id'
 
     def issue_type_badge(self, obj):
         colors = {
@@ -347,9 +365,9 @@ class SupportTicketAdmin(WarehouseScopedAdmin):
         }
         color = colors.get(obj.status, '#6c757d')
         return format_html(
-            '<span style="background-color: {}; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8em;">{}</span>',
+            '<span style="background-color: {}; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; font-weight: bold;">{}</span>',
             color,
-            obj.get_status_display()
+            obj.get_status_display().upper()
         )
     status_badge.short_description = "Status"
 
@@ -359,22 +377,22 @@ class SupportTicketAdmin(WarehouseScopedAdmin):
 
     def created_at_date(self, obj):
         if hasattr(obj, 'created_at') and obj.created_at:
-            return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+            return localtime(obj.created_at).strftime('%d %b %Y, %H:%M')
         return "N/A"
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
-    @admin.action(description='Resolve selected tickets')
+    @admin.action(description='✅ Resolve selected tickets')
     def resolve_tickets(self, request, queryset):
         updated = queryset.filter(status='open').update(status='resolved')
-        self.message_user(request, f"{updated} tickets resolved.")
+        self.message_user(request, f"{updated} tickets marked as resolved.")
 
-    @admin.action(description='Reject selected tickets')
+    @admin.action(description='❌ Reject selected tickets')
     def reject_tickets(self, request, queryset):
         updated = queryset.filter(status='open').update(status='rejected')
-        self.message_user(request, f"{updated} tickets rejected.")
+        self.message_user(request, f"{updated} tickets marked as rejected.")
 
-    @admin.action(description='Reopen selected tickets')
+    @admin.action(description='🔄 Reopen selected tickets')
     def reopen_tickets(self, request, queryset):
         updated = queryset.filter(status__in=['resolved', 'rejected']).update(status='open')
         self.message_user(request, f"{updated} tickets reopened.")

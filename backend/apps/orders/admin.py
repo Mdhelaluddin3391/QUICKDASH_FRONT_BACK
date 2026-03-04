@@ -6,13 +6,32 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.timezone import localtime
 from django.db.models import Q, F
 
-from apps.core.admin_mixins import WarehouseScopedAdmin
+# Master Admin Export Feature
+from import_export import resources, fields, widgets
+from import_export.admin import ImportExportModelAdmin
+
 from .models import Order, OrderItem, OrderConfiguration, OrderItemFulfillment, OrderAbuseLog
 from apps.catalog.models import Product
 from apps.warehouse.models import Warehouse
 
 User = get_user_model()
 
+# ==========================================
+# 1. CSV EXPORT RESOURCE
+# ==========================================
+class OrderResource(resources.ModelResource):
+    customer_phone = fields.Field(column_name='Customer Phone', attribute='user', widget=widgets.ForeignKeyWidget(User, 'phone'))
+    fulfillment_wh = fields.Field(column_name='Fulfillment WH', attribute='fulfillment_warehouse', widget=widgets.ForeignKeyWidget(Warehouse, 'name'))
+    
+    class Meta:
+        model = Order
+        fields = ('id', 'customer_phone', 'status', 'delivery_type', 'payment_method', 'total_amount', 'fulfillment_wh', 'created_at')
+        export_order = ('id', 'created_at', 'customer_phone', 'status', 'total_amount', 'payment_method', 'delivery_type', 'fulfillment_wh')
+
+
+# ==========================================
+# 2. MASTER ADMIN VIEWS
+# ==========================================
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
@@ -52,23 +71,32 @@ class OrderItemInline(admin.TabularInline):
 
 
 @admin.register(Order)
-class OrderAdmin(WarehouseScopedAdmin):
+class OrderAdmin(ImportExportModelAdmin):
+    """UPGRADED: Global Master Admin View, No Restrictions"""
+    resource_class = OrderResource
+    
     list_display = (
         'id', 'customer_phone', 'fulfillment_warehouse', 'transit_route', 
         'status_badge', 'payment_method', 'total_amount_display', 
-        'delivery_type', 'delivery_name', 'delivery_phone', 'Maps_link', 'created_at_date'
+        'delivery_type', 'Maps_link', 'created_at_date'
     )
-    list_filter = ('status', 'created_at', 'payment_method', 'delivery_type')
+    list_display_links = ('id', 'customer_phone')
+    list_filter = ('status', 'created_at', 'payment_method', 'delivery_type', 'fulfillment_warehouse')
     search_fields = (
         'id', 'user__phone', 'user__first_name', 'user__last_name'
     )
     list_select_related = ('user', 'fulfillment_warehouse', 'last_mile_warehouse')
     raw_id_fields = ('user', 'fulfillment_warehouse', 'last_mile_warehouse')
     inlines = [OrderItemInline]
-    list_per_page = 25
+    list_per_page = 50
+    
+    # Master Admin Calendar Filter
+    date_hierarchy = 'created_at'
+
+    # Working Bulk Actions
     actions = [
         'mark_as_confirmed', 'mark_as_picking', 'mark_as_packed',
-        'mark_as_out_for_delivery', 'mark_as_delivered', 'cancel_orders'
+        'mark_as_out_for_delivery', 'mark_as_delivered', 'mark_as_cancelled'
     ]
 
     fieldsets = (
@@ -81,26 +109,6 @@ class OrderAdmin(WarehouseScopedAdmin):
 
     readonly_fields = ('id', 'created_at', 'updated_at', 'total_amount', 'delivery_name', 'delivery_phone', 'full_delivery_address', 'Maps_link')
 
-    # ==========================================
-    # ENTERPRISE WAREHOUSE ISOLATION LOGIC
-    # ==========================================
-    def get_queryset(self, request):
-        """Strictly filter orders to show only those routed through the selected warehouse."""
-        qs = super(admin.ModelAdmin, self).get_queryset(request)
-        wh_id = request.session.get('selected_warehouse_id')
-        if wh_id:
-            return qs.filter(Q(fulfillment_warehouse_id=wh_id) | Q(last_mile_warehouse_id=wh_id))
-        return qs.none()
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        """Only allow assigning this order to the currently selected active warehouse."""
-        wh_id = request.session.get('selected_warehouse_id')
-        if wh_id:
-            if db_field.name in ['fulfillment_warehouse', 'last_mile_warehouse']:
-                kwargs["queryset"] = Warehouse.objects.filter(id=wh_id)
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
-    # ==========================================
-
     def transit_route(self, obj):
         if obj.fulfillment_warehouse and obj.last_mile_warehouse:
             if obj.fulfillment_warehouse != obj.last_mile_warehouse:
@@ -108,41 +116,8 @@ class OrderAdmin(WarehouseScopedAdmin):
         return format_html('<span style="color: #28a745; font-weight: bold; font-size: 0.9em;">📍 Direct Delivery</span>')
     transit_route.short_description = "Transit Route"
 
-    def save_formset(self, request, form, formset, change):
-        instances = formset.save(commit=False)
-        for instance in instances:
-            if isinstance(instance, OrderItem):
-                if instance.pk:
-                    old_instance = OrderItem.objects.get(pk=instance.pk)
-                    old_status = getattr(old_instance, 'status', 'active')
-                    new_status = getattr(instance, 'status', 'active')
-                    
-                    if old_status != 'cancelled' and new_status == 'cancelled':
-                        item_total = instance.price * instance.quantity
-                        order = instance.order
-                        order.total_amount = F('total_amount') - item_total
-                        order.save(update_fields=['total_amount'])
-                        order.refresh_from_db()
-                        
-                        if order.payment_method == 'online':
-                            try:
-                                from apps.payments.models import Payment
-                                from apps.payments.refund_services import RefundService
-                                payment = Payment.objects.filter(order=order, status='paid').first()
-                                if payment:
-                                    RefundService.initiate_partial_refund(payment, item_total)
-                                    self.message_user(request, f"Item '{instance.product_name}' cancelled. ₹{item_total} partial refund auto-initiated to bank!", level=messages.SUCCESS)
-                                else:
-                                    self.message_user(request, f"Item cancelled. Total deducted. But NO valid payment record found to auto-refund ₹{item_total}.", level=messages.WARNING)
-                            except Exception as e:
-                                self.message_user(request, f"Item Cancelled. Auto-Refund failed: {str(e)}", level=messages.ERROR)
-                        else:
-                            self.message_user(request, f"Item '{instance.product_name}' cancelled. COD Amount reduced by ₹{item_total}. New Total: ₹{order.total_amount}", level=messages.SUCCESS)
-            instance.save()
-        formset.save_m2m()
-
     def customer_phone(self, obj):
-        return obj.user.phone
+        return obj.user.phone if obj.user else "N/A"
     customer_phone.short_description = "Customer Phone"
     customer_phone.admin_order_field = 'user__phone'
 
@@ -154,18 +129,18 @@ class OrderAdmin(WarehouseScopedAdmin):
             'cancelled': '#dc3545', 'failed': '#dc3545',
         }
         color = colors.get(obj.status, '#6c757d')
-        return format_html('<span style="background-color: {}; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; white-space: nowrap;">{}</span>', color, obj.get_status_display())
+        return format_html('<span style="background-color: {}; color: white; padding: 3px 8px; border-radius: 4px; font-size: 0.8em; white-space: nowrap; font-weight: bold;">{}</span>', color, obj.get_status_display().upper())
     status_badge.short_description = "Status"
 
     def total_amount_display(self, obj):
-        return f"₹{obj.total_amount:.2f}"
-    total_amount_display.short_description = "Total Amount"
+        return format_html('<span style="color: green; font-weight: bold;">₹{:.2f}</span>', obj.total_amount)
+    total_amount_display.short_description = "Amount"
 
     def created_at_date(self, obj):
         if hasattr(obj, 'created_at') and obj.created_at:
-            return localtime(obj.created_at).strftime('%d/%m/%Y %H:%M')
+            return localtime(obj.created_at).strftime('%d %b %Y, %H:%M')
         return "N/A"
-    created_at_date.short_description = "Created"
+    created_at_date.short_description = "Created At"
 
     def delivery_name(self, obj):
         addr = obj.delivery_address_json or {}
@@ -185,7 +160,7 @@ class OrderAdmin(WarehouseScopedAdmin):
         addr_json = obj.delivery_address_json or {}
         if not addr_json: return "No Address Details Found"
         details = []
-        if addr_json.get('full_address'): details.append(f"<b>Full Address:</b> {addr_json.get('full_address')}")
+        if addr_json.get('full_address'): details.append(f"<b>Address:</b> {addr_json.get('full_address')}")
         if addr_json.get('city'): details.append(f"<b>City:</b> {addr_json.get('city')}")
         return format_html("<br>".join(details)) if details else str(addr_json)
     full_delivery_address.short_description = "Address Details"
@@ -193,28 +168,85 @@ class OrderAdmin(WarehouseScopedAdmin):
     def Maps_link(self, obj):
         addr = obj.delivery_address_json or {}
         lat, lng = addr.get('latitude') or addr.get('lat'), addr.get('longitude') or addr.get('lng')
-        if lat is None or lng is None: return format_html('<span style="color:red;">Location Missing</span>')
-        url = f"https://www.google.com/maps/dir/?api=1&destination={lat},{lng}"
-        return format_html('<a style="background-color: #28a745; color: white; padding: 6px 12px; border-radius: 4px; text-decoration: none; font-weight: bold; display: inline-block;" href="{}" target="_blank">📍 Directions</a>', url)
-    Maps_link.short_description = "Map"
+        if lat is None or lng is None: return format_html('<span style="color:gray;">N/A</span>')
+        url = f"http://maps.google.com/maps?q=loc:{lat},{lng}"
+        return format_html('<a style="background-color: #007bff; color: white; padding: 4px 8px; border-radius: 4px; text-decoration: none; font-size:11px; font-weight: bold;" href="{}" target="_blank">📍 MAP</a>', url)
+    Maps_link.short_description = "Directions"
+
+    # --- ADVANCED AUTO REFUND LOGIC ---
+    def save_formset(self, request, form, formset, change):
+        instances = formset.save(commit=False)
+        for instance in instances:
+            if isinstance(instance, OrderItem):
+                if instance.pk:
+                    old_instance = OrderItem.objects.get(pk=instance.pk)
+                    old_status = getattr(old_instance, 'status', 'active')
+                    new_status = getattr(instance, 'status', 'active')
+                    
+                    if old_status != 'cancelled' and new_status == 'cancelled':
+                        item_total = instance.price * instance.quantity
+                        order = instance.order
+                        order.total_amount = F('total_amount') - item_total
+                        order.save(update_fields=['total_amount'])
+                        order.refresh_from_db()
+                        
+                        if order.payment_method == 'RAZORPAY':
+                            try:
+                                from apps.payments.models import Payment
+                                from apps.payments.refund_services import RefundService
+                                payment = Payment.objects.filter(order=order, status='paid').first()
+                                if payment:
+                                    RefundService.initiate_partial_refund(payment, item_total)
+                                    self.message_user(request, f"Item '{instance.product_name}' cancelled. ₹{item_total} auto-refunded!", level=messages.SUCCESS)
+                                else:
+                                    self.message_user(request, f"NO valid payment record found to auto-refund ₹{item_total}.", level=messages.WARNING)
+                            except Exception as e:
+                                self.message_user(request, f"Auto-Refund failed: {str(e)}", level=messages.ERROR)
+                        else:
+                            self.message_user(request, f"Item cancelled. COD Amount reduced. New Total: ₹{order.total_amount}", level=messages.SUCCESS)
+            instance.save()
+        formset.save_m2m()
+
+    # --- FULLY WORKING BULK ACTIONS ---
+    @admin.action(description="🔵 Mark as Confirmed")
+    def mark_as_confirmed(self, request, queryset):
+        updated = queryset.update(status='confirmed')
+        self.message_user(request, f"{updated} Orders marked as Confirmed.")
+
+    @admin.action(description="🟡 Mark as Picking")
+    def mark_as_picking(self, request, queryset):
+        updated = queryset.update(status='picking')
+        self.message_user(request, f"{updated} Orders marked as Picking.")
+
+    @admin.action(description="📦 Mark as Packed")
+    def mark_as_packed(self, request, queryset):
+        updated = queryset.update(status='packed')
+        self.message_user(request, f"{updated} Orders marked as Packed.")
+
+    @admin.action(description="🚚 Mark as Out For Delivery")
+    def mark_as_out_for_delivery(self, request, queryset):
+        updated = queryset.update(status='out_for_delivery')
+        self.message_user(request, f"{updated} Orders marked as Out For Delivery.")
+
+    @admin.action(description="✅ Mark as Delivered")
+    def mark_as_delivered(self, request, queryset):
+        updated = queryset.update(status='delivered')
+        self.message_user(request, f"{updated} Orders successfully Delivered!")
+
+    @admin.action(description="❌ Mark as Cancelled")
+    def mark_as_cancelled(self, request, queryset):
+        updated = queryset.update(status='cancelled')
+        self.message_user(request, f"{updated} Orders Cancelled.", level=messages.WARNING)
 
 
 @admin.register(OrderItemFulfillment)
-class OrderItemFulfillmentAdmin(WarehouseScopedAdmin):
+class OrderItemFulfillmentAdmin(admin.ModelAdmin):
     list_display = ('id', 'order_id_link', 'sku_link', 'batch_id', 'vendor_phone', 'quantity_allocated', 'vendor_payable_amount', 'created_at')
     list_filter = ('created_at',)
     search_fields = ('order_item__order__id', 'inventory_batch__owner__phone', 'order_item__sku')
     list_select_related = ('order_item', 'order_item__order', 'inventory_batch', 'inventory_batch__owner')
     readonly_fields = ('order_item', 'inventory_batch', 'quantity_allocated', 'vendor_payable_amount')
     list_per_page = 50
-
-    def get_queryset(self, request):
-        """Only show item fulfillments originating from the current warehouse session."""
-        qs = super(admin.ModelAdmin, self).get_queryset(request)
-        wh_id = request.session.get('selected_warehouse_id')
-        if wh_id:
-            return qs.filter(order_item__order__fulfillment_warehouse_id=wh_id)
-        return qs.none()
 
     def order_id_link(self, obj):
         return f"Order #{obj.order_item.order.id}"
@@ -235,7 +267,27 @@ class OrderItemFulfillmentAdmin(WarehouseScopedAdmin):
     vendor_phone.short_description = "Vendor"
 
 
+@admin.register(OrderAbuseLog)
+class OrderAbuseLogAdmin(admin.ModelAdmin):
+    list_display = ('user', 'cancelled_orders', 'blocked_until', 'is_blocked_status', 'updated_at')
+    search_fields = ('user__phone',)
+    list_filter = ('updated_at',)
+    raw_id_fields = ('user',)
+
+    def is_blocked_status(self, obj):
+        if obj.is_blocked():
+            return format_html('<span style="color:red; font-weight:bold;">🚫 Blocked</span>')
+        return format_html('<span style="color:green;">✓ Safe</span>')
+    is_blocked_status.short_description = "Status"
+
+
 @admin.register(OrderConfiguration)
 class OrderConfigurationAdmin(admin.ModelAdmin):
     list_display = ['delivery_fee', 'free_delivery_threshold']
     list_per_page = 25
+    
+    def has_add_permission(self, request):
+        # Configuration file ek hi honi chahiye (Singleton)
+        if OrderConfiguration.objects.exists():
+            return False
+        return super().has_add_permission(request)
