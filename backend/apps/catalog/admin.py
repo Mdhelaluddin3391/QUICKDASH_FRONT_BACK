@@ -105,8 +105,18 @@ class ProductResource(resources.ModelResource):
         else:
             row['brand'] = None
         
-        if not row.get('mrp'): row['mrp'] = 0.00
-        if not row.get('unit'): row['unit'] = '1 Unit'
+        if not row.get('mrp'): 
+            row['mrp'] = 0.00
+            
+        # 6. Auto-fetch Unit from API
+        if not row.get('unit'): 
+            # Check if API gave us a quantity string (like "400 g" or "1 L")
+            api_quantity = product_data.get('quantity', '').strip() if 'product_data' in locals() else ''
+            
+            if api_quantity:
+                row['unit'] = api_quantity
+            else:
+                row['unit'] = '1 Unit'
 
 
 # ==========================================
