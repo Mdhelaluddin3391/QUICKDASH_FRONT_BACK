@@ -43,6 +43,8 @@ class ProductResource(resources.ModelResource):
         UPGRADED OPEN FOOD FACTS API LOGIC
         CSV mein agar sirf SKU ho, toh baaki saari details API se automatically aa jayengi!
         """
+        if 'id' in row:
+            del row['id']
         sku_val = str(row.get('sku', '')).strip()
         name_val = str(row.get('name', '')).strip()
         brand_name = str(row.get('brand', '')).strip()

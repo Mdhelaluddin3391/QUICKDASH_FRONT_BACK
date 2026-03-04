@@ -44,6 +44,8 @@ class InventoryItemResource(resources.ModelResource):
 
     def before_import_row(self, row, **kwargs):
         """Unified import logic: auto-fills defaults to prevent DB crashes."""
+        if 'id' in row:
+            del row['id']
         if not row.get('price'): row['price'] = 0
         if not row.get('cost_price'): row['cost_price'] = 0.0
         if not row.get('total_stock'): row['total_stock'] = 0
