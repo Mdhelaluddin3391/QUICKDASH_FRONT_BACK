@@ -145,7 +145,7 @@ MIDDLEWARE = [
     "apps.core.middleware.LocationContextMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_prometheus.middleware.PrometheusAfterMiddleware",
-    "apps.core.middleware.AdminWarehouseRequirementMiddleware",
+    # "apps.core.middleware.AdminWarehouseRequirementMiddleware",
 ]
 
 if not DEBUG:

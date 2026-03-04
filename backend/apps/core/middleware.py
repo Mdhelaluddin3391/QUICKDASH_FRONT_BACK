@@ -6,8 +6,6 @@ from django.http import JsonResponse
 from django.core.cache import cache
 from django.contrib.gis.geos import Point
 from django.conf import settings
-from django.shortcuts import redirect
-from django.urls import reverse
 
 logger = logging.getLogger(__name__)
 
@@ -25,14 +23,7 @@ class CorrelationIDMiddleware:
         token = _correlation_id.set(request_id)
         request.correlation_id = request_id
         try:
-            logger.info(f"Request {request_id}: {request.method} {request.path}", extra={
-                'correlation_id': request_id,
-                'user_id': request.user.id if request.user.is_authenticated else None,
-                'warehouse_id': getattr(request, 'warehouse', None).id if getattr(request, 'warehouse', None) else None
-            })
-            response = self.get_response(request)
-            response['X-Request-ID'] = request_id
-            return response
+            return self.get_response(request)
         finally:
             _correlation_id.reset(token)
 
@@ -54,9 +45,8 @@ class GlobalKillSwitchMiddleware:
 
 class LocationContextMiddleware(MiddlewareMixin):
     """
-    Resolves Serviceable Warehouse based on Headers.
+    Resolves Serviceable Warehouse based on Headers for the Mobile App/Frontend.
     """
-
     def process_request(self, request):
         request.warehouse = None
         request.user_coords = None
@@ -86,77 +76,5 @@ class LocationContextMiddleware(MiddlewareMixin):
 
     def _resolve_warehouse(self, lat, lng):
         from apps.warehouse.models import Warehouse
-        
-        cache_key = f"wh_poly_lookup_{round(lat, 5)}_{round(lng, 5)}"
-        cached_wh_id = None
-        try:
-            cached_wh_id = cache.get(cache_key)
-        except Exception as e:
-            logger.warning(f"Redis cache error in warehouse resolution: {e}")
-
-        if cached_wh_id:
-            try:
-                return Warehouse.objects.get(id=cached_wh_id)
-            except Warehouse.DoesNotExist:
-                try:
-                    cache.delete(cache_key)
-                except Exception:
-                    pass
-
         point = Point(float(lng), float(lat), srid=4326)
-        
-        warehouse = Warehouse.objects.filter(
-            delivery_zone__contains=point,
-            is_active=True
-        ).order_by('id').first()
-
-        if warehouse:
-            try:
-                cache.set(cache_key, warehouse.id, timeout=300)
-            except Exception as e:
-                logger.warning(f"Redis cache set error: {e}")
-            return warehouse
-       
-        if settings.DEBUG:
-            fallback = Warehouse.objects.filter(is_active=True).order_by('id').first()
-            if fallback:
-                if not cache.get("warn_fallback_active"):
-                    logger.warning(f"DEBUG MODE: Using Fallback Warehouse '{fallback.name}' because exact location match failed.")
-                    try:
-                        cache.set("warn_fallback_active", "1", timeout=60)
-                    except Exception:
-                        pass
-                return fallback
-        
-        return None
-
-class AdminWarehouseRequirementMiddleware:
-    """
-    Enterprise Security: Forces admin staff to select a working warehouse.
-    If an admin accesses the dashboard without a selected warehouse in their session,
-    they are intercepted and redirected to the Warehouse Selection screen.
-    """
-    def __init__(self, get_response):
-        self.get_response = get_response
-
-    def __call__(self, request):
-        path = request.path_info
-        
-        # Check if it's an admin request and user is authenticated as staff
-        if path.startswith('/admin/') and request.user.is_authenticated and request.user.is_staff:
-            
-            # Ignore auth paths and auxiliary paths so we don't get stuck in a redirect loop
-            if any(x in path for x in ['/login/', '/logout/', '/password_change/', '/jsi18n/']):
-                return self.get_response(request)
-            
-            # If the session doesn't have a selected warehouse, enforce selection
-            if not request.session.get('selected_warehouse_id'):
-                try:
-                    select_url = reverse('admin_select_warehouse')
-                    # If they are not already on the selection or set URL, redirect them
-                    if path != select_url and 'admin-set-warehouse' not in path:
-                        return redirect('admin_select_warehouse')
-                except Exception as e:
-                    logger.error(f"Middleware Error Reversing Warehouse URL: {e}")
-
-        return self.get_response(request)
+        return Warehouse.objects.filter(delivery_zone__contains=point, is_active=True).first()
