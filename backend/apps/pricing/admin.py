@@ -36,14 +36,13 @@ class SurgeRuleAdmin(ImportExportModelAdmin):
     list_display = (
         'id',
         'warehouse_info',
-        'max_multiplier_display',
-        'base_factor_display',
+        'max_multiplier',  # Direct original field use kiya
+        'base_factor',     # Direct original field use kiya
         'current_surge_status',
         'created_at_date'
     )
     list_display_links = ('id', 'warehouse_info')
     
-    # Global filter to filter by specific warehouse if needed
     list_filter = ('created_at', 'warehouse')
     search_fields = (
         'warehouse__name',
@@ -54,8 +53,8 @@ class SurgeRuleAdmin(ImportExportModelAdmin):
     raw_id_fields = ('warehouse',)
     list_per_page = 50
     
-    # MASTER FEATURE: Quick edit directly from the list view (Excel style)
-    list_editable = ('max_multiplier_display', 'base_factor_display')
+    # Ab yeh perfectly kaam karega!
+    list_editable = ('max_multiplier', 'base_factor') 
     
     actions = ['reset_to_default']
 
@@ -79,16 +78,6 @@ class SurgeRuleAdmin(ImportExportModelAdmin):
     warehouse_info.short_description = "Warehouse"
     warehouse_info.admin_order_field = 'warehouse__name'
 
-    def max_multiplier_display(self, obj):
-        return obj.max_multiplier
-    max_multiplier_display.short_description = "Max Multiplier"
-    max_multiplier_display.admin_order_field = 'max_multiplier'
-
-    def base_factor_display(self, obj):
-        return obj.base_factor
-    base_factor_display.short_description = "Base Factor"
-    base_factor_display.admin_order_field = 'base_factor'
-
     def current_surge_status(self, obj):
         return format_html('<span style="color: white; background-color: #28a745; padding: 2px 6px; border-radius: 4px; font-weight: bold; font-size: 0.8em;">Normal (1.0x)</span>')
     current_surge_status.short_description = "Live Status"
@@ -100,7 +89,6 @@ class SurgeRuleAdmin(ImportExportModelAdmin):
     created_at_date.short_description = "Created"
     created_at_date.admin_order_field = 'created_at'
 
-    # --- WORKING BULK ACTIONS ---
     @admin.action(description='🔄 Reset selected surge rules to Default (2.0x / 0.1)')
     def reset_to_default(self, request, queryset):
         updated = queryset.update(max_multiplier=2.0, base_factor=0.1)

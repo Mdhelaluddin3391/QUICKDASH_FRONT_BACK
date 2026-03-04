@@ -139,7 +139,7 @@ class ProductAdmin(ImportExportModelAdmin):
         ('Media', {'fields': ('image', 'image_preview')}),
     )
 
-    readonly_fields = ('created_at', 'updated_at', 'image_preview')
+    readonly_fields = ('created_at', 'image_preview')
 
     def dietary_badge(self, obj):
         colors = {'VEG': 'green', 'NON_VEG': 'red', 'VEGAN': '#28a745', 'EGG': '#ffc107', 'NONE': 'gray'}
