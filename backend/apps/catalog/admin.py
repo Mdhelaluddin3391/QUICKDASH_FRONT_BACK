@@ -1,7 +1,6 @@
 import requests
 from django.contrib import admin
 from django.utils.html import format_html
-from django.utils.timezone import localtime
 from django.db.models import F, Value, CharField, Case, When
 from django.db.models.functions import Concat
 
@@ -9,12 +8,16 @@ from import_export import resources, fields, widgets
 from import_export.admin import ImportExportModelAdmin
 from .models import Product, Category, Brand, Banner, FlashSale
 
+# ==========================================
+# 1. CSV IMPORT / EXPORT RESOURCES
+# ==========================================
+
 class CategoryResource(resources.ModelResource):
     parent = fields.Field(column_name='parent', attribute='parent', widget=widgets.ForeignKeyWidget(Category, 'slug'))
     class Meta:
         model = Category
         import_id_fields = ('slug',) 
-        fields = ('id', 'name', 'slug', 'parent', 'icon', 'is_active')
+        fields = ('id', 'name', 'slug', 'parent', 'icon', 'is_active', 'sort_order')
 
 class BrandResource(resources.ModelResource):
     class Meta:
@@ -29,7 +32,6 @@ class ProductResource(resources.ModelResource):
     class Meta:
         model = Product
         import_id_fields = ('sku',) 
-        # Naye fields ko CSV import/export ke liye expose kar diya
         fields = (
             'id', 'name', 'sku', 'description', 'unit', 'mrp', 'image', 'is_active', 'category', 'brand',
             'dietary_preference', 'allergens', 'shelf_life', 'nutri_score', 'eco_score', 'search_tags',
@@ -38,61 +40,62 @@ class ProductResource(resources.ModelResource):
 
     def before_import_row(self, row, **kwargs):
         """
-        SUPER SMART IMPORT LOGIC: Ye missing data ko API se fetch karega!
-        Naye fields jaise Allergens, Nutri-Score aur Packaging ko bhi automatically laayega.
+        UPGRADED OPEN FOOD FACTS API LOGIC
+        CSV mein agar sirf SKU ho, toh baaki saari details API se automatically aa jayengi!
         """
         sku_val = str(row.get('sku', '')).strip()
         name_val = str(row.get('name', '')).strip()
         brand_name = str(row.get('brand', '')).strip()
         category_name = str(row.get('category', '')).strip()
 
-        # 1. API Fallback - Automatically get Data from OpenFoodFacts
         if sku_val:
             try:
-                resp = requests.get(f"https://world.openfoodfacts.org/api/v0/product/{sku_val}.json", timeout=3)
-                data = resp.json()
-                if data.get('status') == 1:
-                    product_data = data.get('product', {})
-                    
-                    # Basic Details
-                    if not name_val: name_val = product_data.get('product_name', '')
-                    if not row.get('image'): row['image'] = product_data.get('image_front_url', '')
-                    if not row.get('description'): row['description'] = product_data.get('ingredients_text', '')
-                    if not brand_name and product_data.get('brands'): brand_name = product_data.get('brands').split(',')[0].strip()
-                    if not category_name and product_data.get('categories'): category_name = product_data.get('categories').split(',')[0].strip()
-                    
-                    # Naye Fields Auto-Fill karna (Magic!)
-                    if not row.get('allergens'): row['allergens'] = product_data.get('allergens', '').replace('en:', '')
-                    if not row.get('nutri_score'): row['nutri_score'] = product_data.get('nutriscore_grade', '').upper()
-                    if not row.get('eco_score'): row['eco_score'] = product_data.get('ecoscore_grade', '').upper()
-                    if not row.get('packaging_type'): row['packaging_type'] = product_data.get('packaging', '')
-                    
-                    # Weight In Grams logic
-                    if not row.get('weight_in_grams') and product_data.get('product_quantity'):
-                        try:
-                            row['weight_in_grams'] = int(float(product_data.get('product_quantity')))
-                        except:
-                            pass
+                headers = {'User-Agent': 'QuickDashMasterAdmin/2.0'}
+                resp = requests.get(f"https://world.openfoodfacts.org/api/v0/product/{sku_val}.json", headers=headers, timeout=5)
+                
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if data.get('status') == 1:
+                        product_data = data.get('product', {})
+                        
+                        # 1. Basic Details
+                        if not name_val: row['name'] = product_data.get('product_name', '')
+                        if not row.get('image'): row['image'] = product_data.get('image_front_url', '')
+                        if not row.get('description'): row['description'] = product_data.get('ingredients_text', '')
+                        
+                        # 2. Auto Categories & Brands
+                        if not brand_name and product_data.get('brands'): 
+                            brand_name = product_data.get('brands').split(',')[0].strip()
+                        if not category_name and product_data.get('categories'): 
+                            category_name = product_data.get('categories').split(',')[0].strip()
+                        
+                        # 3. Health & Packaging
+                        if not row.get('allergens'): row['allergens'] = product_data.get('allergens_from_ingredients', '').replace('en:', '')
+                        if not row.get('nutri_score'): row['nutri_score'] = product_data.get('nutriscore_grade', '').upper()
+                        if not row.get('eco_score'): row['eco_score'] = product_data.get('ecoscore_grade', '').upper()
+                        if not row.get('packaging_type'): row['packaging_type'] = product_data.get('packaging', '')
+                        
+                        # 4. Dietary Check (Veg/Vegan)
+                        if not row.get('dietary_preference') or row.get('dietary_preference') == 'NONE':
+                            tags = product_data.get('ingredients_analysis_tags', [])
+                            if isinstance(tags, list):
+                                if 'en:vegan' in tags: row['dietary_preference'] = 'VEGAN'
+                                elif 'en:vegetarian' in tags: row['dietary_preference'] = 'VEG'
+                                elif 'en:non-vegetarian' in tags: row['dietary_preference'] = 'NON_VEG'
 
-                    # Veg/Non-Veg detection (Vegan/Vegetarian/Non-Veg tags)
-                    if not row.get('dietary_preference') or row.get('dietary_preference') == 'NONE':
-                        tags = product_data.get('ingredients_analysis_tags', [])
-                        if 'en:vegan' in tags: row['dietary_preference'] = 'VEGAN'
-                        elif 'en:vegetarian' in tags: row['dietary_preference'] = 'VEG'
-                        elif 'en:non-vegetarian' in tags: row['dietary_preference'] = 'NON_VEG'
+            except Exception as e:
+                pass # API fail hone par import nahi rukega
 
-            except Exception:
-                pass # Agar API fail hui toh system crash nahi hoga, aage badh jayega
+        # Set Fallbacks
+        row['name'] = row.get('name') or name_val or f"Unknown Product (SKU: {sku_val})"
+        category_name = category_name or "Uncategorized"
 
-        row['name'] = name_val if name_val else f"Unknown Product (SKU: {sku_val})"
-        category_name = category_name if category_name else "Uncategorized"
-
-        # 2. Auto-Create Category dynamically
+        # Create Category dynamically
         cat_slug = category_name.lower().strip().replace(" ", "-")
         Category.objects.get_or_create(slug=cat_slug, defaults={'name': category_name, 'is_active': True})
         row['category'] = cat_slug 
 
-        # 3. Auto-Create Brand dynamically
+        # Create Brand dynamically
         if brand_name:
             brand_slug = brand_name.lower().strip().replace(" ", "-")
             Brand.objects.get_or_create(slug=brand_slug, defaults={'name': brand_name, 'is_active': True})
@@ -104,183 +107,104 @@ class ProductResource(resources.ModelResource):
         if not row.get('unit'): row['unit'] = '1 Unit'
 
 
-class BannerResource(resources.ModelResource):
-    class Meta:
-        model = Banner
-        import_id_fields = ('title',)
-        fields = ('id', 'title', 'image', 'target_url', 'position', 'bg_gradient', 'is_active')
-
-class FlashSaleResource(resources.ModelResource):
-    product = fields.Field(column_name='product', attribute='product', widget=widgets.ForeignKeyWidget(Product, 'sku'))
-    class Meta:
-        model = FlashSale
-        import_id_fields = ('product',) 
-        fields = ('id', 'product', 'discount_percentage', 'end_time', 'is_active')
-
+# ==========================================
+# 2. MASTER ADMIN VIEWS (Standard Django)
+# ==========================================
 
 @admin.register(Product)
 class ProductAdmin(ImportExportModelAdmin):
     resource_class = ProductResource
-
-    # Admin List view me ab Dietary Badge aur Returnable status bhi dikhega
-    list_display = ('name', 'sku', 'dietary_badge', 'category', 'mrp', 'is_returnable_badge', 'is_active')
+    
+    # Pure Master Admin View - No Dark Store limitations
+    list_display = ('id', 'image_preview', 'name', 'sku', 'mrp', 'dietary_badge', 'category', 'brand', 'is_active')
+    list_display_links = ('id', 'name')
     list_filter = ('is_active', 'dietary_preference', 'is_returnable', 'category', 'brand')
     search_fields = ('name', 'sku', 'description', 'search_tags')
+    
+    # Fast Performance Features
     list_select_related = ('category', 'brand')
-    raw_id_fields = ('brand',)
+    raw_id_fields = ('brand', 'category') 
     
     list_editable = ('mrp', 'is_active')
-    list_per_page = 25
-    ordering = ['name']
+    list_per_page = 50
+    ordering = ['-created_at']
+    actions = ['make_active', 'make_inactive']
 
-    # UPGRADED: Naye enterprise fields ko beautiful sections (Fieldsets) me divide kiya
     fieldsets = (
-        ('Basic Details', {
-            'fields': ('name', 'sku', 'description', 'unit', 'is_active')
-        }),
-        ('Categorization', {
-            'fields': ('category', 'brand', 'search_tags')
-        }),
-        ('Customer Experience & Health', {
-            'fields': ('dietary_preference', 'allergens', 'shelf_life', 'nutri_score', 'eco_score')
-        }),
-        ('Logistics & Fulfillment', {
-            'fields': ('weight_in_grams', 'packaging_type', 'is_returnable', 'max_order_quantity')
-        }),
-        ('Pricing & Billing', {
-            'fields': ('mrp', 'tax_rate', 'hsn_code')
-        }),
-        ('Media', {
-            'fields': ('image', 'image_preview'),
-            'classes': ('collapse',)
-        }),
-        ('Timestamps', {
-            'fields': ('created_at',),
-            'classes': ('collapse',)
-        }),
+        ('Basic Details', {'fields': (('name', 'sku'), 'description', ('unit', 'is_active'))}),
+        ('Categorization & Search', {'fields': (('category', 'brand'), 'search_tags')}),
+        ('Pricing & Tax', {'fields': (('mrp', 'tax_rate'), 'hsn_code')}),
+        ('Health & Packaging', {'fields': (('dietary_preference', 'allergens'), ('nutri_score', 'eco_score'), 'shelf_life', 'packaging_type')}),
+        ('Logistics', {'fields': (('weight_in_grams', 'max_order_quantity'), 'is_returnable')}),
+        ('Media', {'fields': ('image', 'image_preview')}),
     )
 
-    readonly_fields = ('created_at', 'image_preview')
+    readonly_fields = ('created_at', 'updated_at', 'image_preview')
 
     def dietary_badge(self, obj):
         colors = {'VEG': 'green', 'NON_VEG': 'red', 'VEGAN': '#28a745', 'EGG': '#ffc107', 'NONE': 'gray'}
         color = colors.get(obj.dietary_preference, 'gray')
         return format_html('<span style="color: {}; font-weight: bold;">● {}</span>', color, obj.get_dietary_preference_display())
-    dietary_badge.short_description = "Type"
-
-    def is_returnable_badge(self, obj):
-        if obj.is_returnable: return format_html('<span style="color: green;">Yes</span>')
-        return format_html('<span style="color: red;">No</span>')
-    is_returnable_badge.short_description = "Returnable?"
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "category":
-            kwargs["queryset"] = Category.objects.annotate(
-                full_display_name=Case(When(parent__isnull=False, then=Concat('parent__name', Value(' > '), 'name')), default=F('name'), output_field=CharField())
-            ).order_by('full_display_name')
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    dietary_badge.short_description = "Diet"
 
     def image_preview(self, obj):
-        if obj.image: return format_html('<img src="{}" style="max-height: 50px; max-width: 50px; border-radius: 5px; object-fit: cover;" />', obj.image)
+        if obj.image: return format_html('<img src="{}" style="height: 40px; border-radius: 4px;" />', obj.image)
         return "-"
-    image_preview.short_description = "Preview"
+    image_preview.short_description = "Image"
+
+    @admin.action(description="Mark selected products as Active")
+    def make_active(self, request, queryset):
+        queryset.update(is_active=True)
+
+    @admin.action(description="Mark selected products as Inactive")
+    def make_inactive(self, request, queryset):
+        queryset.update(is_active=False)
 
 
 @admin.register(Category)
 class CategoryAdmin(ImportExportModelAdmin):
     resource_class = CategoryResource
-    list_display = ('name', 'icon_preview', 'parent_name', 'view_subcategories', 'sort_order', 'is_active')
+    list_display = ('id', 'name', 'slug', 'parent_name', 'sort_order', 'is_active')
+    list_display_links = ('id', 'name')
     list_filter = ('is_active', 'parent')
-    search_fields = ('name', 'parent__name')
-    list_select_related = ('parent',)
-    raw_id_fields = ('parent',)
+    search_fields = ('name', 'slug')
     list_editable = ('is_active', 'sort_order') 
-    list_per_page = 100 
+    list_per_page = 50 
     ordering = ['sort_order', 'name']
-
-    fieldsets = (
-        ('Basic Information', {'fields': ('name', 'slug', 'parent')}),
-        ('Media', {'fields': ('icon', 'icon_preview'), 'classes': ('collapse',)}),
-        ('Status', {'fields': ('is_active',)}),
-    )
     prepopulated_fields = {'slug': ('name',)}
-    readonly_fields = ('icon_preview',)
-
-    def view_subcategories(self, obj):
-        count = obj.subcategories.count()
-        if count > 0:
-            url = f"?parent__id__exact={obj.id}"
-            return format_html('<a class="button" href="{}" style="padding: 3px 10px; background: #417690; color: white; border-radius: 4px;">📂 View {} Subcategories</a>', url, count)
-        return format_html('<span style="color: gray;">-</span>')
-    view_subcategories.short_description = "Subcategories"
-
-    def icon_preview(self, obj):
-        if obj.icon: return format_html('<img src="{}" style="max-height: 40px; max-width: 40px; border-radius: 5px; object-fit: cover;" />', obj.icon)
-        return "-"
-    icon_preview.short_description = "Icon"
+    raw_id_fields = ('parent',)
 
     def parent_name(self, obj):
-        return obj.parent.name if obj.parent else "Root"
-    parent_name.short_description = "Parent"
+        return obj.parent.name if obj.parent else format_html('<b style="color:blue;">ROOT</b>')
+    parent_name.short_description = "Parent Category"
 
 
 @admin.register(Brand)
 class BrandAdmin(ImportExportModelAdmin):
     resource_class = BrandResource
-    list_display = ('name', 'logo_preview', 'is_active')
+    list_display = ('id', 'name', 'slug', 'is_active')
+    list_display_links = ('id', 'name')
     list_filter = ('is_active',)
-    search_fields = ('name',)
+    search_fields = ('name', 'slug')
     list_editable = ('is_active',) 
-    list_per_page = 100 
-    ordering = ['name']
-
-    fieldsets = (
-        ('Basic Information', {'fields': ('name', 'slug')}),
-        ('Media', {'fields': ('logo', 'logo_preview'), 'classes': ('collapse',)}),
-        ('Status', {'fields': ('is_active',)}),
-    )
+    list_per_page = 50 
     prepopulated_fields = {'slug': ('name',)}
-    readonly_fields = ('logo_preview',)
-
-    def logo_preview(self, obj):
-        if obj.logo: return format_html('<img src="{}" style="max-height: 40px; max-width: 40px; border-radius: 5px; object-fit: cover;" />', obj.logo)
-        return "-"
-    logo_preview.short_description = "Logo"
 
 
 @admin.register(Banner)
 class BannerAdmin(ImportExportModelAdmin):
-    resource_class = BannerResource
-    list_display = ('title', 'image_preview', 'position', 'is_active')
+    list_display = ('id', 'title', 'position', 'is_active')
+    list_display_links = ('id', 'title')
     list_filter = ('position', 'is_active')
     search_fields = ('title', 'target_url')
-    list_editable = ('is_active',)
-    list_per_page = 25
+    list_editable = ('is_active', 'position')
 
-    fieldsets = (
-        ('Content', {'fields': ('title', 'image', 'image_preview', 'target_url')}),
-        ('Display Settings', {'fields': ('position', 'bg_gradient', 'is_active')}),
-    )
-    readonly_fields = ('image_preview',)
-
-    def image_preview(self, obj):
-        if obj.image: return format_html('<img src="{}" style="max-height: 60px; max-width: 120px; border-radius: 5px; object-fit: cover;" />', obj.image)
-        return "-"
-    image_preview.short_description = "Preview"
 
 @admin.register(FlashSale)
 class FlashSaleAdmin(ImportExportModelAdmin):
-    resource_class = FlashSaleResource
-    list_display = ('product_name', 'discount_percentage_display', 'end_time', 'is_active')
+    list_display = ('id', 'product', 'discount_percentage', 'end_time', 'is_active')
+    list_display_links = ('id', 'product')
     list_filter = ('is_active', 'end_time')
     search_fields = ('product__name', 'product__sku')
-    list_select_related = ('product',)
     raw_id_fields = ('product',)
-    list_editable = ('is_active',)
-    list_per_page = 25
-
-    def product_name(self, obj): return obj.product.name
-    product_name.short_description = "Product"
-
-    def discount_percentage_display(self, obj): return f"{obj.discount_percentage}% OFF"
-    discount_percentage_display.short_description = "Discount"
+    list_editable = ('is_active', 'discount_percentage')
