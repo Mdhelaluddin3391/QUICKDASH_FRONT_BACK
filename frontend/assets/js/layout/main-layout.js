@@ -387,12 +387,12 @@
         highlightActiveLink(navEl);
 
         // --- 2. Sub-Navbar Render (Scrollable Row below Main Nav) ---
+        // --- 2. Sub-Navbar Render (Scrollable Row below Main Nav) ---
         let subNavEl = document.getElementById('dynamic-subnavbar');
         if (!subNavEl) {
             // Agar nahi hai toh naya div banayenge theek navEl ke niche
             subNavEl = document.createElement('div');
             subNavEl.id = 'dynamic-subnavbar';
-            // Same 'header-nav-row' class lagayenge taaki automatically horizontal scroll aa jaye
             subNavEl.className = 'header-nav-row'; 
             subNavEl.style.backgroundColor = '#f8f9fa';
             subNavEl.style.borderTop = '1px solid #eaeaea';
@@ -405,21 +405,21 @@
         // Agar humein active parent category mil gayi jiske andar sub-categories hain
         if (activeCategory && activeCategory.subcategories && activeCategory.subcategories.length > 0) {
             
-            // "All" ka ek button banate hain
+            // 🔥 Yahan se extra 'style' hata diya gaya hai, ab sirf class="nav-item" hai
             const subItems = [
-                `<a href="search_results.html?slug=${encodeURIComponent(activeCategory.slug)}" class="nav-item" style="font-size:0.85rem; padding:5px 12px; background:#fff; border:1px solid #ddd; border-radius:20px; white-space:nowrap;">All ${activeCategory.name}</a>`
+                `<a href="search_results.html?slug=${encodeURIComponent(activeCategory.slug)}" class="nav-item">All ${activeCategory.name}</a>`
             ];
 
-            // Subcategories ko pill-style mein add karte hain
+            // Subcategories ko add karte hain
             activeCategory.subcategories.forEach(sub => {
-                subItems.push(`<a href="search_results.html?slug=${encodeURIComponent(sub.slug)}" class="nav-item" style="font-size:0.85rem; padding:5px 12px; background:#fff; border:1px solid #ddd; border-radius:20px; white-space:nowrap;">${sub.name}</a>`);
+                subItems.push(`<a href="search_results.html?slug=${encodeURIComponent(sub.slug)}" class="nav-item">${sub.name}</a>`);
             });
 
             subNavEl.innerHTML = subItems.join('');
-            subNavEl.style.display = 'flex'; // Dikhayenge
-            highlightActiveLink(subNavEl);   // Isme bhi active link highlight hoga
+            subNavEl.style.display = 'flex'; 
+            highlightActiveLink(subNavEl);   
         } else {
-            subNavEl.style.display = 'none'; // Chupayenge agar zaroorat nahi
+            subNavEl.style.display = 'none'; 
         }
     }
 
