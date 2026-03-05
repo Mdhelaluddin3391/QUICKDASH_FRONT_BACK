@@ -1,4 +1,5 @@
 import requests
+from django import forms # ADDED: For custom dropdown field
 from django.contrib import admin
 from django.utils.html import format_html
 from django.db.models import F, Value, CharField, Case, When
@@ -7,6 +8,17 @@ from django.db.models.functions import Concat
 from import_export import resources, fields, widgets
 from import_export.admin import ImportExportModelAdmin
 from .models import Product, Category, Brand, Banner, FlashSale
+
+# ==========================================
+# CUSTOM FORM FIELD FOR CATEGORY DROPDOWN
+# ==========================================
+class CategoryChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        # Agar parent category hai, toh "Parent -> Subcategory" dikhayega
+        if obj.parent:
+            return f"{obj.parent.name} -> {obj.name}"
+        # Agar parent nahi hai, toh sirf main category ka naam
+        return obj.name
 
 # ==========================================
 # 1. CSV IMPORT / EXPORT RESOURCES
@@ -146,9 +158,12 @@ class ProductAdmin(ImportExportModelAdmin):
     
     # Fast Performance Features
     list_select_related = ('category', 'brand')
-    raw_id_fields = ('brand', 'category') 
     
-    list_editable = ('mrp', 'is_active')
+    # UPDATE: Removed 'category' from raw_id_fields taaki dropdown kaam kare list_editable mein
+    raw_id_fields = ('brand',) 
+    
+    # UPDATE: Added 'category' here so it can be edited on list page
+    list_editable = ('category', 'mrp', 'is_active')
     list_per_page = 50
     ordering = ['-created_at']
     actions = ['make_active', 'make_inactive']
@@ -163,6 +178,15 @@ class ProductAdmin(ImportExportModelAdmin):
     )
 
     readonly_fields = ('created_at', 'image_preview')
+
+    # UPDATE: Assigning custom choices and alphabetical sorting to the category dropdown
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "category":
+            # Categories ko alphabetically sort karega. Pehle parent name, phir child name.
+            kwargs["queryset"] = Category.objects.all().order_by('parent__name', 'name')
+            # Custom dropdown apply kar rahe hain
+            kwargs["form_class"] = CategoryChoiceField
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def dietary_badge(self, obj):
         colors = {'VEG': 'green', 'NON_VEG': 'red', 'VEGAN': '#28a745', 'EGG': '#ffc107', 'NONE': 'gray'}
@@ -210,7 +234,7 @@ class BrandAdmin(ImportExportModelAdmin):
     list_filter = ('is_active',)
     search_fields = ('name', 'slug')
     list_editable = ('is_active',) 
-    list_per_page = 50 
+    list_per_page = 200
     prepopulated_fields = {'slug': ('name',)}
 
 
