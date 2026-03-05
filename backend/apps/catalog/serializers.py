@@ -4,16 +4,25 @@ from .models import Category, Product, Brand, Banner, FlashSale
 from apps.inventory.models import InventoryItem
 
 
+
+class SubCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Category
+        fields = ("id", "name", "slug")
+
+
 class NavigationCategorySerializer(serializers.ModelSerializer):
     """
-    Used for the Navbar. Returns ONLY essential data for parent categories.
-    No recursion, no products.
+    Used for the Navbar. Returns essential data for parent categories & their subcategories.
     """
     icon_url = serializers.SerializerMethodField()
+    # YEH NAYA FIELD ADD KAREIN:
+    subcategories = SubCategorySerializer(many=True, read_only=True)
 
     class Meta:
         model = Category
-        fields = ("id", "name", "slug", "icon_url")
+        # fields mein "subcategories" add karein:
+        fields = ("id", "name", "slug", "icon_url", "subcategories")
 
     def get_icon_url(self, obj):
         if not obj.icon:

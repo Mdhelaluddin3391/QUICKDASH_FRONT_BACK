@@ -319,31 +319,28 @@
         if (!navEl) return;
 
         const API_URL = `${window.APP_CONFIG.API_BASE_URL}/catalog/categories/parents/`;
-        const CACHE_KEY = 'nav_parents_cache';
+        // 🔥 CACHE KEY UPDATED TO '_v2' taaki browser automatically naya data fetch kare
+        const CACHE_KEY = 'nav_parents_cache_v2'; 
         
-        // 1. Pehle Local Storage se direct cache check karein (Fastest path)
         const cachedStr = localStorage.getItem(CACHE_KEY);
         if (cachedStr) {
             try {
                 const cached = JSON.parse(cachedStr);
-                // Agar cache 1 ghante (3600000ms) se purana nahi hai, toh turant render karein
                 if (cached && (Date.now() - cached.ts) < 3600000 && Array.isArray(cached.data)) {
                     renderNav(cached.data);
-                    return; // Cache mil gaya, aage API call karne ki zaroorat nahi
+                    return; 
                 }
             } catch (e) {
                 console.warn("Nav Cache invalid, fetching fresh data...");
             }
         }
 
-        // 2. Agar cache nahi hai ya purana ho gaya hai, tabhi API call karein
         try {
             const resp = await fetch(API_URL);
             if (!resp.ok) throw new Error(`API failed with status: ${resp.status}`);
             const data = await resp.json();
             
             if (Array.isArray(data)) {
-                // Naya data LocalStorage me save karein aur render karein
                 localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: data }));
                 renderNav(data);
             }
@@ -356,51 +353,74 @@
         const navEl = document.getElementById('dynamic-navbar');
         if (!navEl) return;
 
+        // Current page ka slug nikalte hain
+        const currentUrl = new URL(window.location.href);
+        const currentSlug = currentUrl.searchParams.get('slug');
+
         const items = [];
-        
-        // 1. Trending Link (Static) - इसे हमेशा सबसे ऊपर रखें
-        items.push(
-            `<a href="index.html" class="nav-item">
-                <i class="fas fa-fire"></i> Trending
-             </a>`
-        );
+        items.push(`<a href="index.html" class="nav-item"><i class="fas fa-fire"></i> Trending</a>`);
 
-        // 2. Duplicate Check के लिए Set बनाएं (Use category name for uniqueness)
         const seenNames = new Set();
+        let activeCategory = null; // Yahan save karenge jiska child nav dikhana hai
 
-        // 3. Dynamic Categories Loop
+        // --- 1. Main Navbar Render ---
         categories.forEach(c => {
             const name = c.name || 'Category';
-            
-            // अगर यह name पहले लिस्ट में आ चुका है, तो इसे छोड़ दें (Skip duplicate)
-            if (seenNames.has(name)) {
-                return; 
-            }
-            
-            // अगर नया है, तो इसे Set में नोट करें
+            if (seenNames.has(name)) return; 
             seenNames.add(name);
 
-            // Slug बनाएं
             const slug = c.slug || name.toLowerCase().replace(/\s+/g, '-');
             
-            let imgHtml = '';
-            if (c.icon_url) {
-                imgHtml = `<img src="${c.icon_url}" alt="${name}" style="width:18px;height:18px;object-fit:cover;border-radius:4px;margin-right:8px;vertical-align:middle;">`;
+            // Check karein kya ye category active hai ya iska koi sub-category active hai
+            if (currentSlug === slug) {
+                activeCategory = c;
+            } else if (c.subcategories && c.subcategories.some(sub => sub.slug === currentSlug)) {
+                activeCategory = c;
             }
+
+            let imgHtml = c.icon_url ? `<img src="${c.icon_url}" alt="${name}" style="width:18px;height:18px;object-fit:cover;border-radius:4px;margin-right:8px;vertical-align:middle;">` : '';
             
-            // HTML लिस्ट में जोड़ें
-            items.push(
-                `<a href="search_results.html?slug=${encodeURIComponent(slug)}" class="nav-item" title="${name}">
-                    ${imgHtml}${name}
-                 </a>`
-            );
+            items.push(`<a href="search_results.html?slug=${encodeURIComponent(slug)}" class="nav-item" title="${name}">${imgHtml}${name}</a>`);
         });
 
-        // HTML अपडेट करें
         navEl.innerHTML = items.join('');
-        
-        // एक्टिव लिंक हाइलाइट करें
         highlightActiveLink(navEl);
+
+        // --- 2. Sub-Navbar Render (Scrollable Row below Main Nav) ---
+        let subNavEl = document.getElementById('dynamic-subnavbar');
+        if (!subNavEl) {
+            // Agar nahi hai toh naya div banayenge theek navEl ke niche
+            subNavEl = document.createElement('div');
+            subNavEl.id = 'dynamic-subnavbar';
+            // Same 'header-nav-row' class lagayenge taaki automatically horizontal scroll aa jaye
+            subNavEl.className = 'header-nav-row'; 
+            subNavEl.style.backgroundColor = '#f8f9fa';
+            subNavEl.style.borderTop = '1px solid #eaeaea';
+            subNavEl.style.padding = '8px 15px';
+            subNavEl.style.gap = '10px';
+            
+            navEl.parentNode.insertBefore(subNavEl, navEl.nextSibling);
+        }
+
+        // Agar humein active parent category mil gayi jiske andar sub-categories hain
+        if (activeCategory && activeCategory.subcategories && activeCategory.subcategories.length > 0) {
+            
+            // "All" ka ek button banate hain
+            const subItems = [
+                `<a href="search_results.html?slug=${encodeURIComponent(activeCategory.slug)}" class="nav-item" style="font-size:0.85rem; padding:5px 12px; background:#fff; border:1px solid #ddd; border-radius:20px; white-space:nowrap;">All ${activeCategory.name}</a>`
+            ];
+
+            // Subcategories ko pill-style mein add karte hain
+            activeCategory.subcategories.forEach(sub => {
+                subItems.push(`<a href="search_results.html?slug=${encodeURIComponent(sub.slug)}" class="nav-item" style="font-size:0.85rem; padding:5px 12px; background:#fff; border:1px solid #ddd; border-radius:20px; white-space:nowrap;">${sub.name}</a>`);
+            });
+
+            subNavEl.innerHTML = subItems.join('');
+            subNavEl.style.display = 'flex'; // Dikhayenge
+            highlightActiveLink(subNavEl);   // Isme bhi active link highlight hoga
+        } else {
+            subNavEl.style.display = 'none'; // Chupayenge agar zaroorat nahi
+        }
     }
 
     window.logout = async function () {

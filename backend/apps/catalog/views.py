@@ -33,13 +33,14 @@ class CategoryBrandPagination(PageNumberPagination):
 
 class NavbarCategoryAPIView(APIView):
     """
-    Returns ONLY Parent Categories (Level 0) for the top Navbar.
+    Returns Parent Categories (Level 0) with subcategories for the top Navbar.
     """
     permission_classes = [AllowAny]
     authentication_classes = [] 
 
     def get(self, request):
-        queryset = Category.objects.filter(is_active=True, parent__isnull=True).order_by('sort_order', 'name')
+        # Yahan .prefetch_related('subcategories') add kiya gaya hai
+        queryset = Category.objects.filter(is_active=True, parent__isnull=True).prefetch_related('subcategories').order_by('sort_order', 'name')
         serializer = NavigationCategorySerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
 
