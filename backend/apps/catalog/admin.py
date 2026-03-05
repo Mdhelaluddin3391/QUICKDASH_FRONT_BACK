@@ -211,19 +211,70 @@ class ProductAdmin(ImportExportModelAdmin):
 @admin.register(Category)
 class CategoryAdmin(ImportExportModelAdmin):
     resource_class = CategoryResource
-    list_display = ('id', 'name', 'slug', 'parent_name', 'sort_order', 'is_active')
-    list_display_links = ('id', 'name')
+    
+    # UPDATE: 'name' ki jagah 'hierarchy_name' aur naya 'total_products' column add kiya
+    list_display = ('id', 'hierarchy_name', 'slug', 'parent_name', 'total_products', 'sort_order', 'is_active')
+    list_display_links = ('id', 'hierarchy_name')
     list_filter = ('is_active', 'parent')
     search_fields = ('name', 'slug')
     list_editable = ('is_active', 'sort_order') 
     list_per_page = 50 
-    ordering = ['sort_order', 'name']
+    
+    # Sorting A-Z rakha hai
+    ordering = ['name']
     prepopulated_fields = {'slug': ('name',)}
     raw_id_fields = ('parent',)
 
+    def hierarchy_name(self, obj):
+        """
+        Categories ko Folder 📂 aur File 📄 ke structure mein dikhayega.
+        """
+        if obj.parent:
+            if obj.parent.parent:
+                # Agar yeh Sub-Sub Category hai (3rd level)
+                return format_html('<span style="margin-left: 40px; color: gray;">└── ➖ {}</span>', obj.name)
+            # Agar yeh Sub Category hai (2nd level)
+            return format_html('<span style="margin-left: 20px; color: #555;">└── 📄 {}</span>', obj.name)
+        
+        # Agar yeh Main/Root Category hai (1st level)
+        return format_html('<b style="font-size: 14px; color: #000;">📂 {}</b>', obj.name)
+    
+    hierarchy_name.short_description = "Category Structure"
+
     def parent_name(self, obj):
         return obj.parent.name if obj.parent else format_html('<b style="color:blue;">ROOT</b>')
-    parent_name.short_description = "Parent Category"
+    parent_name.short_description = "Parent"
+
+    def total_products(self, obj):
+        """
+        Root category mein Total Products (Direct + Subcategory ke) show karega.
+        Subcategory mein sirf uske khud ke products dikhayega.
+        """
+        from .models import Product # Import taaki error na aaye
+        
+        # 1. Category ke apne (direct) products ka count
+        direct_count = Product.objects.filter(category=obj).count()
+        
+        if not obj.parent:
+            # 2. Agar yeh ROOT (Main) category hai, toh uske sub-categories ke products bhi nikalenge
+            sub_categories = Category.objects.filter(parent=obj)
+            sub_count = Product.objects.filter(category__in=sub_categories).count()
+            
+            # Total = Direct products + Sub-category ke products
+            total = direct_count + sub_count
+            
+            return format_html(
+                '<b style="color: #28a745; font-size: 13px;">📦 {} Total SKUs</b><br>'
+                '<span style="color: gray; font-size: 11px;">({} direct, {} in sub)</span>', 
+                total, direct_count, sub_count
+            )
+        
+        # 3. Agar Subcategory hai, toh sirf normal count dikhayega
+        if direct_count > 0:
+            return format_html('<span style="color: #444;">📄 {} SKUs</span>', direct_count)
+        return format_html('<span style="color: #dc3545;">0 SKUs</span>')
+    
+    total_products.short_description = "Total Products"
 
 
 @admin.register(Brand)
