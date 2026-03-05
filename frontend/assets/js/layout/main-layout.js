@@ -7,22 +7,29 @@
     const EVENTS = window.APP_CONFIG?.EVENTS || {};
 
     function isLoggedIn() {
+        // ✅ FIX 3A: 'auth_token' को हटाकर 'access_token' करें
         const tokenKey = (window.APP_CONFIG?.STORAGE_KEYS?.TOKEN) || 'access_token';
         return !!localStorage.getItem(tokenKey);
     }
 
+    /**
+     * Component Loader: HTML Partials (Nav/Footer)
+     * 🔥 ADDED: HTML Caching to prevent re-fetching and blinking
+     */
     async function loadComponent(placeholderId, filePath) {
         const element = document.getElementById(placeholderId);
         if (!element) return;
 
+        // --- 🔥 HTML CACHE LOGIC START ---
         const cacheKey = `html_cache_${filePath}`;
         const cachedHtml = sessionStorage.getItem(cacheKey);
 
         if (cachedHtml) {
             element.innerHTML = cachedHtml;
             highlightActiveLink(element);
-            return; 
+            return; // Cache mil gaya, aage fetch karne ki zaroorat nahi
         }
+        // --- HTML CACHE LOGIC END ---
 
         try {
             let resolvedPath = filePath;
@@ -38,51 +45,72 @@
             if (!response.ok) throw new Error(`Failed to load ${resolvedPath}`);
             const html = await response.text();
             
+            // Save fetched HTML to SessionStorage
             try { sessionStorage.setItem(cacheKey, html); } catch(e) {}
+
             element.innerHTML = html;
+
+            // Load hone ke baad highlight karein
             highlightActiveLink(element);
         } catch (error) {
             console.error(`Error loading component ${filePath}:`, error);
         }
     }
 
+    /**
+     * [UPDATED] Smart Link Highlighting
+     * Ab ye Query Parameters (slug) ko bhi check karega
+     */
     function highlightActiveLink(container) {
         try {
             const currentUrl = new URL(window.location.href);
-            const currentPath = currentUrl.pathname; 
-            const currentSlug = currentUrl.searchParams.get('slug'); 
+            const currentPath = currentUrl.pathname; // e.g. /search_results.html
+            const currentSlug = currentUrl.searchParams.get('slug'); // e.g. fruits
 
+            // Select generic nav items and icon links
             const links = container.querySelectorAll('a.nav-item, a.icon-link, .nav-links a');
             
             links.forEach(link => {
-                link.classList.remove('active'); 
+                link.classList.remove('active'); // Reset purana active
+                
+                // Cleanup inline icon color if previously added
                 const icon = link.querySelector('i');
                 if (icon) icon.style.removeProperty('color');
 
                 const href = link.getAttribute('href');
                 if (!href) return;
 
+                // Resolve link URL absolute path to compare safely
                 const linkUrl = new URL(href, window.location.href);
                 const linkPath = linkUrl.pathname;
                 const linkSlug = linkUrl.searchParams.get('slug');
 
                 let isActive = false;
 
+                // CASE 1: Category Pages (Jahan slug matter karta hai)
                 if (currentPath.includes('search_results.html') && linkPath.includes('search_results.html')) {
+                    // Sirf tab active karein jab slug match kare
                     if (currentSlug && linkSlug && currentSlug === linkSlug) {
                         isActive = true;
                     }
-                } else {
+                }
+                // CASE 2: Normal Pages (Home, Orders, Profile)
+                else {
+                    // Simple Path Match
                     if (linkPath === currentPath) {
                         isActive = true;
-                    } else if ((currentPath === '/' && linkPath.endsWith('index.html')) || 
+                    }
+                    // Root / vs index.html handle
+                    else if ((currentPath === '/' && linkPath.endsWith('index.html')) || 
                              (linkPath === '/' && currentPath.endsWith('index.html'))) {
                         isActive = true;
                     }
                 }
 
+                // Apply Active Class
                 if (isActive) {
                     link.classList.add('active');
+                    // Agar icon hai toh color set karein (CSS fallback)
                     if (icon && link.classList.contains('icon-link')) {
                         icon.style.color = 'var(--primary)';
                     }
@@ -91,6 +119,9 @@
         } catch(e) { console.error("Highlight error", e); }
     }
 
+    // ---------------------------------------------------------
+    // Location Rendering Logic (L1 vs L2)
+    // ---------------------------------------------------------
     function renderNavbarLocation() {
         const el = document.getElementById("header-location");
         const box = document.getElementById("navbar-location-box");
@@ -99,7 +130,10 @@
         if (!window.LocationManager) return;
         const display = window.LocationManager.getDisplayLocation();
 
+        // Reset Classes
         box.classList.remove("active-delivery", "active-service");
+
+        // Render Text
         el.innerHTML = `
             <div class="d-flex flex-column" style="line-height:1.2; text-align:left;">
                 <span style="font-weight:600; font-size:0.95rem;">${display.label}</span>
@@ -107,7 +141,9 @@
             </div>
         `;
 
+        // 👉 YAHAN UPDATE KIYA GAYA HAI: SVG icon select aur set karne ka code
         const icon = box.querySelector('.modern-location-icon');
+
         if (display.type === 'DELIVERY') {
             box.classList.add("active-delivery");
             if (icon) icon.setAttribute('class', 'modern-location-icon text-primary');
@@ -259,6 +295,7 @@
         renderNavbarLocation();
         bindNavbarLocationClick();
 
+        // ✅ FIX 3B: डुप्लीकेट Cart API कॉल को हटा दिया गया है
         const tokenKey = (window.APP_CONFIG?.STORAGE_KEYS?.TOKEN) || 'access_token';
         if (!localStorage.getItem(tokenKey)) {
             document.querySelectorAll('.cart-count').forEach(el => el.style.display = 'none');
@@ -282,7 +319,8 @@
         if (!navEl) return;
 
         const API_URL = `${window.APP_CONFIG.API_BASE_URL}/catalog/categories/parents/`;
-        const CACHE_KEY = 'nav_parents_cache_v3'; 
+        // 🔥 CACHE KEY UPDATED TO '_v2' taaki browser automatically naya data fetch kare
+        const CACHE_KEY = 'nav_parents_cache_v2'; 
         
         const cachedStr = localStorage.getItem(CACHE_KEY);
         if (cachedStr) {
@@ -311,11 +349,11 @@
         }
     }
 
-    // 🔥 FIX: Parent aur Sub-category separation
     function renderNav(categories) {
         const navEl = document.getElementById('dynamic-navbar');
         if (!navEl) return;
 
+        // Current page ka slug nikalte hain
         const currentUrl = new URL(window.location.href);
         const currentSlug = currentUrl.searchParams.get('slug');
 
@@ -323,9 +361,9 @@
         items.push(`<a href="index.html" class="nav-item"><i class="fas fa-fire"></i> Trending</a>`);
 
         const seenNames = new Set();
-        let activeCategory = null; 
+        let activeCategory = null; // Yahan save karenge jiska child nav dikhana hai
 
-        // --- 1. Main Navbar Render (ONLY PARENTS) ---
+        // --- 1. Main Navbar Render ---
         categories.forEach(c => {
             const name = c.name || 'Category';
             if (seenNames.has(name)) return; 
@@ -333,6 +371,7 @@
 
             const slug = c.slug || name.toLowerCase().replace(/\s+/g, '-');
             
+            // Check karein kya ye category active hai ya iska koi sub-category active hai
             if (currentSlug === slug) {
                 activeCategory = c;
             } else if (c.subcategories && c.subcategories.some(sub => sub.slug === currentSlug)) {
@@ -341,16 +380,17 @@
 
             let imgHtml = c.icon_url ? `<img src="${c.icon_url}" alt="${name}" style="width:18px;height:18px;object-fit:cover;border-radius:4px;margin-right:8px;vertical-align:middle;">` : '';
             
-            // Parents hi push honge main nav mein
             items.push(`<a href="search_results.html?slug=${encodeURIComponent(slug)}" class="nav-item" title="${name}">${imgHtml}${name}</a>`);
         });
 
         navEl.innerHTML = items.join('');
         highlightActiveLink(navEl);
 
-        // --- 2. Sub-Navbar Render (ONLY SUB-CATEGORIES of active Parent) ---
+        // --- 2. Sub-Navbar Render (Scrollable Row below Main Nav) ---
+        // --- 2. Sub-Navbar Render (Scrollable Row below Main Nav) ---
         let subNavEl = document.getElementById('dynamic-subnavbar');
         if (!subNavEl) {
+            // Agar nahi hai toh naya div banayenge theek navEl ke niche
             subNavEl = document.createElement('div');
             subNavEl.id = 'dynamic-subnavbar';
             subNavEl.className = 'header-nav-row'; 
@@ -362,12 +402,15 @@
             navEl.parentNode.insertBefore(subNavEl, navEl.nextSibling);
         }
 
+        // Agar humein active parent category mil gayi jiske andar sub-categories hain
         if (activeCategory && activeCategory.subcategories && activeCategory.subcategories.length > 0) {
+            
+            // 🔥 Yahan se extra 'style' hata diya gaya hai, ab sirf class="nav-item" hai
             const subItems = [
-                `<a href="search_results.html?slug=${encodeURIComponent(activeCategory.slug)}" class="nav-item" style="color: var(--primary); font-weight: bold;">All ${activeCategory.name}</a>`
+                `<a href="search_results.html?slug=${encodeURIComponent(activeCategory.slug)}" class="nav-item">All ${activeCategory.name}</a>`
             ];
 
-            // Subcategories
+            // Subcategories ko add karte hain
             activeCategory.subcategories.forEach(sub => {
                 subItems.push(`<a href="search_results.html?slug=${encodeURIComponent(sub.slug)}" class="nav-item">${sub.name}</a>`);
             });
@@ -387,6 +430,7 @@
             localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.TOKEN);
             localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.REFRESH);
             
+            // --- 🔥 Cache clearing applied here already by you ---
             if (window.ApiService) { window.ApiService.clearCache(); } else { sessionStorage.clear(); }
 
             localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.USER);
@@ -404,22 +448,25 @@
     };
 })();
 
+// frontend/assets/js/layout/main-layout.js ke end me update karein
 document.addEventListener('DOMContentLoaded', async () => {
     await checkStoreStatus();
 });
 
 async function checkStoreStatus() {
+    // 🔥 FIX: Faltu API Calls Rokne Ke Liye 5 Minute Ka Cache Lagaya Hai
     const CACHE_KEY = 'store_status_cache';
     const cachedStr = sessionStorage.getItem(CACHE_KEY);
     
     if (cachedStr) {
         try {
             const cached = JSON.parse(cachedStr);
+            // Agar cache 5 minute (300000 ms) se purana nahi hai, toh wahi use karein
             if (Date.now() - cached.ts < 300000) { 
                 if (cached.data.is_store_open === false) {
                     showStoreOfflineUI(cached.data.store_closed_message);
                 }
-                return; 
+                return; // Yahan se return ho jayega, API call nahi hogi
             }
         } catch (e) {
             console.warn("Store status cache invalid");
@@ -432,6 +479,8 @@ async function checkStoreStatus() {
         
         if (response.ok) {
             const data = await response.json();
+            
+            // Naya data aane par Cache mein save karein
             sessionStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: data }));
             
             if (data.is_store_open === false) {
