@@ -136,7 +136,12 @@ class OrderAdmin(ImportExportModelAdmin):
 
     def total_amount_display(self, obj):
         amount = obj.total_amount if obj.total_amount is not None else 0
-        return format_html('<span style="color: green; font-weight: bold;">₹{:.2f}</span>', float(amount))
+        # Pehle amount ko 2 decimal places me format kar lein
+        formatted_amount = f"{float(amount):.2f}"
+        
+        # Phir us formatted string ko format_html me pass karein (bina {:.2f} ke)
+        return format_html('<span style="color: green; font-weight: bold;">₹{}</span>', formatted_amount)
+    
     total_amount_display.short_description = "Amount"
 
     def created_at_date(self, obj):

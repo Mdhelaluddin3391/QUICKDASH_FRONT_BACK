@@ -294,7 +294,6 @@ def cancel_order_item(order_item, reason):
         # Agar order packed ya delivered hai, toh cancel process yahi rok do
         return False, f"Yeh item ab cancel nahi ho sakta kyunki order already '{order.get_status_display()}' ho chuka hai."
 
-    # 3. Agar status valid hai, toh cancellation proceed karein
     order_item.status = 'cancelled'
     order_item.cancel_reason = reason
     order_item.save()
@@ -304,7 +303,6 @@ def cancel_order_item(order_item, reason):
     order.total_amount -= item_total
     order.save()
 
-    # 🔥 FIX: 'RAZORPAY' se match kiya order ke payment_method ko aur Refund logic ko safe import kiya
     if order.payment_method == 'RAZORPAY':
         try:
             from apps.payments.models import Payment
