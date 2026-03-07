@@ -17,16 +17,18 @@ class AuditService:
             created_at=timezone.now()
         )
 
-
     @staticmethod
     def order_created(order):
+        # 🚀 FIX: 'order.warehouse' ko 'order.fulfillment_warehouse' me badla
+        warehouse_id = order.fulfillment_warehouse.id if order.fulfillment_warehouse else None
+        
         AuditService.log(
             action="order_created",
             reference_id=str(order.id),
             user=order.user,
             metadata={
                 "amount": str(order.total_amount),
-                "warehouse": order.warehouse.id,
+                "warehouse": warehouse_id, 
                 "delivery_type": order.delivery_type,
             },
         )
