@@ -203,7 +203,6 @@ class OrderAdmin(ImportExportModelAdmin):
         return format_html('<a style="background-color: #007bff; color: white; padding: 4px 8px; border-radius: 4px; text-decoration: none; font-size:11px; font-weight: bold;" href="{}" target="_blank">📍 MAP</a>', url)
     Maps_link.short_description = "Directions"
 
-    # --- ADVANCED AUTO REFUND LOGIC ---
     def save_formset(self, request, form, formset, change):
         instances = formset.save(commit=False)
         for instance in instances:
