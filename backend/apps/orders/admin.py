@@ -152,9 +152,19 @@ class OrderAdmin(ImportExportModelAdmin):
 
     def delivery_name(self, obj):
         addr = obj.delivery_address_json or {}
+        
+        # 1. Sabse pehle Address Form ('receiver_name') check karein
         name = addr.get('receiver_name') or addr.get('name')
-        if not name and obj.user: name = f"{obj.user.first_name} {obj.user.last_name}".strip()
-        return name or "N/A"
+        if name and str(name).strip():
+            return str(name).strip()
+            
+        # 2. Agar Address form mein naam khali hai, toh User Profile se lein (Fallback)
+        if obj.user:
+            profile_name = f"{obj.user.first_name} {obj.user.last_name}".strip()
+            if profile_name:
+                return profile_name
+                
+        return "N/A"
     delivery_name.short_description = "Delivery Name"
 
     def delivery_phone(self, obj):
@@ -168,16 +178,21 @@ class OrderAdmin(ImportExportModelAdmin):
         addr_json = obj.delivery_address_json or {}
         details = []
 
-        # 1. Customer Name Fetch karna
-        name = addr_json.get('receiver_name') or addr_json.get('name')
-        if not name and obj.user: 
-            name = f"{obj.user.first_name} {obj.user.last_name}".strip()
-        if not name:
-            name = "Customer" # Agar koi name nahi mila toh default "Customer" dikhayega
+        # 1. Customer Name (Hamesha Profile se aayega)
+        customer_name = "Customer"
+        if obj.user: 
+            profile_name = f"{obj.user.first_name} {obj.user.last_name}".strip()
+            if profile_name:  # Agar profile mein naam hai toh woh use karein
+                customer_name = profile_name
             
-        details.append(f"👤 <b>Name:</b> {name}")
+        details.append(f"👤 <b>Customer Name:</b> {customer_name}")
 
-        # 2. Customer Phone Fetch karna
+        # 2. Receiver Name (Agar customer khud receive nahi kar raha, kisi aur ka naam diya hai)
+        receiver = addr_json.get('receiver_name') or addr_json.get('name')
+        if receiver and str(receiver).strip() and str(receiver).strip() != customer_name:
+            details.append(f"📦 <b>Receiver Name:</b> {str(receiver).strip()}")
+
+        # 3. Phone Number Fetch karna
         phone = addr_json.get('receiver_phone') or addr_json.get('phone')
         if not phone and obj.user: 
             phone = getattr(obj.user, 'phone', None)
@@ -185,7 +200,7 @@ class OrderAdmin(ImportExportModelAdmin):
         if phone:
             details.append(f"📞 <b>Phone:</b> {phone}")
 
-        # 3. Address aur City
+        # 4. Address aur City
         if addr_json.get('full_address'): 
             details.append(f"🏠 <b>Address:</b> {addr_json.get('full_address')}")
         if addr_json.get('city'): 
@@ -195,7 +210,6 @@ class OrderAdmin(ImportExportModelAdmin):
             return "No Details Found"
             
         return format_html("<br>".join(details))
-        
     full_delivery_address.short_description = "Customer & Address Details"
 
     def Maps_link(self, obj):
