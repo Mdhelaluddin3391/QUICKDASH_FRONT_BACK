@@ -73,9 +73,6 @@ class StandardResultsSetPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 100
 
-# backend/apps/orders/views.py
-# (Keep all your existing imports)
-
 class CreateOrderAPIView(APIView):
     """
     Secure Order Creation.
@@ -87,48 +84,54 @@ class CreateOrderAPIView(APIView):
     @idempotent(timeout=300)
     @transaction.atomic
     def post(self, request):
-        serializer = CreateOrderSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        
         try:
-            address = CustomerAddress.objects.get(id=data['delivery_address_id'], customer__user=request.user)
-        except CustomerAddress.DoesNotExist:
-            return Response({"error": "Invalid Delivery Address"}, status=400)
+            # 1. Validate Request Data
+            serializer = CreateOrderSerializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            data = serializer.validated_data
+            
+            # 2. Fetch Address
+            try:
+                address = CustomerAddress.objects.get(id=data['delivery_address_id'], customer__user=request.user)
+            except CustomerAddress.DoesNotExist:
+                return Response({"error": "Invalid Delivery Address"}, status=400)
 
-        warehouse = WarehouseService.find_nearest_serviceable_warehouse(
-            address.latitude, address.longitude
-        )
-
-        if not warehouse:
-            return Response(
-                {"error": "This address is not serviceable."}, 
-                status=status.HTTP_400_BAD_REQUEST
+            # 3. Fetch Warehouse (If this throws a math error due to missing coords, it's caught now)
+            warehouse = WarehouseService.find_nearest_serviceable_warehouse(
+                address.latitude, address.longitude
             )
 
-        cart = get_object_or_404(Cart, user=request.user)
-        if not cart.items.exists():
-            return Response({"error": "Cart is empty"}, status=400)
+            if not warehouse:
+                return Response(
+                    {"error": "This address is not serviceable."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-        if cart.warehouse_id != warehouse.id:
-            return Response(
-                {"error": "Cart mismatch. Please refresh cart."}, 
-                status=status.HTTP_409_CONFLICT
-            )
-
-        items_data = []
-        for item in cart.items.select_related('sku').all():
-            # Safeguard: if an inventory item was completely deleted from DB
-            if not item.sku:
-                continue 
+            # 4. Safely fetch Cart (Avoids the 500 MultipleObjectsReturned crash)
+            cart = Cart.objects.filter(user=request.user).first()
+            if not cart:
+                return Response({"error": "Cart not found"}, status=400)
                 
-            items_data.append({
-                "sku": item.sku.sku,
-                "quantity": item.quantity
-            })
+            if not cart.items.exists():
+                return Response({"error": "Cart is empty"}, status=400)
 
-        try:
-            # 🚀 FIX: Wrap the dangerous DB operations in a nested savepoint
+            if cart.warehouse_id != warehouse.id:
+                return Response(
+                    {"error": "Cart mismatch. Please refresh cart."}, 
+                    status=status.HTTP_409_CONFLICT
+                )
+
+            # 5. Process Items
+            items_data = []
+            for item in cart.items.select_related('sku').all():
+                if not item.sku:
+                    continue 
+                items_data.append({
+                    "sku": item.sku.sku,
+                    "quantity": item.quantity
+                })
+
+            # 6. Database Operations within Savepoint
             with transaction.atomic():
                 InventoryService.bulk_lock_and_reserve(
                     warehouse_id=warehouse.id,
@@ -168,9 +171,12 @@ class CreateOrderAPIView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            # Now, if it fails, the inner block rolls back safely, 
-            # and we can return the REAL error message to the frontend!
-            return Response({"error": str(e)}, status=400)
+            # Catch ALL exceptions from top to bottom so it NEVER gives a 500 HTML page!
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Order Creation Error: {str(e)}", exc_info=True)
+            
+            return Response({"error": str(e) or "An unexpected error occurred"}, status=400)
 
 class MyOrdersAPIView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
