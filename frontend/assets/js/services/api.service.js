@@ -1,11 +1,5 @@
 /**
  * Centralized API Service (Production Hardened)
- * - Auto-injects Authorization headers
- * - Handles 401 Token Refresh automatically
- * - Injects Location Context (L1/L2) for Backend Middleware
- * - Injects Idempotency-Key for mutating requests
- * - Centralized Error Handling
- * - 🔥 SMART GET CACHING ADDED
  */
 (function () {
     const ApiService = {
@@ -13,7 +7,6 @@
         isRefreshing: false,
         refreshSubscribers: [],
 
-        // Generate UUIDv4 for Idempotency
         uuidv4: function () {
             return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
                 const r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
@@ -21,38 +14,26 @@
             });
         },
 
-        /**
-         * INJECTS HEADERS
-         * 1. Auth Token
-         * 2. Idempotency Key
-         * 3. Location Context (Critical for Backend Warehouse Resolution)
-         */
         getHeaders: function (uploadFile = false, method = 'GET') {
             const headers = {};
             if (!uploadFile) {
                 headers['Content-Type'] = 'application/json';
             }
 
-            // 1. Auth Token
             const token = localStorage.getItem(window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token');
             if (token && token !== 'null' && token !== 'undefined') {
                 headers['Authorization'] = `Bearer ${token}`;
             }
 
-            // 2. Idempotency
             if (['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
                 headers['Idempotency-Key'] = ApiService.uuidv4();
             }
 
-            // 3. LOCATION CONTEXT INJECTION (New Architecture)
-            // Checks for L2 (Delivery Address) first, then L1 (GPS)
             if (window.LocationManager) {
                 const locContext = window.LocationManager.getLocationContext();
-
                 if (locContext.type === 'L2' && locContext.addressId) {
                     headers['X-Address-ID'] = locContext.addressId.toString();
                 } 
-                
                 if (locContext.lat && locContext.lng) {
                     headers['X-Location-Lat'] = locContext.lat.toString();
                     headers['X-Location-Lng'] = locContext.lng.toString();
@@ -63,10 +44,16 @@
         },
 
         request: async function (endpoint, method = 'GET', body = null, isRetry = false) {
-            // Ensure endpoint format
-            const baseUrl = window.APP_CONFIG?.API_BASE_URL || '/api/v1';
+            // 🔥 YAHAN FIX KIYA HAI: URL se Double Slash (//) Hatane ka logic
+            let baseUrl = window.APP_CONFIG?.API_BASE_URL || '/api/v1';
+            if (baseUrl.endsWith('/')) {
+                baseUrl = baseUrl.slice(0, -1); // Remove trailing slash from base
+            }
             const safeEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
             const url = `${baseUrl}${safeEndpoint}`;
+
+            // Development testing log
+            console.log(`[ApiService] ${method} Request URL:`, url);
 
             const options = {
                 method,
@@ -80,7 +67,6 @@
             try {
                 const response = await fetch(url, options);
 
-                // [Global Handler] Location/Cart Mismatch (Architecture Step 8)
                 if (response.status === 409) {
                     const resData = await response.clone().json().catch(() => ({}));
                     if (resData.code === 'WAREHOUSE_MISMATCH') {
@@ -91,7 +77,6 @@
                     }
                 }
 
-                // [Existing Logic] Handle 401 Unauthorized (Token Refresh Flow)
                 if (response.status === 401 && !isRetry) {
                     if (ApiService.isRefreshing) {
                         return new Promise((resolve, reject) => {
@@ -119,7 +104,6 @@
                     }
                 }
 
-                // Parse Response
                 const text = await response.text();
                 let data;
                 try {
@@ -141,9 +125,7 @@
                 return data === null ? {} : data;
 
             } catch (error) {
-                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                    console.error(`API Error [${method} ${endpoint}]:`, error);
-                }
+                console.error(`API Error [${method} ${url}]:`, error);
                 throw error;
             }
         },
@@ -158,7 +140,8 @@
             const refresh = localStorage.getItem(refreshKey);
             if (!refresh) return false;
 
-            const baseUrl = window.APP_CONFIG?.API_BASE_URL || '/api/v1';
+            let baseUrl = window.APP_CONFIG?.API_BASE_URL || '/api/v1';
+            if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
 
             try {
                 const response = await fetch(`${baseUrl}/auth/refresh/`, {
@@ -186,7 +169,6 @@
             localStorage.removeItem(window.APP_CONFIG?.STORAGE_KEYS?.REFRESH || 'refresh_token');
             localStorage.removeItem(window.APP_CONFIG?.STORAGE_KEYS?.USER || 'user_info');
             
-            // Auto clear cache on logout/failure
             this.clearCache();
 
             const currentPath = window.location.pathname;
@@ -209,50 +191,39 @@
             }
         },
 
-        // --- 🔥 SMART GET CACHING 🔥 ---
         get: async function (endpoint, params = {}, skipCache = false) { 
             const queryString = new URLSearchParams(params).toString();
             const url = queryString ? `${endpoint}?${queryString}` : endpoint;
 
-            // 1. URLs that should NEVER be cached (Dynamic/Private data)
             const noCacheEndpoints = ['/auth/', '/cart/', '/orders/', '/checkout/', '/profile/'];
             const shouldSkipCache = skipCache || noCacheEndpoints.some(route => url.includes(route));
 
             const cacheKey = `api_get_cache_${url}`;
 
-            // 2. Return Cache if valid
             if (!shouldSkipCache) {
                 const cachedData = sessionStorage.getItem(cacheKey);
                 if (cachedData) {
                     try {
-                        console.log(`[ApiService] Loaded from Cache: ${url}`);
                         return JSON.parse(cachedData);
                     } catch(e) { /* ignore parse error */ }
                 }
             }
 
-            // 3. Normal API Call
             const data = await this.request(url, 'GET'); 
 
-            // 4. Save to Cache
             if (!shouldSkipCache && data) {
                 try {
                     sessionStorage.setItem(cacheKey, JSON.stringify(data));
-                } catch(e) { 
-                    console.warn("SessionStorage full, skipping cache save"); 
-                }
+                } catch(e) { }
             }
 
             return data;
         },
 
-        // --- CACHE INVALIDATION METHOD ---
-        // Call this when location changes, user logs in, or new address is added!
         clearCache: function () {
             const keysToRemove = [];
             for (let i = 0; i < sessionStorage.length; i++) {
                 const key = sessionStorage.key(i);
-                // Clean all API caches created by this service
                 if (key && (key.startsWith('api_get_cache_') || key.startsWith('cache_') || key.startsWith('storefront_'))) {
                     keysToRemove.push(key);
                 }

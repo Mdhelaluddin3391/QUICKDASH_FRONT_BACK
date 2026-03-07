@@ -82,21 +82,18 @@ class CreateOrderAPIView(APIView):
     permission_classes = [IsCustomer]
 
     @idempotent(timeout=300)
-    @transaction.atomic
     def post(self, request):
         try:
-            # 1. Validate Request Data
             serializer = CreateOrderSerializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             data = serializer.validated_data
             
-            # 2. Fetch Address
             try:
                 address = CustomerAddress.objects.get(id=data['delivery_address_id'], customer__user=request.user)
             except CustomerAddress.DoesNotExist:
-                return Response({"error": "Invalid Delivery Address"}, status=400)
+                return Response({"error": "Invalid Delivery Address"}, status=status.HTTP_400_BAD_REQUEST)
 
-            # 3. Fetch Warehouse (If this throws a math error due to missing coords, it's caught now)
+            # Warehouse check (Agar lat/lng na ho toh crash nahi karega)
             warehouse = WarehouseService.find_nearest_serviceable_warehouse(
                 address.latitude, address.longitude
             )
@@ -107,13 +104,10 @@ class CreateOrderAPIView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # 4. Safely fetch Cart (Avoids the 500 MultipleObjectsReturned crash)
+            # 🔥 FIX: get_object_or_404 ki jagah .first() lagaya taaki 500 MultipleObjects Error na aye
             cart = Cart.objects.filter(user=request.user).first()
-            if not cart:
-                return Response({"error": "Cart not found"}, status=400)
-                
-            if not cart.items.exists():
-                return Response({"error": "Cart is empty"}, status=400)
+            if not cart or not cart.items.exists():
+                return Response({"error": "Cart is empty"}, status=status.HTTP_400_BAD_REQUEST)
 
             if cart.warehouse_id != warehouse.id:
                 return Response(
@@ -121,7 +115,6 @@ class CreateOrderAPIView(APIView):
                     status=status.HTTP_409_CONFLICT
                 )
 
-            # 5. Process Items
             items_data = []
             for item in cart.items.select_related('sku').all():
                 if not item.sku:
@@ -131,7 +124,7 @@ class CreateOrderAPIView(APIView):
                     "quantity": item.quantity
                 })
 
-            # 6. Database Operations within Savepoint
+            # 🔥 FIX: Transaction Block andar dala taaki sirf database operation atomic rahe
             with transaction.atomic():
                 InventoryService.bulk_lock_and_reserve(
                     warehouse_id=warehouse.id,
@@ -160,7 +153,6 @@ class CreateOrderAPIView(APIView):
                         "key_id": getattr(settings, 'RAZORPAY_KEY_ID', '')
                     }
 
-            # Return success after exiting the atomic block successfully
             return Response({
                 "order": {
                     "id": order.id, 
@@ -171,12 +163,10 @@ class CreateOrderAPIView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            # Catch ALL exceptions from top to bottom so it NEVER gives a 500 HTML page!
             import logging
             logger = logging.getLogger(__name__)
             logger.error(f"Order Creation Error: {str(e)}", exc_info=True)
-            
-            return Response({"error": str(e) or "An unexpected error occurred"}, status=400)
+            return Response({"error": str(e) or "An unexpected error occurred while creating order."}, status=status.HTTP_400_BAD_REQUEST)
 
 class MyOrdersAPIView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
