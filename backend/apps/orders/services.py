@@ -117,6 +117,8 @@ class OrderService:
 
         address_snapshot = {
             "id": address.id,
+            "name": getattr(address, 'receiver_name', getattr(address, 'name', '')),   # Name add kiya
+            "phone": getattr(address, 'receiver_phone', getattr(address, 'phone', '')), # Phone add kiya
             "full_address": address.google_address_text or f"{address.house_no}, {address.apartment_name}",
             "lat": float(address.latitude),
             "lng": float(address.longitude),

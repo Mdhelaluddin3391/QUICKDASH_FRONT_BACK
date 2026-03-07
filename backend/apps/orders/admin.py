@@ -168,25 +168,28 @@ class OrderAdmin(ImportExportModelAdmin):
         addr_json = obj.delivery_address_json or {}
         details = []
 
-        # 1. Customer Name Fetch karna (Pehle address JSON se, nahi toh User table se)
+        # 1. Customer Name Fetch karna
         name = addr_json.get('receiver_name') or addr_json.get('name')
         if not name and obj.user: 
             name = f"{obj.user.first_name} {obj.user.last_name}".strip()
-        if name:
-            details.append(f" <b>Name:</b> {name}")
+        if not name:
+            name = "Customer" # Agar koi name nahi mila toh default "Customer" dikhayega
+            
+        details.append(f"👤 <b>Name:</b> {name}")
 
-        # 2. Customer Phone Fetch karna (Pehle address JSON se, nahi toh User table se)
+        # 2. Customer Phone Fetch karna
         phone = addr_json.get('receiver_phone') or addr_json.get('phone')
         if not phone and obj.user: 
             phone = getattr(obj.user, 'phone', None)
+            
         if phone:
-            details.append(f" <b>Phone:</b> {phone}")
+            details.append(f"📞 <b>Phone:</b> {phone}")
 
         # 3. Address aur City
         if addr_json.get('full_address'): 
-            details.append(f" <b>Address:</b> {addr_json.get('full_address')}")
+            details.append(f"🏠 <b>Address:</b> {addr_json.get('full_address')}")
         if addr_json.get('city'): 
-            details.append(f" <b>City:</b> {addr_json.get('city')}")
+            details.append(f"🏙️ <b>City:</b> {addr_json.get('city')}")
 
         if not details: 
             return "No Details Found"
