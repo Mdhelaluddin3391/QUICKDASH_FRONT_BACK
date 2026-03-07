@@ -73,6 +73,9 @@ class StandardResultsSetPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 100
 
+# backend/apps/orders/views.py
+# (Keep all your existing imports)
+
 class CreateOrderAPIView(APIView):
     """
     Secure Order Creation.
@@ -115,39 +118,46 @@ class CreateOrderAPIView(APIView):
 
         items_data = []
         for item in cart.items.select_related('sku').all():
+            # Safeguard: if an inventory item was completely deleted from DB
+            if not item.sku:
+                continue 
+                
             items_data.append({
                 "sku": item.sku.sku,
                 "quantity": item.quantity
             })
 
         try:
-            InventoryService.bulk_lock_and_reserve(
-                warehouse_id=warehouse.id,
-                items_dict={i['sku']: i['quantity'] for i in items_data},
-                reference=f"order_init_{request.user.id}"
-            )
-            
-            order = OrderService.create_order_after_reservation(
-                user=request.user,
-                warehouse_id=warehouse.id, 
-                items_data=items_data,
-                delivery_type=data['delivery_type'],
-                address_id=address.id,
-                payment_method=data['payment_method']
-            )
+            # 🚀 FIX: Wrap the dangerous DB operations in a nested savepoint
+            with transaction.atomic():
+                InventoryService.bulk_lock_and_reserve(
+                    warehouse_id=warehouse.id,
+                    items_dict={i['sku']: i['quantity'] for i in items_data},
+                    reference=f"order_init_{request.user.id}"
+                )
+                
+                order = OrderService.create_order_after_reservation(
+                    user=request.user,
+                    warehouse_id=warehouse.id, 
+                    items_data=items_data,
+                    delivery_type=data['delivery_type'],
+                    address_id=address.id,
+                    payment_method=data['payment_method']
+                )
 
-            cart.items.all().delete()
+                cart.items.all().delete()
 
-            razorpay_order = None
-            if data['payment_method'] == 'RAZORPAY':
-                payment = PaymentService.create_payment(order)
-                razorpay_order = {
-                    "id": payment.provider_order_id,
-                    "amount": int(payment.amount * 100),
-                    "currency": "INR",
-                    "key_id": getattr(settings, 'RAZORPAY_KEY_ID', '')
-                }
+                razorpay_order = None
+                if data['payment_method'] == 'RAZORPAY':
+                    payment = PaymentService.create_payment(order)
+                    razorpay_order = {
+                        "id": payment.provider_order_id,
+                        "amount": int(payment.amount * 100),
+                        "currency": "INR",
+                        "key_id": getattr(settings, 'RAZORPAY_KEY_ID', '')
+                    }
 
+            # Return success after exiting the atomic block successfully
             return Response({
                 "order": {
                     "id": order.id, 
@@ -158,8 +168,9 @@ class CreateOrderAPIView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         except Exception as e:
+            # Now, if it fails, the inner block rolls back safely, 
+            # and we can return the REAL error message to the frontend!
             return Response({"error": str(e)}, status=400)
-
 
 class MyOrdersAPIView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
