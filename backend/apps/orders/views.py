@@ -149,7 +149,11 @@ class CreateOrderAPIView(APIView):
                 }
 
             return Response({
-                "order": {"id": order.id, "status": order.status, "total": order.total_amount},
+                "order": {
+                    "id": order.id, 
+                    "status": order.status, 
+                    "total": str(order.total_amount) 
+                },
                 "razorpay_order": razorpay_order
             }, status=status.HTTP_201_CREATED)
 

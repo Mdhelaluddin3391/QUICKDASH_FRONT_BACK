@@ -64,7 +64,9 @@ class OrderItemInline(admin.TabularInline):
         
         details = []
         for f in fulfillments:
-            owner = f.inventory_batch.owner.phone if f.inventory_batch.owner else "Company"
+            # Safely check for owner and then phone
+            owner_obj = getattr(f.inventory_batch, 'owner', None)
+            owner = getattr(owner_obj, 'phone', 'Company') if owner_obj else "Company"
             details.append(f"<b>{f.quantity_allocated}x</b> (Batch {f.inventory_batch.id} - {owner})")
         return format_html("<br>".join(details))
     fulfillment_details.short_description = "Stock Source"
@@ -133,7 +135,8 @@ class OrderAdmin(ImportExportModelAdmin):
     status_badge.short_description = "Status"
 
     def total_amount_display(self, obj):
-        return format_html('<span style="color: green; font-weight: bold;">₹{:.2f}</span>', obj.total_amount)
+        amount = obj.total_amount if obj.total_amount is not None else 0
+        return format_html('<span style="color: green; font-weight: bold;">₹{:.2f}</span>', float(amount))
     total_amount_display.short_description = "Amount"
 
     def created_at_date(self, obj):
@@ -261,8 +264,10 @@ class OrderItemFulfillmentAdmin(admin.ModelAdmin):
     batch_id.short_description = "Batch ID"
 
     def vendor_phone(self, obj):
-        if obj.inventory_batch.owner:
-            return format_html('<span style="color: blue; font-weight: bold;">{}</span>', obj.inventory_batch.owner.phone)
+        owner_obj = getattr(obj.inventory_batch, 'owner', None)
+        if owner_obj:
+            phone = getattr(owner_obj, 'phone', 'Vendor')
+            return format_html('<span style="color: blue; font-weight: bold;">{}</span>', phone)
         return format_html('<span style="color: green; font-weight: bold;">Company</span>')
     vendor_phone.short_description = "Vendor"
 

@@ -24,9 +24,6 @@ from .abuse_services import OrderAbuseService
 from .models import Order, OrderItem, OrderItemFulfillment  
 from .abuse_services import OrderAbuseService
 from apps.catalog.models import Product
-# from apps.payments.refund_services import initiate_partial_refund # Aapka refund service
-
-
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -128,8 +125,8 @@ class OrderService:
 
         order = Order.objects.create(
             user=user, 
-            fulfillment_warehouse=warehouse, # Changed here
-            last_mile_warehouse=warehouse,   # Changed here
+            fulfillment_warehouse=warehouse, 
+            last_mile_warehouse=warehouse,   
             status="created",
             delivery_type=delivery_type, 
             total_amount=Decimal("0.00"),
@@ -171,12 +168,16 @@ class OrderService:
                     break
                 
                 # Check kitna stock is batch se le sakte hain
-                # Note: Aapka bulk_reserve pehle chal chuka hoga isliye total_stock se map kar rahe hain
                 batch_stock = batch.total_stock
                 qty_to_take = min(batch_stock, qty_remaining)
                 
                 # 3. Kiska maal gaya uska hisaab lagao
-                payable_amt = Decimal(getattr(batch, 'cost_price', "0.00")) * Decimal(qty_to_take) if getattr(batch, 'owner', None) else Decimal("0.00")
+                # 🔥 FIX: Null/NoneType handle kiya taaki crash na ho
+                cost_val = getattr(batch, 'cost_price', 0)
+                if cost_val is None:
+                    cost_val = 0
+                
+                payable_amt = Decimal(str(cost_val)) * Decimal(str(qty_to_take)) if getattr(batch, 'owner', None) else Decimal("0.00")
                 
                 OrderItemFulfillment.objects.create(
                     order_item=order_item,
@@ -279,7 +280,6 @@ class OrderSimulationService:
         return "Delivered"
     
 
-
 def cancel_order_item(order_item, reason):
     # 1. Pehle check karein ki item already cancel toh nahi hai
     if order_item.status == 'cancelled':
@@ -304,13 +304,16 @@ def cancel_order_item(order_item, reason):
     order.total_amount -= item_total
     order.save()
 
-    # Agar online payment thi, toh refund initiate karein
-    if order.payment_method == 'online':
-        # Yahan ensure karein ki initiate_partial_refund function import ho gaya ho top par
-        initiate_partial_refund(
-            order=order, 
-            amount=item_total, 
-            reason=reason
-        )
+    # 🔥 FIX: 'RAZORPAY' se match kiya order ke payment_method ko aur Refund logic ko safe import kiya
+    if order.payment_method == 'RAZORPAY':
+        try:
+            from apps.payments.models import Payment
+            from apps.payments.refund_services import RefundService
+            
+            payment = Payment.objects.filter(order=order, status='paid').first()
+            if payment:
+                RefundService.initiate_partial_refund(payment, item_total, reason)
+        except Exception as e:
+            logger.error(f"Refund initiation failed: {e}")
 
     return True, "Item successfully cancel ho gaya aur amount adjust ho gaya."
