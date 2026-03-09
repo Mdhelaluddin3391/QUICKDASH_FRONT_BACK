@@ -7,7 +7,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
 from rest_framework import generics
-
+from django.conf import settings
 from .services import OTPService
 from .models import Notification
 from .serializers import NotificationSerializer
@@ -38,7 +38,19 @@ class SendOTPAPIView(APIView):
 
         try:
             otp = OTPService.create_and_send(phone, ip_address=client_ip)
-            return Response({"status": "otp_sent", "debug_otp": otp}, status=status.HTTP_200_OK)
+            
+            # Response Data Prepare Karein
+            response_data = {"status": "otp_sent"}
+            
+            # SMART FALLBACK: Agar Twilio Configure NAHI hai, tabhi OTP response mein bhejo
+            has_twilio = bool(getattr(settings, 'TWILIO_ACCOUNT_SID', None) and 
+                              getattr(settings, 'TWILIO_AUTH_TOKEN', None) and 
+                              getattr(settings, 'TWILIO_PHONE_NUMBER', None))
+            
+            if not has_twilio or settings.DEBUG:
+                response_data["debug_otp"] = otp
+                
+            return Response(response_data, status=status.HTTP_200_OK)
             
         except Exception as exc:
             from apps.utils.exceptions import BusinessLogicException
@@ -51,7 +63,6 @@ class SendOTPAPIView(APIView):
                     }
                 }, status=status.HTTP_400_BAD_REQUEST)
             raise
-
 
 class MyNotificationListAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]

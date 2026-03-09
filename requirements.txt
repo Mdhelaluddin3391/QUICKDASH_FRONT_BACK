@@ -27,3 +27,4 @@ geopy>=2.4
 django-leaflet>=0.29.0
 django-import-export==4.4.0
 firebase-admin==7.2.0
+twilio>=8.0.0

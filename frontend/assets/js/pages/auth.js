@@ -1,7 +1,7 @@
 // assets/js/pages/auth.js
 
-let isUsingFirebase = false; 
-let confirmationResult = null;
+let isUsingFirebase = false; // Variable rakha hai taaki errors na aayein
+let confirmationResult = null; // Isey bhi safe rakha hai
 const stepPhone = document.getElementById('step-phone');
 const stepOtp = document.getElementById('step-otp');
 let phoneNumber = '';
@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const otpForm = document.getElementById('step-otp');
     if (otpForm) otpForm.addEventListener('submit', handleVerifyAndLogin);
 
-    // 🔥 Advanced & Smooth OTP Input Logic
+    // 🔥 Advanced & Smooth OTP Input Logic (No changes here)
     const otpInputs = document.querySelectorAll('.otp-input');
     otpInputs.forEach((input, index) => {
         input.addEventListener('input', (e) => {
@@ -63,7 +63,10 @@ async function handleSendOtp(e) {
     phoneNumber = `+91${rawInput}`;
 
     try {
-        // 🔥 PLAN A: Firebase SMS Attempt (Fixed for Compat API)
+        // ==========================================
+        // 🔥 OLD PLAN A: Firebase SMS Attempt (COMMENTED OUT FOR SAFETY)
+        // ==========================================
+        /*
         if (!window.recaptchaVerifier) {
             window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('get-otp-btn', {
                 'size': 'invisible',
@@ -72,48 +75,47 @@ async function handleSendOtp(e) {
                 }
             });
         }
-        
         console.log("Attempting Firebase SMS...");
         window.confirmationResult = await window.firebaseAuth.signInWithPhoneNumber(phoneNumber, window.recaptchaVerifier);
-        isUsingFirebase = true; // Firebase pass ho gaya
-        
+        isUsingFirebase = true; 
         showOtpScreen(phoneNumber);
         Toast.success("OTP Sent successfully via SMS");
+        */
 
-    } catch (firebaseErr) { 
-        console.warn("Firebase SMS Failed. Switching to Local Fallback...", firebaseErr);
-        isUsingFirebase = false; // Firebase fail, ab local system use karenge
+        // ==========================================
+        // 🛠️ NEW PLAN: Tumhara Local Backend / Twilio API
+        // ==========================================
+        isUsingFirebase = false; // Always force local validation now
         
-        // 🛠️ PLAN B: Tumhara Local Backend / Render API Fallback
-        try {
-            const res = await ApiService.post('/notifications/send-otp/', { phone: phoneNumber });
-            showOtpScreen(phoneNumber);
-            
-            if (res.debug_otp) {
-                Toast.devOTP(res.debug_otp); 
-                const debugOtpStr = String(res.debug_otp);
-                const otpInputs = document.querySelectorAll('.otp-input');
-                otpInputs.forEach((inp, i) => {
-                    if (debugOtpStr[i]) inp.value = debugOtpStr[i];
-                });
-            } else {
-                Toast.success("OTP Sent successfully (Fallback Mode)");
-            }
-        } catch (localErr) {
-            console.error("Local Error Object:", localErr);
-            
-            // ✅ IMPROVED ERROR HANDLING FOR CLEAN TOAST
-            let errorMsg = "Failed to send OTP completely";
-            if (localErr.detail) {
-                errorMsg = localErr.detail; // Extract direct detail (for Rate Limit)
-            } else if (localErr.error) {
-                errorMsg = localErr.error;
-            } else if (localErr.message) {
-                errorMsg = typeof localErr.message === 'string' ? localErr.message : (localErr.message.detail || JSON.stringify(localErr.message));
-            }
-            
-            Toast.error(errorMsg); // Ab ganda JSON nahi aayega
+        const res = await ApiService.post('/notifications/send-otp/', { phone: phoneNumber });
+        showOtpScreen(phoneNumber);
+        
+        // Smart Fallback: Agar Twilio fail ho ya debug mode ho
+        if (res.debug_otp) {
+            Toast.devOTP(res.debug_otp); 
+            const debugOtpStr = String(res.debug_otp);
+            const otpInputs = document.querySelectorAll('.otp-input');
+            otpInputs.forEach((inp, i) => {
+                if (debugOtpStr[i]) inp.value = debugOtpStr[i];
+            });
+        } else {
+            Toast.success("OTP Sent successfully via SMS"); // Backend handled Twilio successfully
         }
+
+    } catch (err) {
+        console.error("Local Error Object:", err);
+        
+        // ✅ IMPROVED ERROR HANDLING FOR CLEAN TOAST
+        let errorMsg = "Failed to send OTP completely";
+        if (err.detail) {
+            errorMsg = err.detail; 
+        } else if (err.error) {
+            errorMsg = err.error;
+        } else if (err.message) {
+            errorMsg = typeof err.message === 'string' ? err.message : (err.message.detail || JSON.stringify(err.message));
+        }
+        
+        Toast.error(errorMsg);
     } finally {
         btn.innerHTML = originalHtml;
         btn.disabled = false;
@@ -146,15 +148,23 @@ async function handleVerifyAndLogin(e) {
     try {
         let requestPayload = {};
 
+        // ==========================================
+        // 🔥 OLD FIREBASE VERIFY LOGIC (COMMENTED OUT FOR SAFETY)
+        // ==========================================
+        /*
         if (isUsingFirebase) {
-            // Firebase OTP Verify
             const result = await window.confirmationResult.confirm(otp);
             const idToken = await result.user.getIdToken();
-            requestPayload = { login_type: 'firebase', token: idToken }; // Send Firebase Token
+            requestPayload = { login_type: 'firebase', token: idToken }; 
         } else {
-            // Local OTP Verify
-            requestPayload = { login_type: 'local', phone: phoneNumber, otp: otp }; // Send Local OTP
+            requestPayload = { login_type: 'local', phone: phoneNumber, otp: otp }; 
         }
+        */
+
+        // ==========================================
+        // 🛠️ NEW LOCAL VERIFY LOGIC
+        // ==========================================
+        requestPayload = { login_type: 'local', phone: phoneNumber, otp: otp }; 
 
         // Call Tumhari Existing Backend API (Render)
         const res = await ApiService.post('/auth/register/customer/', requestPayload);
@@ -178,23 +188,24 @@ async function handleVerifyAndLogin(e) {
     } catch (err) {
         console.error("Verification Error Object:", err);
         
-        // ✅ IMPROVED ERROR HANDLING FOR CLEAN TOAST
         let errorMsg = "Verification Failed! Wrong OTP.";
         if (err.detail) {
-            errorMsg = err.detail; // Extract direct detail
+            errorMsg = err.detail; 
         } else if (err.error) {
             errorMsg = err.error;
         } else if (err.message) {
             errorMsg = typeof err.message === 'string' ? err.message : (err.message.detail || JSON.stringify(err.message));
         }
         
-        Toast.error(errorMsg); // Ab ganda JSON nahi aayega
+        Toast.error(errorMsg); 
         
-        // Agar Firebase se fail hua toh reCAPTCHA reset karna padta hai
+        // Old Firebase reset logic kept safely commented
+        /*
         if (isUsingFirebase && window.recaptchaVerifier) {
             window.recaptchaVerifier.clear();
             window.recaptchaVerifier = null;
         }
+        */
     } finally {
         btn.disabled = false;
         btn.innerText = originalText;
@@ -205,7 +216,6 @@ function startTimerLocal() {
     let time = 30;
     const container = document.querySelector('.mt-4.text-muted.small'); 
     
-    // Har baar jab timer start ho, toh wapas "Resend OTP in 30s" set karein
     if (container) {
         container.innerHTML = `Resend OTP in <span id="timer">${time}</span>s`;
     }
@@ -218,7 +228,6 @@ function startTimerLocal() {
         
         if(time <= 0) {
             clearInterval(interval);
-            // Jab time 0 ho jaye, toh isko clickable 'Resend OTP' link bana dein
             if (container) {
                 container.innerHTML = `<span class="link-text text-primary" style="cursor: pointer; font-weight: bold;" onclick="triggerResend()">Resend OTP</span>`;
             }
@@ -226,11 +235,9 @@ function startTimerLocal() {
     }, 1000);
 }
 
-// Resend OTP par click karne se form ko dobara submit karega
 window.triggerResend = function() {
     const phoneForm = document.getElementById('step-phone');
     if (phoneForm) {
-        // Yeh wapas handleSendOtp function ko call kar dega
         phoneForm.dispatchEvent(new Event('submit'));
     }
 }

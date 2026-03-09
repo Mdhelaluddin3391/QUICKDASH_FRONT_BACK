@@ -55,41 +55,30 @@ class MeAPIView(APIView):
 
 class CustomerRegisterAPIView(APIView):
     """
-    Combines OTP Verification AND Registration/Login.
-    Supports both Firebase Token Verification and Local OTP Fallback.
+    Local OTP Verification AND Registration/Login.
+    Firebase OTP has been replaced with Backend-first Twilio integration.
     """
     permission_classes = [AllowAny]
     throttle_classes = [RegistrationThrottle]
 
     def post(self, request):
-        login_type = request.data.get("login_type", "local") 
         phone = request.data.get("phone")
-        fcm_token = request.data.get("fcm_token")
+        otp = request.data.get("otp")
+        fcm_token = request.data.get("fcm_token") # Push notifications ke liye fcm token chalega
 
-        if login_type == "firebase":
-            firebase_token = request.data.get("token")
-            if not firebase_token:
-                return Response({"error": "Firebase token missing"}, status=status.HTTP_400_BAD_REQUEST)
-            try:
-                decoded_token = firebase_auth.verify_id_token(firebase_token)
-                phone = decoded_token.get('phone_number') 
-            except Exception as e:
-                return Response({"error": f"Firebase Verification Failed: {str(e)}"}, status=status.HTTP_401_UNAUTHORIZED)
+        if not phone or not otp:
+            return Response({"error": "Phone and OTP required"}, status=status.HTTP_400_BAD_REQUEST)
         
-        else:
-            otp = request.data.get("otp")
-            if not phone or not otp:
-                return Response({"error": "Phone and OTP required"}, status=status.HTTP_400_BAD_REQUEST)
-            try:
-                OTPService.verify(phone, otp)
-            except Exception as e:
-                return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            # Apne database se OTP verify karega
+            OTPService.verify(phone, otp)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not phone:
-             return Response({"error": "Invalid phone number"}, status=status.HTTP_400_BAD_REQUEST)
-
+        # Agar OTP sahi hai, toh customer create ya fetch karo
         user = AccountService.create_customer(phone)
 
+        # Push notification token update karo agar aaya hai
         if fcm_token:
             user.fcm_token = fcm_token
             user.save(update_fields=['fcm_token'])

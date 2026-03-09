@@ -7,7 +7,6 @@ from celery import shared_task
 from firebase_admin import messaging
 import logging
 
-logger = logging.getLogger(__name__)
 logger = get_task_logger(__name__)
 
 @shared_task(
@@ -18,36 +17,40 @@ logger = get_task_logger(__name__)
 )
 def send_otp_sms(self, phone, content):
     """
-    Async SMS Sender using 3rd party provider.
+    Async SMS Sender using Twilio provider.
     """
-    sms_key = getattr(settings, "SMS_PROVIDER_KEY", None)
-    sms_url = getattr(settings, "SMS_PROVIDER_URL", None)
+    account_sid = getattr(settings, "TWILIO_ACCOUNT_SID", "")
+    auth_token = getattr(settings, "TWILIO_AUTH_TOKEN", "")
+    twilio_number = getattr(settings, "TWILIO_PHONE_NUMBER", "")
 
-    if settings.DEBUG:
-        
-        return "Dev Sent"
-
-    if not sms_key or not sms_url:
-        logger.error("SMS Configuration missing")
-        return "Config Missing"
+    # Agar Twilio config missing hai, toh SMS nahi jayega (Fallback chalega)
+    if not account_sid or not auth_token or not twilio_number:
+        logger.warning("Twilio config missing. SMS not sent. Relying on API fallback.")
+        return "Config Missing - Fallback Active"
 
     try:
-        response = requests.post(
-            sms_url,
-            json={
-                "to": phone, 
-                "message": content, 
-                "api_key": sms_key
-            },
-            timeout=5 
+        # Twilio Client Initialize
+        client = Client(account_sid, auth_token)
+        
+        # SMS Send Request
+        message = client.messages.create(
+            body=content,
+            from_=twilio_number,
+            to=phone
         )
-        response.raise_for_status()
-        return "Sent"
+        logger.info(f"Twilio SMS sent successfully to {phone}. SID: {message.sid}")
+        return f"Sent: {message.sid}"
 
-    except requests.RequestException as e:
-        logger.warning(f"SMS Provider Failed: {e}. Retrying...")
+    except TwilioRestException as e:
+        logger.error(f"Twilio API Error: {e}")
+        # Agar Server error ya Rate Limit error aaye, toh Task retry karega
+        if e.status in [429, 500, 502, 503, 504]:
+            logger.warning(f"Retrying SMS for {phone} due to Twilio error...")
+            raise self.retry(exc=e)
+        return f"Twilio Failed: {e}"
+    except Exception as e:
+        logger.error(f"Unexpected error in SMS sending: {e}")
         raise self.retry(exc=e)
-    
 
 
 @shared_task
