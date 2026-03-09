@@ -1,5 +1,5 @@
 import logging
-from firebase_admin import messaging # Ye import add karna zaroori hai
+from firebase_admin import messaging # Firebase notifications ke liye
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -14,14 +14,15 @@ from .serializers import NotificationSerializer
 
 logger = logging.getLogger(__name__)
 
+# IP address fetch karne ke liye fallback mechanism
 try:
     from ipware import get_client_ip
 except ImportError:
     def get_client_ip(request):
         return request.META.get('REMOTE_ADDR'), False
 
+
 class SendOTPAPIView(APIView):
-    # ... (Aapka OTP wala code same rahega) ...
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'otp_send'
     permission_classes = [AllowAny]
@@ -37,7 +38,7 @@ class SendOTPAPIView(APIView):
 
         try:
             otp = OTPService.create_and_send(phone, ip_address=client_ip)
-            return Response({"status": "otp_sent", "debug_otp": otp})
+            return Response({"status": "otp_sent", "debug_otp": otp}, status=status.HTTP_200_OK)
             
         except Exception as exc:
             from apps.utils.exceptions import BusinessLogicException
@@ -57,6 +58,7 @@ class MyNotificationListAPIView(generics.ListAPIView):
     serializer_class = NotificationSerializer
 
     def get_queryset(self):
+        # User ki saari notifications fetch karna, latest pehle aayegi
         return Notification.objects.filter(user=self.request.user).order_by('-created_at')
 
 
@@ -68,19 +70,24 @@ class SubscribeFCMTokenView(APIView):
         token = request.data.get('token')
         
         if not token:
-            return Response({"error": "FCM Token is required"}, status=400)
+            return Response({"error": "FCM Token is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Token ko in topics par subscribe kar rahe hain
+            # 1. Agar user logged in hai, toh uska token DB (User model) mein save karein
+            if request.user.is_authenticated:
+                request.user.fcm_token = token
+                request.user.save(update_fields=['fcm_token'])
+                logger.info(f"FCM Token saved for user {request.user.phone}")
+
+            # 2. Token ko topics par subscribe karein (sabke liye - global alerts ke liye)
             topics = ['promotions', 'new_arrivals']
-            
             for topic in topics:
                 # Firebase Admin SDK ka use karke token ko topic se jodna
                 response = messaging.subscribe_to_topic([token], topic)
                 logger.info(f"Subscribed token to {topic}: {response.success_count} success")
 
-            return Response({"message": "Successfully subscribed to notifications!"}, status=200)
+            return Response({"message": "Successfully subscribed to notifications!"}, status=status.HTTP_200_OK)
             
         except Exception as e:
             logger.error(f"Error subscribing token: {e}")
-            return Response({"error": str(e)}, status=500)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
