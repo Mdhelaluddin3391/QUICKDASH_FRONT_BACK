@@ -34,8 +34,8 @@
     position: relative;
     display: flex; flex-direction: column;
     height: 100%; text-decoration: none; color: inherit;
-    background: #fff; border: 1px solid #eee; /* Added visible border */
-    border-radius: 12px; padding: 10px; /* Slimmer: Changed radius to 12px, padding to 10px */
+    background: #fff; border: 1px solid #eee;
+    border-radius: 12px; padding: 10px;
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 .product-card:hover {
@@ -44,17 +44,17 @@
     transform: translateY(-5px);
 }
 .product-card img {
-    width: 100%; height: 110px; object-fit: contain; /* Slimmer: Height reduced from 140px to 110px */
+    width: 100%; height: 110px; object-fit: contain;
     margin-bottom: 10px; transition: transform 0.3s;
 }
 .product-card:hover img { transform: scale(1.05); }
 
 /* Common Item Name Styling for consistency */
 .product-card .item-name {
-    font-weight: 600; 
-    font-size: 0.95rem; 
-    height: 40px; /* Fix height for 2 lines */
-    overflow: hidden; 
+    font-weight: 600;
+    font-size: 0.95rem;
+    height: 40px;
+    overflow: hidden;
     line-height: 1.4;
     margin-bottom: 4px;
 }
@@ -97,8 +97,6 @@
 .status-confirmed { background: #eff6ff; color: #1d4ed8; }
 .status-delivered { background: #f0fdf4; color: #15803d; }
 
-
-
 /* Location Picker Modal Styling */
 .location-modal {
     position: fixed;
@@ -106,23 +104,23 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.6); /* Background dim karne ke liye */
+    background: rgba(0, 0, 0, 0.6);
     z-index: 9999;
-    display: none; /* Default mein hidden rahega */
+    display: none;
     align-items: center;
     justify-content: center;
     backdrop-filter: blur(4px);
 }
 
 .location-modal.active {
-    display: flex; /* Jab active hoga tab dikhega */
+    display: flex;
 }
 
 .modal-content-map {
     background: #fff;
     width: 90%;
     max-width: 500px;
-    height: 80vh; /* Screen ka 80% height */
+    height: 80vh;
     border-radius: 16px;
     display: flex;
     flex-direction: column;
@@ -152,7 +150,7 @@
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -100%); /* Pin ki tip center pe ho */
+    transform: translate(-50%, -100%);
     z-index: 500;
     pointer-events: none;
     display: flex;
@@ -205,69 +203,21 @@
     z-index: 10;
 }
 
-
-
-/* Address Switcher Modal Styles */
-.address-switcher-backdrop {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.5); z-index: 9998;
-}
-.address-switcher-modal {
-    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: 90%; max-width: 400px; background: #fff; border-radius: 12px;
-    z-index: 9999; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-    overflow: hidden; display: flex; flex-direction: column;
-}
-.addr-header {
-    padding: 15px 20px; border-bottom: 1px solid #eee; display: flex;
-    justify-content: space-between; align-items: center; background: #f8f9fa;
-}
-.addr-header h3 { margin: 0; font-size: 1.1rem; font-weight: 600; color: #333; }
-.close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; }
-
-.addr-list { max-height: 300px; overflow-y: auto; padding: 10px; }
-.addr-item {
-    display: flex; align-items: center; padding: 12px; margin-bottom: 8px;
-    border: 1px solid #eee; border-radius: 8px; cursor: pointer;
-    transition: all 0.2s;
-}
-.addr-item:hover { border-color: var(--primary, #007bff); background: #f0f7ff; }
-.addr-item .icon { width: 30px; color: #555; font-size: 1.1rem; }
-.addr-item .details { flex: 1; overflow: hidden; }
-.addr-item .details .label { font-weight: 600; font-size: 0.9rem; color: #333; }
-.addr-item .details .text { font-size: 0.8rem; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.addr-item .action { color: var(--primary, #007bff); display: none; }
-.addr-item:hover .action { display: block; }
-
-.addr-footer { padding: 15px; border-top: 1px solid #eee; display: flex; gap: 10px; flex-direction: column; }
-.addr-footer button {
-    border: none; padding: 10px; border-radius: 6px; font-weight: 500; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 0.9rem;
-}
-.btn-gps { background: #e9ecef; color: #333; }
-.btn-add { background: var(--primary, #007bff); color: #fff; }
-.empty-addr { text-align: center; padding: 20px; color: #888; font-size: 0.9rem; }
-
-
-
-
 /* ============================
    Toast Notifications Styling
    ============================ */
 
-/* Container for all toasts - Top Right Positioning */
 #toast-container {
     position: fixed;
     top: 20px;
     right: 20px;
-    z-index: 10000; /* Modal se upar dikhna chahiye */
+    z-index: 10000;
     display: flex;
     flex-direction: column;
     gap: 15px;
-    pointer-events: none; /* Container click block na kare */
+    pointer-events: none;
 }
 
-/* Individual Toast Card */
 .toast {
     background: #fff;
     min-width: 300px;
@@ -278,38 +228,33 @@
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    pointer-events: auto; /* Toast clickable ho */
+    pointer-events: auto;
     overflow: hidden;
     position: relative;
-    
-    /* Initial State for Animation */
+
     transform: translateX(120%);
     opacity: 0;
-    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); /* Bouncy slide effect */
+    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
     border-left: 5px solid #ccc;
 }
 
-/* Active State (Shown via JS) */
 .toast.show {
     transform: translateX(0);
     opacity: 1;
 }
 
-/* Inner Content Layout */
 .toast-content {
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
-/* Icons Styling */
 .toast-icon {
     font-size: 1.4rem;
     display: flex;
     align-items: center;
 }
 
-/* Message Styling */
 .toast-msg {
     font-size: 0.95rem;
     font-weight: 500;
@@ -317,7 +262,6 @@
     line-height: 1.4;
 }
 
-/* Close Button */
 .toast-close {
     background: transparent;
     border: none;
@@ -334,187 +278,29 @@
     color: #333;
 }
 
-/* ============================
-   Toast Types (Colors)
-   ============================ */
+/* Toast Types */
 
-/* Success - Green */
-.toast-success {
-    border-left-color: #22c55e;
-}
-.toast-success .toast-icon {
-    color: #22c55e;
-}
+.toast-success { border-left-color: #22c55e; }
+.toast-success .toast-icon { color: #22c55e; }
 
-/* Error - Red */
-.toast-error {
-    border-left-color: #ef4444;
-}
-.toast-error .toast-icon {
-    color: #ef4444;
-}
+.toast-error { border-left-color: #ef4444; }
+.toast-error .toast-icon { color: #ef4444; }
 
-/* Warning - Orange */
-.toast-warning {
-    border-left-color: #f59e0b;
-}
-.toast-warning .toast-icon {
-    color: #f59e0b;
-}
+.toast-warning { border-left-color: #f59e0b; }
+.toast-warning .toast-icon { color: #f59e0b; }
 
-/* Info - Blue */
-.toast-info {
-    border-left-color: #3b82f6;
-}
-.toast-info .toast-icon {
-    color: #3b82f6;
-}
+.toast-info { border-left-color: #3b82f6; }
+.toast-info .toast-icon { color: #3b82f6; }
 
-/* Mobile Responsive */
-@media (max-width: 480px) {
-    #toast-container {
-        right: 10px;
-        left: 10px; /* Full width on mobile */
-        top: 10px;
-        align-items: center;
-    }
-    
-    .toast {
-        width: 100%;
-        min-width: auto;
-    }
-}
+/* Notification Modal */
 
-
-
-/* Dev OTP Toast Styling */
-#dev-toast-container {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%); /* बिल्कुल Center करने के लिए */
-    z-index: 10001; /* बाकि सब से ऊपर */
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    width: 90%;
-    max-width: 400px;
-    pointer-events: none;
-}
-
-.toast-dev {
-    background: #fff;
-    border-left: 5px solid #7209b7; /* अलग दिखने के लिए Purple रंग */
-    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-    animation: slideDown 0.5s ease forwards;
-}
-
-.toast-dev .toast-icon {
-    color: #7209b7;
-    font-size: 1.5rem;
-}
-
-@keyframes slideDown {
-    from { transform: translateY(-100%); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
-}
-
-
-
-/* Delivery ETA Badges */
-.badge-instant {
-    background: linear-gradient(135deg, #e21b70, #ff4d94); /* Dark store pink/red style */
-}
-
-.badge-mega {
-    background: linear-gradient(135deg, #0066ff, #3385ff); /* Mega store blue style */
-}
-
-
-
-
-/* =========================================
-   1. BREADCRUMB STYLE (Home / Category / Shop) 
-   ========================================= */
-.custom-breadcrumb {
-    display: inline-flex;
-    align-items: center;
-    background-color: #f8f9fa; /* Light background */
-    padding: 8px 16px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    margin-top: 15px; /* Navbar ke thik niche thoda space */
-    font-size: 14px;
-    font-weight: 500;
-    color: #6c757d;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05); /* Halka sa shadow */
-}
-
-.custom-breadcrumb a {
-    color: #0d6efd; /* Link color */
-    text-decoration: none;
-    transition: all 0.2s ease-in-out;
-}
-
-.custom-breadcrumb a:hover {
-    color: #0043a8;
-    text-decoration: underline;
-}
-
-.custom-breadcrumb .divider {
-    color: #adb5bd;
-    margin: 0 10px;
-    font-size: 12px;
-}
-
-.custom-breadcrumb span.current-page {
-    color: #212529; /* Dark color for current page */
-    font-weight: 600;
-}
-
-
-/* =========================================
-   2. BACK LINK STYLE (< Back to Cart) 
-   ========================================= */
-.back-link {
-    display: inline-flex;
-    align-items: center;
-    padding: 8px 12px;
-    font-size: 15px;
-    font-weight: 500;
-    color: #495057;
-    background-color: transparent;
-    border-radius: 6px;
-    text-decoration: none;
-    margin-bottom: 15px;
-    transition: all 0.2s ease-in-out;
-}
-
-.back-link i {
-    margin-right: 8px;
-    font-size: 14px;
-    transition: transform 0.2s; /* Arrow animation */
-}
-
-.back-link:hover {
-    background-color: #e9ecef; /* Hover par button jaisa lagega */
-    color: #212529;
-}
-
-.back-link:hover i {
-    transform: translateX(-4px); /* Hover par arrow piche jayega */
-}
-
-
-
-/* Overlay background for modal */
 .notification-modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent black */
+    background-color: rgba(0, 0, 0, 0.5);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -523,13 +309,11 @@
     transition: opacity 0.3s ease;
 }
 
-/* Hide utility class */
 .notification-modal-overlay.hidden {
     display: none;
     opacity: 0;
 }
 
-/* Modal Content Box */
 .notification-modal-content {
     background: #ffffff;
     width: 90%;
@@ -546,7 +330,6 @@
     to { transform: translateY(0); opacity: 1; }
 }
 
-/* Icon & Text Styling */
 .notification-icon {
     background: #fdecea;
     width: 80px;
@@ -572,7 +355,6 @@
     line-height: 1.5;
 }
 
-/* Buttons Styling */
 .notification-actions {
     display: flex;
     gap: 10px;
@@ -596,13 +378,4 @@
 
 .btn-secondary:hover {
     background-color: #e4e4e4;
-}
-
-.btn-primary {
-    background-color: #32CD32;  /* QuickDash primary red color */
-    color: #ffffff;
-}
-
-.btn-primary:hover {
-    background-color: #c0392b;
 }
