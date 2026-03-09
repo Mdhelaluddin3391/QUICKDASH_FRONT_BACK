@@ -1,6 +1,6 @@
-
 import os
 import sys
+import json  # <--- Add this line here
 import logging
 from pathlib import Path
 import dj_database_url
