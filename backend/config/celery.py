@@ -13,11 +13,22 @@ app = Celery('config')
 app.config_from_object('django.conf:settings', namespace='CELERY')
 
 
-app.conf.task_queues = (
-    Queue('default', routing_key='default'),
-    Queue('high_priority', routing_key='high_priority'),
-    Queue('low_priority', routing_key='low_priority'),
-)
+app.conf.task_routes = {
+    'apps.delivery.tasks.retry_auto_assign_rider': {'queue': 'high_priority'},
+    'apps.delivery.tasks.assign_rider_to_order': {'queue': 'high_priority'},
+    'apps.delivery.tasks.periodic_assign_unassigned_orders': {'queue': 'high_priority'},
+    
+    # Notifications tasks ko high priority me daalein taaki turant deliver ho
+    'apps.notifications.tasks.send_otp_sms': {'queue': 'high_priority'},
+    'apps.notifications.tasks.send_push_to_topic_task': {'queue': 'high_priority'},
+    'apps.notifications.tasks.send_push_to_user_task': {'queue': 'high_priority'},
+    
+    'apps.orders.tasks.send_order_confirmation_email': {'queue': 'high_priority'},
+    
+    'apps.core.tasks.*': {'queue': 'default'},
+    
+    'apps.assistant.views.*': {'queue': 'low_priority'},
+}
 
 app.conf.task_default_queue = 'default'
 app.conf.task_default_exchange = 'default'
