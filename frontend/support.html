@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Help Center - QuickDash</title>
+    <script src="/assets/js/env.js"></script>
+<script src="/assets/js/config.js"></script>
+    <link rel="preload" href="./components/navbar.html" as="fetch" crossorigin>
+<link rel="preload" href="./components/footer.html" as="fetch" crossorigin>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./assets/css/base.css">
+    <link rel="stylesheet" href="./assets/css/components.css">
+    <link rel="stylesheet" href="./assets/css/layout.css">
+    <link rel="stylesheet" href="./assets/css/pages/support.css">
+</head>
+
+<body>
+    <div id="navbar-placeholder"></div>
+    <script>
+        const cachedNav = sessionStorage.getItem('html_cache_./components/navbar.html');
+        if (cachedNav) {
+            document.getElementById('navbar-placeholder').innerHTML = cachedNav;
+        }
+    </script>
+
+    <main class="container">
+        <div class="support-hero">
+            <h1>How can we help you?</h1>
+            <div class="search-wrap">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Search issues e.g. 'refund', 'delivery'...">
+            </div>
+        </div>
+
+        <div class="faq-grid">
+            <div class="card faq-item text-center">
+                <i class="fas fa-box text-primary fa-2x mb-3"></i>
+                <h4>Orders</h4>
+                <p class="text-muted small">Track, return or cancel orders</p>
+            </div>
+            <div class="card faq-item text-center">
+                <i class="fas fa-money-bill text-primary fa-2x mb-3"></i>
+                <h4>Payments</h4>
+                <p class="text-muted small">Refunds and payment modes</p>
+            </div>
+            <div class="card faq-item text-center">
+                <i class="fas fa-map-marker-alt text-primary fa-2x mb-3"></i>
+                <h4>Delivery</h4>
+                <p class="text-muted small">Change address, delivery time</p>
+            </div>
+        </div>
+
+        <section class="ticket-section">
+            <div class="card p-4">
+                <h3 class="mb-4">Raise a Support Ticket</h3>
+                <form id="ticket-form">
+                    <div class="form-group">
+                        <label class="form-label">Select Order</label>
+                        <select id="ticket-order" class="form-control" required>
+                            <option value="">Loading your orders...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Issue Type</label>
+                        <select id="ticket-issue" class="form-control" required>
+                            <option value="missing_item">Missing Item</option>
+                            <option value="damaged">Damaged Item</option>
+                            <option value="late">Late Delivery</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea id="ticket-desc" class="form-control" rows="4"
+                            placeholder="Tell us more about the problem..." required></textarea>
+                    </div>
+                    <button type="submit" id="submit-ticket-btn" class="btn btn-primary w-100">Submit Ticket</button>
+                </form>
+            </div>
+        </section>
+
+
+        <section class="ticket-history-section container mt-5" id="history-section" style="display:none;">
+            <h3 class="mb-3">My Support Tickets</h3>
+            <div id="ticket-list" class="d-grid gap-3"></div>
+        </section>
+
+        <div class="contact-section mb-5">
+            <h3 class="text-center">Still need help?</h3>
+            <div class="d-flex flex-column flex-md-row gap-3 mt-4 justify-center">
+                <a href="support_chat.html" class="card contact-card">
+                    <div class="icon-circle bg-green"><i class="fas fa-comments"></i></div>
+                    <div>
+                        <h5>Live Chat</h5>
+                        <p class="small text-muted">Chat with our AI assistant</p>
+                    </div>
+                </a>
+                <div class="card contact-card">
+                    <div class="icon-circle bg-blue"><i class="fas fa-envelope"></i></div>
+                    <div>
+                        <h5>Email Us</h5>
+                        <p class="small text-muted">support@quickdash.com</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="footer-placeholder"></div>
+
+    <script src="./assets/js/config.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/formatters.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+
+    <script src="./assets/js/pages/support-page.js?v=1.0.0" defer></script>
+</body>
+
+</html>

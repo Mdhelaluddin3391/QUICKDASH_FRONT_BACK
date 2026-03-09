@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Brands - QuickDash</title>
+    <script src="/assets/js/env.js"></script>
+<script src="/assets/js/config.js"></script>
+    <link rel="preload" href="./components/navbar.html" as="fetch" crossorigin>
+<link rel="preload" href="./components/footer.html" as="fetch" crossorigin>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./assets/css/base.css">
+    <link rel="stylesheet" href="./assets/css/layout.css">
+    <link rel="stylesheet" href="./assets/css/components.css">
+    <link rel="stylesheet" href="./assets/css/pages/brands.css">
+</head>
+
+<body>
+    <div id="navbar-placeholder"></div>
+    <script>
+        const cachedNav = sessionStorage.getItem('html_cache_./components/navbar.html');
+        if (cachedNav) {
+            document.getElementById('navbar-placeholder').innerHTML = cachedNav;
+        }
+    </script>
+
+    <main class="container">
+        <h1 class="text-center my-4">Our Brands</h1>
+        <div id="brands-container" class="brands-grid">
+            <div class="loader-spinner"></div>
+        </div>
+    </main>
+
+    <div id="footer-placeholder"></div>
+
+   <script src="./assets/js/config.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+<script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+<script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+<script src="./assets/js/pages/brands.js?v=1.0.0" defer></script>
+</body>
+
+</html>

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Cart - QuickDash</title>
+    <script src="/assets/js/env.js"></script>
+    <script src="/assets/js/config.js"></script>
+    <link rel="preload" href="./components/navbar.html" as="fetch" crossorigin>
+    <link rel="preload" href="./components/footer.html" as="fetch" crossorigin>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./assets/css/base.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/components.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/layout.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/pages/checkout.css?v=1.1.0">
+</head>
+
+<body>
+    <div id="navbar-placeholder"></div>
+    <script>
+        const cachedNav = sessionStorage.getItem('html_cache_./components/navbar.html');
+        if (cachedNav) {
+            document.getElementById('navbar-placeholder').innerHTML = cachedNav;
+        }
+    </script>
+
+    <main class="container">
+        <div id="loader" class="loader-spinner"></div>
+
+        <div id="empty-cart" class="text-center py-5 d-none"
+            style="min-height: 60vh; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+            <img src="https://cdn-icons-png.flaticon.com/512/11329/11329060.png"
+                style="width:180px; opacity:0.8; margin-bottom:25px;">
+            <h3 class="mb-2">Your cart is empty</h3>
+            <p class="text-muted mb-4">
+                Add products from groceries, essentials, electronics, fashion and more.
+            </p>
+            <a href="index.html" class="btn btn-primary px-5">Browse Products</a>
+        </div>
+
+        <div id="cart-content" class="cart-layout d-none">
+
+            <div class="cart-list">
+                <div class="d-flex justify-between align-center mb-3">
+                    <h2 class="m-0" style="font-size: 1.5rem;">Shopping Cart</h2>
+                    <span id="item-count" class="badge" style="background:#e5e7eb; color:#333;">0 Items</span>
+                </div>
+                <div id="cart-items"></div>
+            </div>
+
+            <div class="cart-summary-wrapper">
+                <div class="summary-card">
+                    <div class="summary-row total-row" style="border-top: none; padding-top: 0; margin-top: 0;">
+                        <span style="font-size: 1.1rem; font-weight: bold; color: #374151;">To Pay</span>
+                        <span id="total" class="text-primary" style="font-size: 1.3rem; font-weight: 800;">₹0</span>
+                    </div>
+
+                    <a href="checkout.html" class="btn btn-primary w-100 mt-3 py-3"
+                        style="font-size: 1.1rem; box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4); text-align: center; display: block;">
+                        Proceed to Checkout <i class="fas fa-arrow-right ms-2"></i>
+                    </a>
+
+                    <div class="text-center mt-3">
+                        <small class="text-muted">By placing order, you agree to our Terms.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="footer-placeholder"></div>
+
+    <script src="./assets/js/config.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/formatters.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+    <script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+    <script src="./assets/js/services/cart.service.js?v=1.0.0" defer></script>
+    <script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+    <script src="./assets/js/pages/cart.js?v=1.0.0" defer></script>
+</body>
+
+</html>

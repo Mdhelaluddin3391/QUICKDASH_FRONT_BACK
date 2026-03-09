@@ -1,0 +1,391 @@
+// assets/js/pages/catalog.js
+
+// State Variables
+let currentPage = 1;
+let isLoading = false;
+let hasNext = true;
+let currentEndpointBase = ''; 
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Pehle Brands load karein
+    await loadBrandFilters();
+    await loadSubCategories();
+    
+    // 2. First Load trigger karein (Infinite scroll setup ab data aane ke baad hoga)
+    applyFilters(true);
+});
+
+// --- 1. Infinite Scroll Setup (UPDATED) ---
+function setupInfiniteScroll() {
+    const list = document.getElementById('product-list');
+    if (!list) return;
+
+    // Purana sentinel (trigger point) hatao agar pehle se hai toh
+    const oldSentinel = document.getElementById('catalog-sentinel');
+    if (oldSentinel) oldSentinel.remove();
+
+    // Naya Sentinel Element banayen
+    const sentinel = document.createElement('div');
+    sentinel.id = 'catalog-sentinel';
+    sentinel.style.width = '100%';
+    sentinel.style.height = '20px';
+    sentinel.style.marginBottom = '50px'; // Niche thoda space
+    
+    list.after(sentinel);
+
+    const observer = new IntersectionObserver((entries) => {
+        // Jab list ka end screen par aane wala ho, aur loading na ho rahi ho, aur aage data bacha ho
+        if (entries[0].isIntersecting && !isLoading && hasNext) {
+            currentPage++;
+            loadProducts(false); // Naya data append karega (bina page clear kiye)
+        }
+    }, { rootMargin: '300px' }); // 300px pehle hi backend se data mangna shuru kar dega
+
+    observer.observe(sentinel);
+}
+
+// Bottom Scroll Loader Functions
+function insertSentinelLoader() {
+    let loader = document.getElementById('scroll-loader');
+    if(!loader) {
+        loader = document.createElement('div');
+        loader.id = 'scroll-loader';
+        loader.className = 'text-center py-3 w-100';
+        loader.innerHTML = '<div class="loader-spinner" style="width:30px; height:30px; margin:auto;"></div>';
+        
+        const list = document.getElementById('product-list');
+        list.after(loader);
+    }
+}
+
+function removeSentinelLoader() {
+    const loader = document.getElementById('scroll-loader');
+    if(loader) loader.remove();
+}
+
+// --- 2. Sub Categories Logic (NO CHANGES) ---
+async function loadSubCategories() {
+    const params = new URLSearchParams(window.location.search);
+    const currentSlug = params.get('slug');
+    const container = document.getElementById('sub-category-pills');
+
+    if (!currentSlug || !container) return;
+
+    try {
+        // Categories fetch ko LocalStorage Cache mein daala gaya hai (1 Hour Expiry)
+        const CACHE_KEY = 'all_categories_full_cache';
+        let allCats = [];
+        const cachedStr = localStorage.getItem(CACHE_KEY);
+        
+        if (cachedStr) {
+            try {
+                const cached = JSON.parse(cachedStr);
+                if (cached && (Date.now() - cached.ts) < 3600000) { // 1 Hour
+                    allCats = cached.data;
+                }
+            } catch(e) { console.warn("Subcategory cache invalid"); }
+        }
+
+        // Agar Cache nahi mila, tabhi API Call karein
+        if (!allCats || allCats.length === 0) {
+            const res = await ApiService.get('/catalog/categories/');
+            allCats = res.results || res;
+            
+            if (Array.isArray(allCats)) {
+                localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: allCats }));
+            }
+        }
+
+        // 2. Find Current Category
+        const currentCat = allCats.find(c => c.slug === currentSlug);
+        
+        if (!currentCat) return;
+
+        let parentId = null;
+        let parentSlug = null;
+        
+        // 3. Check karein ki current category 'Parent' hai ya 'Sub-category'
+        const isSubcategory = currentCat.parent !== null && currentCat.parent !== undefined;
+
+        if (isSubcategory) {
+            const pId = typeof currentCat.parent === 'object' ? currentCat.parent.id : currentCat.parent;
+            const parentObj = allCats.find(c => c.id === pId);
+            parentId = parentObj ? parentObj.id : pId;
+            parentSlug = parentObj ? parentObj.slug : null;
+        } else {
+            parentId = currentCat.id;
+            parentSlug = currentCat.slug;
+        }
+
+        // 4. Parent ke saare children/siblings find karein
+        const children = allCats.filter(c => {
+            const cParentId = (typeof c.parent === 'object' && c.parent !== null) ? c.parent.id : c.parent;
+            return cParentId === parentId;
+        });
+
+        // 5. Render Pills HTML
+        if (children.length > 0 && parentSlug) {
+            container.classList.remove('d-none'); 
+            let html = `
+                <a href="./search_results.html?slug=${parentSlug}" 
+                   class="pill-btn ${!isSubcategory ? 'active' : ''}">
+                   All
+                </a>
+            `;
+            html += children.map(child => `
+                <a href="./search_results.html?slug=${child.slug}" 
+                   class="pill-btn ${currentSlug === child.slug ? 'active' : ''}">
+                   ${child.name}
+                </a>
+            `).join('');
+            container.innerHTML = html;
+        } else {
+            container.classList.add('d-none');
+        }
+    } catch (e) {
+        console.warn("Sub-categories load failed", e);
+    }
+}
+
+// --- 3. Build URL & Apply Filters ---
+window.applyFilters = async (reset = true) => {
+    // URL Params
+    const params = new URLSearchParams(window.location.search);
+    const query = params.get('q') || params.get('search');
+    const slug = params.get('slug'); // Category Slug
+    const brandFromUrl = params.get('brand'); // Brand from URL (e.g. Home page click)
+
+    // Local Storage
+    const whId = localStorage.getItem(APP_CONFIG.STORAGE_KEYS.WAREHOUSE_ID);
+    
+    // Sidebar Inputs
+    const sortVal = document.getElementById('sort-select') ? document.getElementById('sort-select').value : '';
+    
+    // Checkboxes se selected brands nikalein
+    const selectedBrands = Array.from(document.querySelectorAll('input[name="brand"]:checked')).map(cb => cb.value);
+
+    // --- Sab filters ko combine karna ---
+    let queryParams = [];
+    let title = 'All Products';
+
+    // 1. Category Filter
+    if (slug) {
+        queryParams.push(`category__slug=${slug}`);
+        title = capitalize(slug.replace(/-/g, ' '));
+    }
+
+    // 2. Search Query
+    if (query) {
+        queryParams.push(`search=${encodeURIComponent(query)}`);
+        if(!slug) title = `Search: "${query}"`;
+    }
+
+    // 3. Brand Filter (URL + Sidebar Combined)
+    let finalBrands = [...selectedBrands];
+    if (brandFromUrl && !finalBrands.includes(brandFromUrl)) {
+        finalBrands.push(brandFromUrl);
+    }
+    
+    if (finalBrands.length > 0) {
+        // Backend might expect comma separated IDs
+        queryParams.push(`brand=${finalBrands.join(',')}`);
+        if (!slug && !query) title = "Brand Products";
+    }
+
+    // 4. Warehouse Context
+    if (whId) queryParams.push(`warehouse_id=${whId}`);
+    
+    // 5. Sorting
+    if (sortVal) queryParams.push(`ordering=${sortVal}`);
+
+    // Update Title UI
+    const titleEl = document.getElementById('page-title');
+    if (titleEl) titleEl.innerText = title;
+
+    // Construct Endpoint
+    const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+    currentEndpointBase = `/catalog/skus/${queryString}`;
+
+    // Load Data
+    await loadProducts(reset);
+    
+    // 🔥 DATA LOAD HONE KE BAAD OBSERVER LAGAYEIN
+    if (reset) {
+        setupInfiniteScroll();
+    }
+};
+
+// Global handlers
+window.applySort = () => applyFilters(true);
+window.applyBrandFilter = () => applyFilters(true); // Checkbox click par ye call hoga
+
+// --- 4. Core Loading Logic (UPDATED) ---
+async function loadProducts(reset = false) {
+    if (isLoading) return;
+    
+    isLoading = true;
+    const list = document.getElementById('product-list');
+    const emptyState = document.getElementById('empty-state');
+    const countLabel = document.getElementById('result-count');
+
+    if (reset) {
+        currentPage = 1;
+        hasNext = true;
+        list.innerHTML = '<div class="loader-spinner main-loader"></div>';
+        if (emptyState) emptyState.classList.add('d-none');
+    } else {
+        // Niche scroll karte waqt spinner dikhana
+        insertSentinelLoader();
+    }
+
+    try {
+        const separator = currentEndpointBase.includes('?') ? '&' : '?';
+        const url = `${currentEndpointBase}${separator}page=${currentPage}`;
+
+        const res = await ApiService.get(url);
+        
+        let products = [];
+        if (Array.isArray(res)) {
+            products = res;
+            hasNext = false; 
+            if (countLabel) countLabel.innerText = `${products.length} Items`;
+        } else {
+            products = res.results || [];
+            hasNext = !!res.next; 
+            if (res.count !== undefined && countLabel) countLabel.innerText = `${res.count} Items`;
+        }
+
+        if (reset) list.innerHTML = ''; // Clear loader
+
+        if (products.length === 0 && currentPage === 1) {
+            if (emptyState) emptyState.classList.remove('d-none');
+            hasNext = false;
+        } else {
+            renderProductCards(products, list);
+        }
+
+    } catch (e) {
+        console.error("Load Error:", e);
+        if (currentPage === 1) {
+            list.innerHTML = '<p class="text-danger text-center w-100">Failed to load products.</p>';
+        }
+    } finally {
+        isLoading = false;
+        
+        // Data aane ke baad bottom spinner remove karein
+        if (!reset) removeSentinelLoader();
+        
+        const s = document.getElementById('catalog-sentinel');
+        if (s) s.style.display = hasNext ? 'block' : 'none';
+    }
+}
+
+function renderProductCards(products, container) {
+    const html = products.map(p => {
+        const imageSrc = p.image_url || p.image || 'https://via.placeholder.com/150?text=No+Image';
+        const finalPrice = p.sale_price || p.price || 0;
+        const isOOS = p.available_stock <= 0;
+        
+        let discountBadge = '';
+        if (p.mrp && p.sale_price && p.mrp > p.sale_price) {
+            const off = Math.round(((p.mrp - p.sale_price) / p.mrp) * 100);
+            discountBadge = `<div class="badge-off" style="position:absolute; top:8px; left:8px; background:#ef4444; color:white; padding:2px 6px; border-radius:4px; font-size:0.7rem; font-weight:bold; z-index:2;">${off}% OFF</div>`;
+        }
+
+        // ETA / Delivery Badge logic (Standardized)
+        let deliveryBadge = '';
+        if (p.delivery_eta) {
+            let badgeClass = p.delivery_type === 'dark_store' ? 'badge-instant' : 'badge-mega';
+            deliveryBadge = `<div class="${badgeClass}" style="position:absolute; top:8px; right:8px; color:white; padding:3px 6px; border-radius:6px; font-size:0.65rem; font-weight:bold; z-index:2; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">${p.delivery_eta}</div>`; 
+        }
+
+        return `
+        <div class="card product-card fade-in">
+            ${discountBadge}
+            ${deliveryBadge}
+            <a href="./product.html?code=${p.sku}" style="text-decoration:none; color:inherit;">
+                <img src="${imageSrc}" style="opacity: ${isOOS ? 0.5 : 1};" loading="lazy">
+                <div class="item-name">${p.name}</div>
+                <div class="item-unit text-muted small mb-2" style="font-size:0.8rem;">${p.unit || '1 Unit'}</div>
+            </a>
+            
+            <div class="d-flex justify-between align-center mt-auto">
+                <div class="price-section d-flex flex-column">
+                    <span class="font-bold" style="font-size:1.05rem; line-height:1;">${Formatters.currency(finalPrice)}</span>
+                    ${p.mrp > finalPrice ? `<span class="text-muted small" style="text-decoration: line-through; font-size:0.75rem; margin-top:2px;">${Formatters.currency(p.mrp)}</span>` : ''}
+                </div>
+                ${isOOS ? 
+                    `<button class="btn btn-sm btn-secondary" style="border-radius:6px; padding: 6px 16px;" disabled>OOS</button>` : 
+                    `<button class="btn btn-sm btn-outline-primary" style="border-radius:6px; padding: 6px 16px;" onclick="window.addToCart('${p.sku}', this)">ADD</button>`
+                }
+            </div>
+        </div>
+        `;
+    }).join('');
+
+    container.insertAdjacentHTML('beforeend', html);
+}
+
+// --- 5. Helper Functions ---
+
+async function loadBrandFilters() {
+    const container = document.getElementById('brand-filter-container');
+    if (!container) return; 
+
+    try {
+        const res = await ApiService.get('/catalog/brands/');
+        const brands = res.results || res;
+        
+        if (!brands || brands.length === 0) {
+            container.innerHTML = '<p class="text-muted small">No brands.</p>';
+            return;
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentBrandId = urlParams.get('brand');
+
+        container.innerHTML = brands.map(b => `
+            <label class="filter-item">
+                <input type="checkbox" class="filter-checkbox" name="brand" value="${b.id}" 
+                       ${currentBrandId == b.id ? 'checked' : ''} 
+                       onchange="applyBrandFilter()"> 
+                <span style="margin-left: 8px;">${b.name}</span>
+            </label>
+        `).join('');
+
+    } catch (e) {
+        console.warn("Failed to load brands", e);
+        if(container) container.innerHTML = '<p class="text-danger small">Error</p>';
+    }
+}
+
+// Helper: Capitalize
+function capitalize(str) {
+    if(!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// Helper: Add to Cart (Same as before)
+window.addToCart = async function(skuCode, btn) {
+    if (!localStorage.getItem(APP_CONFIG.STORAGE_KEYS.TOKEN)) {
+        Toast.warning("Login required");
+        setTimeout(() => window.location.href = APP_CONFIG.ROUTES.LOGIN, 1500);
+        return;
+    }
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '...';
+    try {
+        await CartService.addItem(skuCode, 1);
+        Toast.success("Added");
+        btn.innerHTML = '✔';
+    } catch (e) {
+        Toast.error(e.message || "Failed");
+        btn.innerHTML = originalText;
+    } finally {
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.innerHTML = "ADD";
+        }, 2000);
+    }
+};

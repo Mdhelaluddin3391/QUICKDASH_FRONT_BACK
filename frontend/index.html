@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuickDash - Groceries in Minutes</title>
+    <script src="/assets/js/env.js"></script>
+    <script src="/assets/js/config.js"></script>
+    <link rel="preload" href="./components/navbar.html" as="fetch" crossorigin>
+    <link rel="preload" href="./components/footer.html" as="fetch" crossorigin>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./assets/css/base.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/layout.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/components.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/pages/home.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/assistant.css?v=1.0.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+</head>
+
+<body>
+    <div id="navbar-placeholder"></div>
+    <script>
+        const cachedNav = sessionStorage.getItem('html_cache_./components/navbar.html');
+        if (cachedNav) {
+            document.getElementById('navbar-placeholder').innerHTML = cachedNav;
+        }
+    </script>
+
+    <main class="container">
+        <div class="hero-wrapper">
+            <div id="hero-slider" class="hero-slider skeleton"></div>
+        </div>
+
+
+
+        <div class="features-bar">
+            <div class="feature-item">
+                <i class="fa-solid fa-truck-fast"></i>
+                Fast Delivery
+            </div>
+            <div class="feature-item">
+                <i class="fa-solid fa-award"></i>
+                Best Quality
+            </div>
+            <div class="feature-item">
+                <i class="fa-solid fa-tags"></i>
+                Cheap Prices
+            </div>
+            <div class="feature-item">
+                <i class="fa-solid fa-headset"></i>
+                24/7 Support
+            </div>
+
+        </div>
+
+        <section class="category-scroll-section">
+            <div class="section-head">
+                <h3>Shop by Category</h3>
+                <a href="category.html">View All <i class="fas fa-arrow-right"></i></a>
+            </div>
+            <div id="category-grid" class="category-scroll">
+                <div class="skeleton" style="height:90px; width:90px; border-radius:25px;"></div>
+                <div class="skeleton" style="height:90px; width:90px; border-radius:25px;"></div>
+                <div class="skeleton" style="height:90px; width:90px; border-radius:25px;"></div>
+            </div>
+        </section>
+
+        <section id="flash-sale-section" class="flash-sale-container" style="display: none;">
+            <div class="flash-header">
+                <div class="flash-title">
+                    <i class="fas fa-bolt fa-lg"></i>
+                    <h3 class="m-0">Flash Sales</h3>
+                </div>
+                <div id="flash-timer" class="flash-timer">00:00:00</div>
+            </div>
+            <div id="flash-sale-grid" class="flash-grid"></div>
+        </section>
+        <div id="mid-banner-container" class="mid-banner-wrapper" style="display: none;"></div>
+        <section style="margin-bottom: 20px;">
+            <div class="section-head"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 5px;">
+                <h3 style="margin:0;">Popular Brands</h3>
+                <a href="brands.html" style="color: var(--primary); text-decoration: none; font-weight: 600;">
+                    See All <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            <div id="brand-scroller" class="d-flex gap-3"
+                style="overflow-x:auto; padding-bottom:15px; scrollbar-width:none; padding-left:5px;">
+            </div>
+        </section>
+<div style="height: 8px; background-color: #f1f5f9; border-radius: 4px; margin: 10px 0 35px 0;"></div>
+
+        <div id="feed-container" style="min-height: 300px;">
+            <div class="loader-spinner"></div>
+        </div>
+    </main>
+
+    <div id="footer-placeholder"></div>
+
+    <script src="./assets/js/config.js?v=1.0.0" defer></script>
+
+    <script src="./assets/js/utils/formatters.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/maps_loader.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/location_picker.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/service-check.js?v=1.0.0" defer></script>
+
+    <script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+    <script src="./assets/js/services/cart.service.js?v=1.0.0" defer></script>
+
+    <script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+
+    <script src="./assets/js/pages/home.js?v=1.0.0" defer></script>
+    <script src="/assets/js/utils/toast.js"></script>
+
+
+
+
+
+
+
+    <script>
+        // Initialize Popup after DOM is ready so deferred scripts (including service-check.js) have executed
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.ServiceCheck && typeof window.ServiceCheck.init === 'function') {
+                window.ServiceCheck.init();
+            } else {
+                console.error('ServiceCheck not available');
+            }
+        });
+    </script>
+
+    <div id="custom-notification-modal" class="notification-modal-overlay hidden">
+    <div class="notification-modal-content">
+        <div class="notification-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+            </svg>
+        </div>
+        <h3 class="notification-title">Never Miss a Deal!</h3>
+        <p class="notification-desc">
+            Enable notifications to get instant alerts for <b>heavy discounts</b> and <b>new stock arrivals</b>.
+        </p>
+        <div class="notification-actions">
+            <button id="btn-reject-notify" class="btn-secondary">Not Now</button>
+            <button id="btn-accept-notify" class="btn-primary">Yes, Notify Me</button>
+        </div>
+    </div>
+</div>
+
+
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+          apiKey: "AIzaSyBLN2izNbTgaG6K-9zblxVIx70TL8QzVbo",
+          authDomain: "quickdash-2dd12.firebaseapp.com",
+          projectId: "quickdash-2dd12",
+          storageBucket: "quickdash-2dd12.firebasestorage.app",
+          messagingSenderId: "808946416778",
+          appId: "1:808946416778:web:c59376f6d73b3937bf4173",
+          measurementId: "G-JFB92V2QG3"
+        };
+        
+        // Initialize Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+    </script>
+
+    <script src="./assets/js/utils/notifications.js?v=1.0.0" defer></script>
+
+
+</body>
+
+</html>

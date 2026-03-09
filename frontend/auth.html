@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - QuickDash</title>
+    <script src="/assets/js/env.js"></script>
+    <script src="/assets/js/config.js"></script>
+    <link rel="stylesheet" href="./assets/css/base.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/components.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/layout.css?v=1.0.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./assets/css/pages/auth.css?v=1.0.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+
+<body>
+    <div id="navbar-placeholder"></div>
+    <script>
+        const cachedNav = sessionStorage.getItem('html_cache_./components/navbar.html');
+        if (cachedNav) {
+            document.getElementById('navbar-placeholder').innerHTML = cachedNav;
+        }
+    </script>
+
+    <main class="auth-container">
+        <div class="card auth-card">
+            <div class="mb-4">
+                <i class="fas fa-bolt fa-3x text-primary"></i>
+                <h2 class="mt-2">Welcome Back</h2>
+                <p class="text-muted">Login with your phone number</p>
+            </div>
+
+            <form id="step-phone">
+                <div class="form-group text-left">
+                    <label class="form-label">Mobile Number</label>
+                    <div class="form-control" style="display: flex; align-items: center; padding: 0; overflow: hidden;">
+                        <span style="padding: 0 12px; color: #555; font-weight: bold; background-color: #f0f0f0; border-right: 1px solid #ccc; height: 100%; display: flex; align-items: center;">+91</span>
+                        <input type="tel" id="phone-input" placeholder="9876543210" maxlength="10" autofocus style="border: none; outline: none; width: 100%; padding: 0.375rem 0.75rem; background: transparent;">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary w-100" id="get-otp-btn">
+                    Get OTP <i class="fas fa-arrow-right"></i>
+                </button>
+            </form>
+
+            <form id="step-otp" style="display: none;">
+                <p class="mb-2">Enter OTP sent to <strong id="display-phone"></strong> <span class="link-text"
+                        onclick="resetForm()">(Edit)</span></p>
+
+                <div class="otp-inputs">
+                    <input type="tel" class="otp-input" maxlength="1">
+                    <input type="tel" class="otp-input" maxlength="1">
+                    <input type="tel" class="otp-input" maxlength="1">
+                    <input type="tel" class="otp-input" maxlength="1">
+                    <input type="tel" class="otp-input" maxlength="1">
+                    <input type="tel" class="otp-input" maxlength="1">
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100" id="verify-btn">Verify & Login</button>
+                <div class="mt-4 text-muted small">Resend OTP in <span id="timer">30</span>s</div>
+            </form>
+        </div>
+    </main>
+
+    <div id="footer-placeholder"></div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBLN2izNbTgaG6K-9zblxVIx70TL8QzVbo",
+            authDomain: "quickdash-2dd12.firebaseapp.com",
+            projectId: "quickdash-2dd12",
+            storageBucket: "quickdash-2dd12.firebasestorage.app",
+            messagingSenderId: "808946416778",
+            appId: "1:808946416778:web:c59376f6d73b3937bf4173",
+            measurementId: "G-JFB92V2QG3"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        window.firebaseAuth = firebase.auth();
+    </script>
+
+    <script src="./assets/js/config.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+    <script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+    <script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+    <script src="./assets/js/pages/auth.js?v=1.0.0" defer></script>
+</body>
+
+</html>

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop - QuickDash</title>
+    <script src="/assets/js/env.js"></script>
+<script src="/assets/js/config.js"></script>
+<link rel="preload" href="./components/navbar.html" as="fetch" crossorigin>
+<link rel="preload" href="./components/footer.html" as="fetch" crossorigin>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./assets/css/base.css">
+    <link rel="stylesheet" href="./assets/css/components.css">
+    <link rel="stylesheet" href="./assets/css/layout.css">
+    <link rel="stylesheet" href="./assets/css/pages/catalog.css">
+</head>
+
+<body>
+    <div id="navbar-placeholder"></div>
+    <script>
+        const cachedNav = sessionStorage.getItem('html_cache_./components/navbar.html');
+        if (cachedNav) {
+            document.getElementById('navbar-placeholder').innerHTML = cachedNav;
+        }
+    </script>
+    <div id="sub-category-pills" class="sub-cat-strip d-none">
+    </div>
+
+    <main class="container">
+        <div class="custom-breadcrumb">
+    <a href="index.html">Home</a> 
+    <span class="divider"><i class="fas fa-chevron-right"></i></span> 
+    <span id="page-breadcrumb" class="current-page">Shop</span>
+</div>
+
+        <div class="catalog-layout">
+            <aside class="filters-sidebar sidebar-card">
+                <div class="filter-group">
+                    <div class="filter-title">Sort By</div>
+                    <select id="sort-select" class="form-control" onchange="applySort()">
+                        <option value="">Relevance</option>
+                        <option value="price_asc">Price: Low to High</option>
+                        <option value="price_desc">Price: High to Low</option>
+                        <option value="newest">New Arrivals</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-title">Popular Brands</div>
+
+                    <div id="brand-filter-container" style="max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                        <div class="loader-spinner"></div>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <div class="filter-title">Availability</div>
+                    <label class="filter-item">
+                        <input type="checkbox" class="filter-checkbox" checked disabled> In Stock
+                    </label>
+                </div>
+            </aside>
+
+            <div class="catalog-content">
+                <div class="toolbar">
+                    <h2 id="page-title" style="font-size:1.5rem;">All Products</h2>
+                    <span id="result-count" class="text-muted small">Loading...</span>
+                </div>
+
+                <div id="product-list" class="product-grid-view">
+                    <div class="loader-spinner"></div>
+                </div>
+
+                <div id="empty-state" class="text-center py-5 d-none">
+                    <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                    <h3>No products found</h3>
+                    <p class="text-muted">Try adjusting your search or filters</p>
+                    <a href="index.html" class="btn btn-outline mt-2">Go Home</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="footer-placeholder"></div>
+
+   <script src="./assets/js/config.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/utils/asset-resolver.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/formatters.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+<script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+<script src="./assets/js/services/cart.service.js?v=1.0.0" defer></script>
+
+<script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+<script src="./assets/js/pages/catalog.js?v=1.0.0" defer></script>
+
+
+
+
+</body>
+
+</html>

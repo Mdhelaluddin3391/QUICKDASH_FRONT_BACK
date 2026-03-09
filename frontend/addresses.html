@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Addresses - QuickDash</title>
+    <script src="/assets/js/env.js"></script>
+    <script src="/assets/js/config.js"></script>
+    <link rel="preload" href="./components/navbar.html" as="fetch" crossorigin>
+    <link rel="preload" href="./components/footer.html" as="fetch" crossorigin>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./assets/css/base.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/components.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/layout.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/pages/account.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/pages/addresses-modal.css?v=1.0.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+
+<body>
+    <div id="navbar-placeholder"></div>
+    <script>
+        const cachedNav = sessionStorage.getItem('html_cache_./components/navbar.html');
+        if (cachedNav) {
+            document.getElementById('navbar-placeholder').innerHTML = cachedNav;
+        }
+    </script>
+    <main class="container">
+        <div class="account-layout">
+            <aside class="account-sidebar">
+                <nav>
+                    <a href="profile.html" class="sidebar-link"><i class="fas fa-th-large"></i> Dashboard</a>
+                    <a href="orders.html" class="sidebar-link"><i class="fas fa-box"></i> My Orders</a>
+                    <a href="addresses.html" class="sidebar-link active"><i class="fas fa-map-marker-alt"></i>
+                        Addresses</a>
+                    <button onclick="logout()" class="sidebar-link logout w-100 border-0 bg-transparent text-left"><i
+                            class="fas fa-sign-out-alt"></i> Logout</button>
+                </nav>
+            </aside>
+            <div class="account-content">
+                <div class="d-flex justify-between align-center mb-4">
+                    <h2>Saved Addresses</h2>
+                    <button class="btn btn-primary btn-sm" onclick="openAddressModal()"><i class="fas fa-plus"></i> Add
+                        New Address</button>
+                </div>
+                <div id="addr-grid" class="d-grid gap-3"
+                    style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">
+                    <div class="loader-spinner"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="address-modal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Add New Address</h3><button type="button" class="close-icon" onclick="closeModal()"><i
+                        class="fas fa-times"></i></button>
+            </div>
+            <form id="address-form">
+                <div class="modal-body">
+                    <input type="hidden" id="a-lat"><input type="hidden" id="a-lng"><input type="hidden"
+                        id="a-google-text">
+                    <div class="map-preview-text"><i class="fas fa-map-marker-alt mt-1"></i>
+                        <div><strong style="display:block; margin-bottom:2px;">Selected Location:</strong><span
+                                id="display-map-address">...</span></div>
+                    </div>
+                    <h5 class="mb-3 text-muted" style="font-size:0.9rem; text-transform:uppercase;">Contact Details</h5>
+                    <div class="form-grid">
+                        <div class="form-group mb-0"><label class="small">Name</label><input type="text" id="a-name"
+                                class="form-control" required></div>
+                        <div class="form-group mb-0"><label class="small">Phone</label><input type="tel" id="a-phone"
+                                class="form-control" maxlength="10" required></div>
+                    </div>
+                    <hr style="margin: 20px 0; border:0; border-top:1px dashed #eee;">
+                    <h5 class="mb-3 text-muted" style="font-size:0.9rem; text-transform:uppercase;">Address Details</h5>
+                    <div class="form-grid mb-3">
+                        <div class="form-group mb-0"><label class="small">House/Flat No *</label><input type="text"
+                                id="a-house" class="form-control" required></div>
+                        <div class="form-group mb-0"><label class="small">Floor No</label><input type="text"
+                                id="a-floor" class="form-control"></div>
+                    </div>
+                    <div class="form-group mb-3"><label class="small">Building Name *</label><input type="text"
+                            id="a-building" class="form-control" required></div>
+
+                    <div class="form-group mb-3"><label class="small">Landmark *</label><input type="text" 
+                         id="a-landmark" class="form-control" required></div>
+                         
+                    <div class="form-grid mb-3">
+                        <div class="form-group mb-0">
+                            <label class="small">City</label>
+                            <input type="text" id="a-city" class="form-control" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="small">Pincode</label>
+                            <input type="text" id="a-pin" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="form-group mb-0"><label class="small mb-2">Type</label>
+                        <div class="address-type-selector d-flex gap-2">
+                            <div><input type="radio" id="type-home" name="atype" value="HOME" checked><label
+                                    for="type-home">Home</label></div>
+                            <div><input type="radio" id="type-work" name="atype" value="WORK"><label
+                                    for="type-work">Work</label></div>
+                            <div><input type="radio" id="type-other" name="atype" value="OTHER"><label
+                                    for="type-other">Other</label></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-outline"
+                        onclick="closeModal()">Cancel</button><button type="submit" class="btn btn-primary">Save
+                        Address</button></div>
+            </form>
+        </div>
+    </div>
+    <div id="footer-placeholder"></div>
+
+    <script src="./assets/js/config.js?v=1.0.1" defer></script>
+    <script src="./assets/js/utils/maps_loader.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/location_picker.js?v=1.0.1" defer></script>
+    <script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+    <script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+    <script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+    <script src="./assets/js/pages/addresses.js?v=1.0.4" defer></script>
+</body>
+
+</html>

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - QuickDash</title>
+    <script src="/assets/js/env.js"></script>
+    <script src="/assets/js/config.js"></script>
+    <link rel="preload" href="./components/navbar.html" as="fetch" crossorigin>
+    <link rel="preload" href="./components/footer.html" as="fetch" crossorigin>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./assets/css/base.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/components.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/layout.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/pages/checkout.css?v=1.1.0">
+    <link rel="stylesheet" href="./assets/css/pages/checkout-modal.css?v=1.0.0">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</head>
+
+<body>
+    <div id="navbar-placeholder"></div>
+    <script>
+        const cachedNav = sessionStorage.getItem('html_cache_./components/navbar.html');
+        if (cachedNav) {
+            document.getElementById('navbar-placeholder').innerHTML = cachedNav;
+        }
+    </script>
+
+    <main class="container">
+        <div class="mb-3 mt-2">
+    <a href="cart.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Cart</a>
+</div>
+
+        <h1 class="mb-4" style="font-weight: 800;">Secure Checkout</h1>
+
+        <div class="checkout-layout">
+            <div class="checkout-steps">
+
+                <div class="step-card">
+                    <div class="step-header">
+                        <div class="step-number">1</div>
+                        <h3>Delivery Address</h3>
+                    </div>
+
+                    <div id="address-list" class="address-grid mt-3">
+                        <div class="loader-spinner"></div>
+                    </div>
+
+                    <div class="mt-4">
+                        <button class="btn btn-outline btn-sm" onclick="openAddressModal()">
+                            <i class="fas fa-plus"></i> Add New Address
+                        </button>
+                    </div>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-header">
+                        <div class="step-number">2</div>
+                        <h3>Payment Method</h3>
+                    </div>
+
+                    <div class="payment-options mt-3">
+                        <label class="payment-option selected" onclick="selectPayment('COD', this)">
+                            <input type="radio" name="payment" value="COD" checked>
+                            <div class="pay-icon"><i class="fas fa-money-bill-wave text-success"></i></div>
+                            <div>
+                                <strong style="font-size:1.05rem;">Cash on Delivery</strong>
+                                <p class="text-muted small m-0">Pay cash upon receiving your order</p>
+                            </div>
+                            <i class="fas fa-check-circle ml-auto text-primary" style="font-size:1.2rem;"></i>
+                        </label>
+
+                        <label class="payment-option disabled-option" title="Currently Unavailable">
+                            <input type="radio" name="payment" value="RAZORPAY" disabled>
+                            <div class="pay-icon"><i class="fas fa-credit-card" style="color: #9ca3af;"></i></div>
+                            <div>
+                                <strong style="font-size:1.05rem; color: #6b7280;">Pay Online
+                                    <span
+                                        style="font-size: 0.7rem; background: #e5e7eb; color: #4b5563; padding: 2px 6px; border-radius: 4px; margin-left: 5px;">Coming
+                                        Soon</span>
+                                </strong>
+                                <p class="text-muted small m-0">UPI, Cards, Netbanking (Currently unavailable)</p>
+                            </div>
+                            <i class="fas fa-lock ml-auto" style="font-size:1.2rem; color: #d1d5db;"></i>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="checkout-sidebar">
+                <div class="summary-card">
+                    <h3>Order Summary</h3>
+
+                    <div id="mini-cart-list" class="mini-cart mb-3"
+                        style="max-height: 200px; overflow-y: auto; padding-right: 5px;">
+                    </div>
+
+                    <div style="border-top: 2px dashed #eee; margin: 15px 0;"></div>
+
+                    <div class="summary-row">
+                        <span>Item Total</span>
+                        <span id="summ-subtotal">...</span>
+                    </div>
+                    <div class="summary-row">
+                        <span>Delivery Fee</span>
+                        <span id="summ-delivery" class="text-success">FREE</span>
+                    </div>
+
+                    <div class="summary-row total-row">
+                        <span>To Pay</span>
+                        <span id="summ-total" class="text-primary">...</span>
+                    </div>
+
+                    <button id="place-order-btn" class="btn btn-primary w-100 mt-4 py-3"
+                        style="font-size: 1.1rem; box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4);">
+                        Place Order
+                    </button>
+
+                    <div class="text-center mt-3">
+                        <small class="text-muted">By placing order, you agree to our
+                            <a href="terms.html" style="color: var(--primary); text-decoration: underline;">Terms &
+                                Conditions</a>.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="address-modal" class="modal-overlay d-none">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>Add New Address</h3>
+                <button type="button" class="close-icon" onclick="closeAddressModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form id="address-form">
+                <div class="modal-body">
+                    <input type="hidden" id="addr-lat">
+                    <input type="hidden" id="addr-lng">
+                    <input type="hidden" id="addr-google-text">
+
+                    <div class="map-preview-text">
+                        <i class="fas fa-map-marker-alt mt-1"></i>
+                        <div>
+                            <strong style="display:block; margin-bottom:2px;">Selected Location:</strong>
+                            <span id="display-map-address">...</span>
+                        </div>
+                    </div>
+
+                    <h5 class="mb-3 text-muted" style="font-size:0.9rem; text-transform:uppercase;">Contact Details</h5>
+                    <div class="form-grid">
+                        <div class="form-group mb-0">
+                            <label class="small">Name</label>
+                            <input type="text" id="addr-name" class="form-control" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="small">Phone</label>
+                            <input type="tel" id="addr-phone" class="form-control" maxlength="10" required>
+                        </div>
+                    </div>
+
+                    <hr style="margin: 20px 0; border:0; border-top:1px dashed #eee;">
+
+                    <h5 class="mb-3 text-muted" style="font-size:0.9rem; text-transform:uppercase;">Address Details</h5>
+                    <div class="form-grid mb-3">
+                        <div class="form-group mb-0">
+                            <label class="small">House/Flat No *</label>
+                            <input type="text" id="addr-house" class="form-control" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="small">Floor No</label>
+                            <input type="text" id="addr-floor" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="small">Building Name *</label>
+                        <input type="text" id="addr-building" class="form-control" required>
+                    </div>
+                    <div class="form-group mb-3">
+                        <label class="small">Landmark</label>
+                        <input type="text" id="addr-landmark" class="form-control">
+                    </div>
+                    <div class="form-grid mb-3">
+                        <div class="form-group mb-0">
+                            <label class="small">City</label>
+                            <input type="text" id="addr-city" class="form-control" required>
+                        </div>
+                        <div class="form-group mb-0">
+                            <label class="small">Pincode</label>
+                            <input type="text" id="addr-pin" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="form-group mb-0">
+                        <label class="small mb-2">Type</label>
+                        <div class="address-type-selector d-flex gap-2">
+                            <div><input type="radio" id="addr-type-home" name="addr-type" value="HOME" checked><label
+                                    for="addr-type-home">Home</label></div>
+                            <div><input type="radio" id="addr-type-work" name="addr-type" value="WORK"><label
+                                    for="addr-type-work">Work</label></div>
+                            <div><input type="radio" id="addr-type-other" name="addr-type" value="OTHER"><label
+                                    for="addr-type-other">Other</label></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeAddressModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Address</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="footer-placeholder"></div>
+
+    <script>
+        const originalWarn = console.warn;
+        console.warn = function (...args) {
+            const message = args.join(' ');
+            if (message.includes("Unrecognized feature: 'otp-credentials'") ||
+                message.includes("Unrecognized feature: 'web-share'")) {
+                return; // Suppress these specific warnings
+            }
+            originalWarn.apply(console, args);
+        };
+    </script>
+
+    <script src="https://checkout.razorpay.com/v1/checkout.js" defer></script>
+    <script src="./assets/js/config.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/formatters.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/toast.js?v=1.0.0" defer></script>
+
+    <script src="./assets/js/utils/maps_loader.js?v=1.0.0" defer></script>
+    <script src="./assets/js/utils/location_picker.js?v=1.0.0" defer></script>
+
+    <script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+    <script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+    <script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+    <script src="./assets/js/pages/checkout.js?v=1.0.0" defer></script>
+</body>
+
+</html>

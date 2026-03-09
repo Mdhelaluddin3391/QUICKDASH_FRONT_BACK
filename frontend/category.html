@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Categories - QuickDash</title>
+    <script src="/assets/js/env.js"></script>
+    <script src="/assets/js/config.js"></script>
+    <link rel="preload" href="./components/navbar.html" as="fetch" crossorigin>
+    <link rel="preload" href="./components/footer.html" as="fetch" crossorigin>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./assets/css/base.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/components.css?v=1.0.0">
+    <link rel="stylesheet" href="./assets/css/layout.css?v=1.0.0">
+
+    <style>
+        body {
+            background: #f5f7f9;
+        }
+
+        /* Page Heading */
+        .page-header {
+            text-align: center;
+            padding: 30px 0 10px;
+        }
+
+        .page-header h1 {
+            font-weight: 700;
+        }
+
+        .page-header p {
+            color: #777;
+            margin-top: 5px;
+        }
+
+        /* NEW CATEGORY GRID */
+        .cat-grid-page {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        /* CARD */
+        .cat-card-lg {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.2s ease;
+            border: 1px solid #eee;
+        }
+
+        .cat-card-lg:hover {
+            /* transform: scale(1.03); */
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        /* IMAGE */
+        .cat-icon-lg {
+            width: 100%;
+            height: 100px;
+            object-fit: contain;
+            margin-bottom: 8px;
+        }
+
+        /* TITLE */
+        .cat-title-lg {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        /* 🔥 If last item odd → full width */
+        .cat-grid-page .cat-card-lg:last-child:nth-child(odd) {
+            grid-column: 1 / -1;
+        }
+
+        /* Responsive */
+        @media(max-width: 768px) {
+            .cat-grid-page {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media(max-width: 480px) {
+            .cat-grid-page {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="navbar-placeholder"></div>
+    <script>
+        const cachedNav = sessionStorage.getItem('html_cache_./components/navbar.html');
+        if (cachedNav) {
+            document.getElementById('navbar-placeholder').innerHTML = cachedNav;
+        }
+    </script>
+
+    <main class="container">
+        <div class="page-header">
+            <h1>Explore Categories</h1>
+            <p>Freshest picks for your daily needs</p>
+        </div>
+
+        <div id="cat-grid" class="cat-grid-page">
+            <div class="loader-spinner"></div>
+        </div>
+    </main>
+
+    <div id="footer-placeholder"></div>
+
+    <script src="./assets/js/config.js?v=1.0.0" defer></script>
+
+    <script src="./assets/js/utils/location-manager.js?v=1.0.0" defer></script>
+
+    <script src="./assets/js/services/api.service.js?v=1.0.0" defer></script>
+
+    <script src="./assets/js/layout/main-layout.js?v=1.0.0" defer></script>
+
+    <script defer>
+        let currentPage = 1;
+        let isLoading = false;
+        let hasNext = true;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCategories(true);
+        });
+
+        // --- Infinite Scroll Setup ---
+        function setupCatScroll() {
+            const grid = document.getElementById('cat-grid');
+            const oldSentinel = document.getElementById('cat-sentinel');
+            if(oldSentinel) oldSentinel.remove();
+
+            const sentinel = document.createElement('div');
+            sentinel.id = 'cat-sentinel';
+            sentinel.style.width = '100%';
+            sentinel.style.height = '20px';
+            sentinel.style.marginBottom = '50px';
+            grid.after(sentinel);
+
+            const observer = new IntersectionObserver((entries) => {
+                if(entries[0].isIntersecting && !isLoading && hasNext) {
+                    currentPage++;
+                    loadCategories(false);
+                }
+            }, { rootMargin: '200px' });
+            
+            observer.observe(sentinel);
+        }
+
+        function insertLoader() {
+            let loader = document.getElementById('scroll-loader');
+            if(!loader) {
+                loader = document.createElement('div');
+                loader.id = 'scroll-loader';
+                loader.className = 'text-center py-3 w-100';
+                loader.innerHTML = '<div class="loader-spinner" style="width:30px; height:30px; margin:auto;"></div>';
+                document.getElementById('cat-grid').after(loader);
+            }
+        }
+
+        function removeLoader() {
+            const loader = document.getElementById('scroll-loader');
+            if(loader) loader.remove();
+        }
+
+        // --- Fetch & Render Function ---
+        async function loadCategories(reset = false) {
+            if(isLoading) return;
+            isLoading = true;
+            
+            const grid = document.getElementById('cat-grid');
+
+            if(reset) {
+                currentPage = 1;
+                hasNext = true;
+                grid.innerHTML = '<div class="loader-spinner"></div>';
+            } else {
+                insertLoader();
+            }
+
+            try {
+                // Direct Fetch Approach jaisa aapne change kiya tha
+                const baseUrl = window.APP_CONFIG ? window.APP_CONFIG.API_BASE_URL : "http://localhost:5000/api/v1";
+                const response = await fetch(`${baseUrl}/catalog/categories/?page=${currentPage}`);
+                
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status}`);
+                }
+                const res = await response.json();
+
+                // Response array hai ya paginated result us hisab se check karna
+                const categories = Array.isArray(res) ? res : (res && res.results ? res.results : []);
+                hasNext = !Array.isArray(res) && !!res.next;
+
+                if(reset) grid.innerHTML = '';
+
+                if(categories.length === 0 && currentPage === 1) {
+                    grid.innerHTML = '<p class="text-center w-100 text-muted">No categories found.</p>';
+                    hasNext = false;
+                } else {
+                    const html = categories.map(c => `
+                        <div class="cat-card-lg fade-in" onclick="window.location.href='./search_results.html?slug=${c.slug}'">
+                            <img src="${c.icon_url || 'https://via.placeholder.com/80'}" class="cat-icon-lg" alt="${c.name}" loading="lazy">
+                            <div class="cat-title-lg">${c.name}</div>
+                        </div>
+                    `).join('');
+                    grid.insertAdjacentHTML('beforeend', html);
+                }
+
+            } catch (e) {
+                console.error("Category Load Error:", e);
+                if(reset) {
+                    grid.innerHTML = `
+                        <div class="text-center w-100">
+                            <p class="text-danger mb-2">Failed to load categories</p>
+                            <button class="btn btn-sm btn-outline-primary" onclick="location.reload()">Retry</button>
+                        </div>`;
+                }
+            } finally {
+                isLoading = false;
+                if(!reset) removeLoader();
+                
+                if(reset && hasNext) {
+                    setupCatScroll();
+                }
+                
+                const s = document.getElementById('cat-sentinel');
+                if(s) s.style.display = hasNext ? 'block' : 'none';
+            }
+        }
+    </script>
+</body>
+
+</html>
