@@ -1,31 +1,22 @@
 import os
 import sys
-import json  # <--- Add this line here
+import json
 import logging
 from pathlib import Path
-import dj_database_url
+from datetime import timedelta
 
+import dj_database_url
 import sentry_sdk
+import firebase_admin
+from firebase_admin import credentials
 from sentry_sdk.integrations.django import DjangoIntegration
 from sentry_sdk.integrations.redis import RedisIntegration
 from sentry_sdk.integrations.celery import CeleryIntegration
 from corsheaders.defaults import default_headers
 
-from datetime import timedelta 
-import firebase_admin
-from firebase_admin import credentials
 
-
-
-AUTH_USER_MODEL = "accounts.User"
-
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DJANGO_ENV = os.getenv("DJANGO_ENV", "production")
@@ -33,22 +24,20 @@ DJANGO_ENV = os.getenv("DJANGO_ENV", "production")
 logger.info(f"🚀 Django initializing in {DJANGO_ENV} environment")
 
 
-
 DEBUG = os.getenv("DEBUG", "true").lower() in ("true", "1", "yes")
 
 if DEBUG:
-    logger.warning(" DEBUG mode is enabled - NEVER use in production")
+    logger.warning("DEBUG mode is enabled - NEVER use in production")
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
 if not SECRET_KEY:
     if DEBUG:
-        logger.warning("  DJANGO_SECRET_KEY not set, using insecure dev key")
+        logger.warning("DJANGO_SECRET_KEY not set, using insecure dev key")
         SECRET_KEY = "dev-insecure-key-change-in-production"
     else:
-        logger.critical(" DJANGO_SECRET_KEY environment variable is REQUIRED in production")
+        logger.critical("DJANGO_SECRET_KEY environment variable is REQUIRED in production")
         sys.exit(1)
 
-ALLOWED_HOSTS_STR = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1" if DEBUG else "")
 
 ALLOWED_HOSTS = [
     ".railway.app",
@@ -58,16 +47,8 @@ ALLOWED_HOSTS = [
     "*"
 ]
 
-
-
-CSRF_TRUSTED_ORIGINS = [
-    url.strip() for url in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if url.strip()
-]
-
-
-CORS_ALLOWED_ORIGINS = [
-    url.strip() for url in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if url.strip()
-]
+CSRF_TRUSTED_ORIGINS = [url.strip() for url in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if url.strip()]
+CORS_ALLOWED_ORIGINS = [url.strip() for url in os.getenv("CORS_ALLOWED_ORIGINS", "").split(",") if url.strip()]
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
@@ -93,6 +74,10 @@ else:
     SESSION_COOKIE_SAMESITE = "Lax"
     CSRF_COOKIE_SAMESITE = "Lax"
 
+
+AUTH_USER_MODEL = "accounts.User"
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -101,8 +86,6 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.gis",
-
-    # Third-party
     "rest_framework",
     "django_filters",
     "corsheaders",
@@ -112,9 +95,7 @@ INSTALLED_APPS = [
     "storages",
     "django_celery_beat",
     "leaflet",
-    'import_export',
-
-    # Local apps
+    "import_export",
     "apps.accounts",
     "apps.customers",
     "apps.orders",
@@ -132,7 +113,6 @@ INSTALLED_APPS = [
     "apps.core",
 ]
 
-
 MIDDLEWARE = [
     "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -147,12 +127,10 @@ MIDDLEWARE = [
     "apps.core.middleware.LocationContextMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_prometheus.middleware.PrometheusAfterMiddleware",
-    # "apps.core.middleware.AdminWarehouseRequirementMiddleware",
 ]
 
 if not DEBUG:
     MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
-
 
 ROOT_URLCONF = "config.urls"
 WSGI_APPLICATION = "config.wsgi.application"
@@ -182,7 +160,7 @@ if "default" in DATABASES and DATABASES["default"]:
     db_config = DATABASES["default"]
     logger.info(f"Database configured: {db_config.get('HOST')}:{db_config.get('PORT')}/{db_config.get('NAME')}")
 else:
-    logger.critical(" Database configuration failed. Check DATABASE_URL or PG* variables.")
+    logger.critical("Database configuration failed. Check DATABASE_URL or PG* variables.")
 
 
 TEMPLATES = [
@@ -205,7 +183,7 @@ TEMPLATES = [
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0" if DEBUG else None)
 
 if not REDIS_URL and not DEBUG:
-    logger.critical(" REDIS_URL environment variable is REQUIRED in production")
+    logger.critical("REDIS_URL environment variable is REQUIRED in production")
     sys.exit(1)
 
 if REDIS_URL:
@@ -242,7 +220,7 @@ if REDIS_URL:
         }
     }
 else:
-    logger.warning("  Redis not configured, using in-memory cache (NOT for production)")
+    logger.warning("Redis not configured, using in-memory cache (NOT for production)")
     CACHES = {
         "default": {
             "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -315,16 +293,12 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
-
-
 if not DEBUG:
     STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
 
 
 REST_FRAMEWORK = {
@@ -359,8 +333,6 @@ X_FRAME_OPTIONS = "DENY" if not DEBUG else "SAMEORIGIN"
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_SECURITY_POLICY_NOSCRIPT_SOURCES = ("'none'",)
 
-
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 RIDER_FIXED_PAY_PER_ORDER = int(os.getenv("RIDER_FIXED_PAY_PER_ORDER", 50))
 
 
@@ -387,36 +359,28 @@ if os.getenv("SENTRY_DSN"):
             environment=DJANGO_ENV,
             traces_sample_rate=0.1,
         )
-        logger.info(" Sentry error tracking initialized")
+        logger.info("Sentry error tracking initialized")
     except Exception as e:
-        logger.warning(f"  Failed to initialize Sentry: {e}")
+        logger.warning(f"Failed to initialize Sentry: {e}")
 else:
-    logger.info("ℹ  Sentry not configured (optional)")
+    logger.info("Sentry not configured")
 
+logger.info(f"Django configuration loaded successfully")
+logger.info(f"Environment: {DJANGO_ENV}")
+logger.info(f"DEBUG: {DEBUG}")
+logger.info(f"Allowed Hosts: {ALLOWED_HOSTS}")
+logger.info(f"CSRF Trusted Origins: {CSRF_TRUSTED_ORIGINS}")
+logger.info(f"Database: {DATABASES.get('default', {}).get('HOST', 'unknown')}")
 
-logger.info(f" Django configuration loaded successfully")
-logger.info(f"   Environment: {DJANGO_ENV}")
-logger.info(f"   DEBUG: {DEBUG}")
-logger.info(f"   Allowed Hosts: {ALLOWED_HOSTS}")
-logger.info(f"   CSRF Trusted Origins: {CSRF_TRUSTED_ORIGINS}")
-logger.info(f"   Database: {DATABASES.get('default', {}).get('HOST', 'unknown')}")
-
-
-
-FIREBASE_CREDENTIALS_PATH = os.path.join(BASE_DIR, 'serviceAccountKey.json')
 
 if not firebase_admin._apps:
     try:
-        # Pehle .env se FIREBASE_CREDENTIALS_JSON dhoondhne ki koshish karega
         firebase_json_str = os.getenv('FIREBASE_CREDENTIALS_JSON')
-        
         if firebase_json_str:
-            # Agar production (Railway/Render) par variable mil gaya
             cred_dict = json.loads(firebase_json_str)
             cred = credentials.Certificate(cred_dict)
             logger.info("🔥 Firebase Admin Initialized using Environment Variable (.env).")
         else:
-            # Agar local pc par hain, toh serviceAccountKey.json file use karega
             FIREBASE_CREDENTIALS_PATH = os.path.join(BASE_DIR, 'serviceAccountKey.json')
             cred = credentials.Certificate(FIREBASE_CREDENTIALS_PATH)
             logger.info("🔥 Firebase Admin Initialized using local file.")
@@ -436,14 +400,9 @@ SIMPLE_JWT = {
 }
 
 
-
-
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'Asia/Kolkata' 
-
 USE_I18N = True
 USE_TZ = True 
-
 DATETIME_FORMAT = 'd/m/Y H:i'
 DATE_FORMAT = 'd/m/Y'
