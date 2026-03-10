@@ -14,15 +14,21 @@ document.addEventListener("DOMContentLoaded", () => {
     // 2. Separate logic to get the token and send it to Django
     async function subscribeToPushNotifications() {
         try {
-            // IMPORTANT: Replace this with your full 87-character PUBLIC VAPID KEY from Firebase Console
+            console.log("Attempting to register Service Worker manually...");
+            
+            // 🌟 NEW: Manually register the service worker to catch hidden errors
+            const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+            console.log('Service Worker registered perfectly with scope:', registration.scope);
+
+            // Pass the registration to Firebase
             const currentToken = await messaging.getToken({ 
-                vapidKey: 'BHJ_VgQk4o1NwiKb-JtaF-md-OJsxeFLtItftNLQ8fBRBgPAlyIhWL6_sCUgMl4p8_jAn_r6Lgh-cu5Ld_KAVO0' 
+                vapidKey: 'BHJ_VgQk4o1NwiKb-JtaF-md-OJsxeFLtItftNLQ8fBRBgPAlyIhWL6_sCUgMl4p8_jAn_r6Lgh-cu5Ld_KAVO0',
+                serviceWorkerRegistration: registration 
             });
 
             if (currentToken) {
                 console.log("FCM Token generated:", currentToken);
                 
-                // Use config.js to get the correct storage key and API base URL
                 const tokenKey = window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token';
                 const accessToken = localStorage.getItem(tokenKey); 
                 const apiBase = window.APP_CONFIG?.API_BASE_URL || "https://quickdash-front-back.onrender.com/api/v1";
@@ -47,6 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.log("No registration token available. Request permission to generate one.");
             }
         } catch (error) {
+            // 🌟 Now we will see exactly WHY the registration is failing!
             console.error("An error occurred while retrieving token or sending to server:", error);
         }
     }

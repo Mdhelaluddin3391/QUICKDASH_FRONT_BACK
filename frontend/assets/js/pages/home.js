@@ -126,7 +126,7 @@ async function loadStorefront(lat, lng, city, isInitial = false) {
         if (res.serviceable === false) {
             feedContainer.innerHTML = `
                 <div class="text-center py-5">
-                    <img src="/assets/images/empty-store.png" style="width:120px; opacity:0.8; margin-bottom:15px;" onerror="this.style.display='none'">
+                    <i class="fas fa-store-slash" style="font-size: 80px; color: #ccc; margin-bottom: 15px;"></i>
                     
                     <h4 style="color: #dc3545; font-weight: 600;">Not Serviceable Area</h4>
                     
