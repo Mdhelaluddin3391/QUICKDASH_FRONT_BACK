@@ -3,7 +3,9 @@ from django.contrib.auth import get_user_model
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
-
+from django.contrib import admin
+from .models import ManualPushNotification
+from .services import NotificationService
 # Import Export Magic for Master Admin
 from import_export import resources, fields, widgets
 from import_export.admin import ImportExportModelAdmin
@@ -210,3 +212,38 @@ class OTPAbuseLogAdmin(ImportExportModelAdmin):
     def reset_attempts(self, request, queryset):
         updated = queryset.update(failed_attempts=0)
         self.message_user(request, f"Failed attempts reset for {updated} numbers.")
+
+
+# apps/notifications/admin.py
+from django.contrib import admin
+from .models import ManualPushNotification
+from .services import NotificationService
+
+@admin.register(ManualPushNotification)
+class ManualPushNotificationAdmin(admin.ModelAdmin):
+    list_display = ('title', 'topic', 'created_at', 'is_sent')
+    list_filter = ('is_sent', 'topic', 'created_at')
+    search_fields = ('title', 'message')
+    readonly_fields = ('is_sent', 'created_at')
+
+    def save_model(self, request, obj, form, change):
+        # Naya object create ho raha hai ya purana edit ho raha hai?
+        is_new = obj.pk is None 
+        super().save_model(request, obj, form, change)
+        
+        # Agar ye naya message hai aur abhi tak bheja nahi gaya hai:
+        if is_new and not obj.is_sent:
+            # Extra data (agar admin me khali chhod diya toh default type dega)
+            extra_data = obj.extra_data or {"type": "manual_push"}
+            
+            # Aapke existing Service ko call karke sabko Notification bhej rahe hain
+            NotificationService.send_global_push(
+                topic=obj.topic,
+                title=obj.title,
+                message=obj.message,
+                extra_data=extra_data
+            )
+            
+            # Update kar do ki message ja chuka hai taaki dubara send na ho
+            obj.is_sent = True
+            obj.save(update_fields=['is_sent'])
