@@ -1,3 +1,3 @@
 window.env = {
-  API_BASE_URL: "http://localhost:8000/api/v1"
+  API_BASE_URL: "https://quickdash-front-back.onrender.com/api/v1"
 };

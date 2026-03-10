@@ -25,7 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 // Use config.js to get the correct storage key and API base URL
                 const tokenKey = window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token';
                 const accessToken = localStorage.getItem(tokenKey); 
-                const apiBase = window.APP_CONFIG?.API_BASE_URL || 'http://localhost:8000/api/v1';
+                const apiBase = window.APP_CONFIG?.API_BASE_URL || "https://quickdash-front-back.onrender.com/api/v1";
                 
                 // Send token to Django API
                 const response = await fetch(`${apiBase}/notifications/fcm/subscribe/`, {
