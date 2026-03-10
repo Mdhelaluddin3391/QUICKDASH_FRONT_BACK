@@ -25,7 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             // Pass the READY registration to Firebase
             const currentToken = await messaging.getToken({
-                vapidKey: 'BHJ_VgQk4o1NwiKb-JtaF-md-OJsxeFLtItftNLQ8fBRBgPAlyIhWL6_sCUgMl4p8_jAn_r6Lgh-cu5Ld_KAVO0',
+                vapidKey: 'BALkEcuyf1AEXy2XiZs3_ZAmQNfzaBkyKN2Gze6OzG51SMtfZPJAS3SXPnWOvqY5Y4VQNfxtr8IP_chBJKZZBPI',
                 serviceWorkerRegistration: readyRegistration
             });
 
