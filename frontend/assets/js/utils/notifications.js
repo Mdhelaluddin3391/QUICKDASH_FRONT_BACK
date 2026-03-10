@@ -74,4 +74,25 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     checkNotificationPermission();
+
+    // =========================================================
+    // UPDATE: Foreground Notification Listener (Website open hone par)
+    // =========================================================
+    if ('Notification' in window && navigator.serviceWorker) {
+        firebase.messaging().onMessage((payload) => {
+            console.log('[Foreground] Message received. ', payload);
+            
+            const title = payload.notification?.title || "New Alert!";
+            const body = payload.notification?.body || "You have a new notification.";
+            
+            // Browser notification show karna
+            new Notification(title, {
+                body: body,
+                icon: '/assets/images/logo.png', // Apna QuickDash logo yahan set karein
+            });
+            
+            // Note: Agar aapke project mein custom Toast Alert system hai, 
+            // toh aap use bhi yahan call kar sakte hain. Example: showToast(title, body)
+        });
+    }
 });
