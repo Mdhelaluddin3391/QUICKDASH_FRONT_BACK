@@ -12,27 +12,30 @@ document.addEventListener("DOMContentLoaded", () => {
     const messaging = firebase.messaging();
 
     // 2. Separate logic to get the token and send it to Django
+    // 2. Separate logic to get the token and send it to Django
     async function subscribeToPushNotifications() {
         try {
             console.log("Attempting to register Service Worker manually...");
-            
-            // 🌟 NEW: Manually register the service worker to catch hidden errors
             const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
-            console.log('Service Worker registered perfectly with scope:', registration.scope);
 
-            // Pass the registration to Firebase
-            const currentToken = await messaging.getToken({ 
+            // 🌟 THE FIX: Wait for the service worker to become fully ACTIVE
+            console.log('Service Worker registered. Waiting for it to become active...');
+            const readyRegistration = await navigator.serviceWorker.ready;
+            console.log('Service Worker is now ACTIVE and READY!');
+
+            // Pass the READY registration to Firebase
+            const currentToken = await messaging.getToken({
                 vapidKey: 'BHJ_VgQk4o1NwiKb-JtaF-md-OJsxeFLtItftNLQ8fBRBgPAlyIhWL6_sCUgMl4p8_jAn_r6Lgh-cu5Ld_KAVO0',
-                serviceWorkerRegistration: registration 
+                serviceWorkerRegistration: readyRegistration
             });
 
             if (currentToken) {
                 console.log("FCM Token generated:", currentToken);
-                
+
                 const tokenKey = window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token';
-                const accessToken = localStorage.getItem(tokenKey); 
+                const accessToken = localStorage.getItem(tokenKey);
                 const apiBase = window.APP_CONFIG?.API_BASE_URL || "https://quickdash-front-back.onrender.com/api/v1";
-                
+
                 // Send token to Django API
                 const response = await fetch(`${apiBase}/notifications/fcm/subscribe/`, {
                     method: 'POST',
@@ -40,7 +43,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         'Content-Type': 'application/json',
                         ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {})
                     },
-                    body: JSON.stringify({ token: currentToken }) 
+                    body: JSON.stringify({ token: currentToken })
                 });
 
                 if (response.ok) {
@@ -53,7 +56,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 console.log("No registration token available. Request permission to generate one.");
             }
         } catch (error) {
-            // 🌟 Now we will see exactly WHY the registration is failing!
             console.error("An error occurred while retrieving token or sending to server:", error);
         }
     }
@@ -66,7 +68,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (Notification.permission === "default" && !sessionStorage.getItem('notificationModalDismissed')) {
                 setTimeout(() => {
                     modal.classList.remove('hidden');
-                }, 3000); 
+                }, 3000);
             }
         }
 
@@ -76,8 +78,8 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         btnAccept.addEventListener('click', async () => {
-            modal.classList.add('hidden'); 
-            
+            modal.classList.add('hidden');
+
             try {
                 const permission = await Notification.requestPermission();
                 if (permission === "granted") {
@@ -92,8 +94,8 @@ document.addEventListener("DOMContentLoaded", () => {
         });
 
         checkNotificationPermission();
-    } 
-    
+    }
+
     // If the user already granted permission previously, refresh the token silently
     if ("Notification" in window && Notification.permission === "granted") {
         subscribeToPushNotifications();
@@ -104,10 +106,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // =========================================================
     messaging.onMessage((payload) => {
         console.log('[Foreground] Message received. ', payload);
-        
+
         const title = payload.notification?.title || "New Alert!";
         const body = payload.notification?.body || "You have a new notification.";
-        
+
         // Show Browser Notification if allowed
         if (Notification.permission === 'granted') {
             new Notification(title, {
@@ -115,7 +117,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 icon: '/assets/images/logo.png', // Fallback QuickDash Logo
             });
         }
-        
+
         // Optional: Trigger QuickDash custom Toast if you have the Toast utility imported
         if (window.Toast && typeof window.Toast.show === 'function') {
             window.Toast.show(`${title}: ${body}`, 'info');
