@@ -16,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             // IMPORTANT: Replace this with your full 87-character PUBLIC VAPID KEY from Firebase Console
             const currentToken = await messaging.getToken({ 
-                vapidKey: 'YOUR_LONG_PUBLIC_VAPID_KEY_FROM_FIREBASE_CONSOLE_GOES_HERE' 
+                vapidKey: 'V1oP5rw8TIseT0-u-mLFdfRYY1BPvHYmIx8hcUFDh8A' 
             });
 
             if (currentToken) {
