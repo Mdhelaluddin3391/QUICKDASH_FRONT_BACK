@@ -1,6 +1,7 @@
 import secrets
 import logging
 from datetime import timedelta
+import threading
 from django.conf import settings
 from django.utils import timezone
 from django.db import transaction
@@ -36,7 +37,7 @@ class NotificationService:
     @staticmethod
     def send_push(user, title, message, extra_data=None):
         """
-        Persist notification and log Push. Phir background mein FCM send karega.
+        Persist notification and log Push. Phir background mein FCM send karega (bina Celery).
         """
         Notification.objects.create(
             user=user,
@@ -48,28 +49,36 @@ class NotificationService:
         fcm_token = getattr(user, 'fcm_token', None) 
         
         if fcm_token:
-            send_push_to_user_task.delay(
-                fcm_token=fcm_token,
-                title=title,
-                body=message,
-                data=extra_data
+            # 🌟 FREE TIER HACK: Celery .delay() ki jagah Python Threading use karein
+            thread = threading.Thread(
+                target=send_push_to_user_task, 
+                kwargs={
+                    'fcm_token': fcm_token,
+                    'title': title,
+                    'body': message,
+                    'data': extra_data
+                }
             )
+            thread.start() # Ye background mein notification bhej dega
         else:
             logger.warning(f"[PUSH] User {user.phone} has no FCM token. Notification saved to DB only.")
 
     @staticmethod
     def send_global_push(topic, title, message, extra_data=None):
         """
-        Ye function sabhi users ko (logged in ho ya na ho) notification bhejega.
+        Ye function sabhi users ko notification bhejega (bina Celery).
         """
-        # Celery task ko background mein call karna
-        send_push_to_topic_task.delay(
-            topic=topic, 
-            title=title, 
-            body=message, 
-            data=extra_data
+        # 🌟 FREE TIER HACK: Celery ki jagah Threading
+        thread = threading.Thread(
+            target=send_push_to_topic_task,
+            kwargs={
+                'topic': topic, 
+                'title': title, 
+                'body': message, 
+                'data': extra_data
+            }
         )
-
+        thread.start()
 
 class OTPService:
     MAX_ATTEMPTS = 5
