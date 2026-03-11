@@ -1,80 +1,56 @@
 from django.db import models
+from django.contrib.auth import get_user_model
 from django.utils import timezone
-from django.conf import settings
-from django.db.models import JSONField
+
+User = get_user_model()
 
 class PhoneOTP(models.Model):
     phone = models.CharField(max_length=15, db_index=True)
     otp = models.CharField(max_length=6)
-
+    attempts = models.IntegerField(default=0)
     is_verified = models.BooleanField(default=False)
-    attempts = models.PositiveIntegerField(default=0)
-
-    created_at = models.DateTimeField(default=timezone.now)
-
-    class Meta:
-        indexes = [
-            models.Index(fields=["phone", "created_at"]),
-        ]
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def is_expired(self):
-        return (timezone.now() - self.created_at).total_seconds() > 300
-
-
-class Notification(models.Model):
-    TYPE_CHOICES = (
-        ("sms", "SMS"),
-        ("push", "Push"),
-    )
-
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-    )
-
-    type = models.CharField(max_length=10, choices=TYPE_CHOICES)
-    title = models.CharField(max_length=100)
-    message = models.TextField()
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
+        from django.conf import settings
+        expiry = getattr(settings, 'OTP_EXPIRY_SECONDS', 300)
+        return timezone.now() > self.created_at + timezone.timedelta(seconds=expiry)
 
 class OTPAbuseLog(models.Model):
-    """
-    Tracks failed attempts per phone number to prevent brute-force.
-    """
-    phone = models.CharField(max_length=15, db_index=True)
-    failed_attempts = models.PositiveIntegerField(default=0)
+    phone = models.CharField(max_length=15, unique=True)
+    failed_attempts = models.IntegerField(default=0)
     blocked_until = models.DateTimeField(null=True, blank=True)
-    last_attempt = models.DateTimeField(auto_now=True)
 
     def is_blocked(self):
-        return self.blocked_until and self.blocked_until > timezone.now()
-    
+        return self.blocked_until and timezone.now() < self.blocked_until
 
-class ManualPushNotification(models.Model):
-    title = models.CharField(max_length=255, help_text="Example: 🏏 World Cup Mega Offer!")
-    message = models.TextField(help_text="Example: Order your snacks now and enjoy the match.")
-    topic = models.CharField(
-        max_length=100, 
-        default="global", 
-        help_text="FCM Topic name. Default is 'global' (bhejne ke liye sabko). Aap 'promotions' bhi use kar sakte hain."
-    )
-    extra_data = models.JSONField(
-        blank=True, 
-        null=True, 
-        help_text='Optional JSON data for app routing. Example: {"target_url": "/offers"}'
-    )
+class Notification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    type = models.CharField(max_length=20)
+    title = models.CharField(max_length=255)
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    is_sent = models.BooleanField(
-        default=False, 
-        help_text="Admin me save hote hi ye True ho jayega. (Read Only)"
-    )
 
-    class Meta:
-        verbose_name = "Manual Push Notification"
-        verbose_name_plural = "Manual Push Notifications"
-        ordering = ['-created_at']
+
+# --- NAYA MODEL: MANUAL PUSH NOTIFICATION ---
+class ManualPushNotification(models.Model):
+    TARGET_CHOICES = (
+        ('all', 'All Users (with App/Web)'),
+        ('selected', 'Selected Users Only'),
+    )
+    title = models.CharField(max_length=200, help_text="Notification ka title")
+    message = models.TextField(help_text="Notification ka main message")
+    target_audience = models.CharField(max_length=20, choices=TARGET_CHOICES, default='all')
+    
+    selected_users = models.ManyToManyField(
+        User, 
+        blank=True, 
+        help_text="Agar 'Selected Users' chuna hai, toh yahan se users select karein."
+    )
+    
+    sent = models.BooleanField(default=False, help_text="Status check ki push send ho chuka hai ya nahi.")
+    created_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
-        return f"{self.title} - {'(Sent)' if self.is_sent else '(Pending)'}"
+        return self.title
