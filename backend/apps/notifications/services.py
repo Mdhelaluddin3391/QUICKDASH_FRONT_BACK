@@ -1,6 +1,5 @@
 import secrets
 import logging
-import threading
 from datetime import timedelta
 from django.conf import settings
 from django.utils import timezone
@@ -13,7 +12,7 @@ from .tasks import send_otp_sms
 
 logger = logging.getLogger(__name__)
 
-# --- BACKGROUND PUSH FUNCTIONS (Bina Celery) ---
+# --- BACKGROUND PUSH FUNCTIONS (Bina Celery/Timer ke) ---
 def execute_push_to_user(fcm_token, title, body, data=None):
     if not fcm_token:
         return
@@ -53,23 +52,26 @@ class NotificationService:
             send_otp_sms.delay(user.phone, message)
 
     @staticmethod
-    def send_push(user, title, message, extra_data=None, delay_seconds=2):
-        """User ko notification bhejna (Order status ke liye)"""
+    def send_push(user, title, message, extra_data=None):
+        """User ko notification bhejna (Order status ke liye) bina timer/Redis ke"""
         Notification.objects.create(user=user, type="push", title=title, message=message)
         
         user_devices = user.devices.all()
         if user_devices.exists():
             for device in user_devices:
-                threading.Timer(delay_seconds, execute_push_to_user, args=[device.fcm_token, title, message, extra_data]).start()
+                # Direct function call kiya gaya hai Timer hata kar
+                execute_push_to_user(device.fcm_token, title, message, extra_data)
         elif getattr(user, 'fcm_token', None):
-            threading.Timer(delay_seconds, execute_push_to_user, args=[user.fcm_token, title, message, extra_data]).start()
+            # Direct function call kiya gaya hai Timer hata kar
+            execute_push_to_user(user.fcm_token, title, message, extra_data)
         else:
             logger.warning(f"[PUSH] User {user.phone} has no active FCM devices.")
 
     @staticmethod
-    def send_global_push(topic, title, message, extra_data=None, delay_seconds=2):
+    def send_global_push(topic, title, message, extra_data=None):
         """Sabhi users ko notification bhejna (Flash sale, promotions)"""
-        threading.Timer(delay_seconds, execute_push_to_topic, args=[topic, title, message, extra_data]).start()
+        # Direct function call kiya gaya hai Timer hata kar
+        execute_push_to_topic(topic, title, message, extra_data)
 
 
 # --- OTP SERVICES ---
