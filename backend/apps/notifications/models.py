@@ -32,8 +32,7 @@ class Notification(models.Model):
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
-
-# --- NAYA MODEL: MANUAL PUSH NOTIFICATION ---
+# --- MANUAL PUSH NOTIFICATION ---
 class ManualPushNotification(models.Model):
     TARGET_CHOICES = (
         ('all', 'All Users (with App/Web)'),
