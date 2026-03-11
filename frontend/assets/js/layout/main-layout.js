@@ -1,4 +1,18 @@
-// frontend/assets/js/layout/main-layout.js
+const CURRENT_APP_VERSION = "2.8.3";
+
+function isUpdateAvailable(currentVersion, latestVersion) {
+    const current = currentVersion.replace('v', '').split('.').map(Number);
+    const latest = latestVersion.replace('v', '').split('.').map(Number);
+
+    for (let i = 0; i < 3; i++) {
+        let currPart = current[i] || 0;
+        let latestPart = latest[i] || 0;
+
+        if (latestPart > currPart) return true;
+        if (latestPart < currPart) return false;
+    }
+    return false;
+}
 
 (function () {
     "use strict";
@@ -7,29 +21,22 @@
     const EVENTS = window.APP_CONFIG?.EVENTS || {};
 
     function isLoggedIn() {
-        // ✅ FIX 3A: 'auth_token' को हटाकर 'access_token' करें
         const tokenKey = (window.APP_CONFIG?.STORAGE_KEYS?.TOKEN) || 'access_token';
         return !!localStorage.getItem(tokenKey);
     }
 
-    /**
-     * Component Loader: HTML Partials (Nav/Footer)
-     * 🔥 ADDED: HTML Caching to prevent re-fetching and blinking
-     */
     async function loadComponent(placeholderId, filePath) {
         const element = document.getElementById(placeholderId);
         if (!element) return;
 
-        // --- 🔥 HTML CACHE LOGIC START ---
         const cacheKey = `html_cache_${filePath}`;
         const cachedHtml = sessionStorage.getItem(cacheKey);
 
         if (cachedHtml) {
             element.innerHTML = cachedHtml;
             highlightActiveLink(element);
-            return; // Cache mil gaya, aage fetch karne ki zaroorat nahi
+            return;
         }
-        // --- HTML CACHE LOGIC END ---
 
         try {
             let resolvedPath = filePath;
@@ -45,72 +52,53 @@
             if (!response.ok) throw new Error(`Failed to load ${resolvedPath}`);
             const html = await response.text();
             
-            // Save fetched HTML to SessionStorage
             try { sessionStorage.setItem(cacheKey, html); } catch(e) {}
 
             element.innerHTML = html;
-
-            // Load hone ke baad highlight karein
             highlightActiveLink(element);
         } catch (error) {
             console.error(`Error loading component ${filePath}:`, error);
         }
     }
 
-    /**
-     * [UPDATED] Smart Link Highlighting
-     * Ab ye Query Parameters (slug) ko bhi check karega
-     */
     function highlightActiveLink(container) {
         try {
             const currentUrl = new URL(window.location.href);
-            const currentPath = currentUrl.pathname; // e.g. /search_results.html
-            const currentSlug = currentUrl.searchParams.get('slug'); // e.g. fruits
+            const currentPath = currentUrl.pathname;
+            const currentSlug = currentUrl.searchParams.get('slug');
 
-            // Select generic nav items and icon links
             const links = container.querySelectorAll('a.nav-item, a.icon-link, .nav-links a');
             
             links.forEach(link => {
-                link.classList.remove('active'); // Reset purana active
+                link.classList.remove('active');
                 
-                // Cleanup inline icon color if previously added
                 const icon = link.querySelector('i');
                 if (icon) icon.style.removeProperty('color');
 
                 const href = link.getAttribute('href');
                 if (!href) return;
 
-                // Resolve link URL absolute path to compare safely
                 const linkUrl = new URL(href, window.location.href);
                 const linkPath = linkUrl.pathname;
                 const linkSlug = linkUrl.searchParams.get('slug');
 
                 let isActive = false;
 
-                // CASE 1: Category Pages (Jahan slug matter karta hai)
                 if (currentPath.includes('search_results.html') && linkPath.includes('search_results.html')) {
-                    // Sirf tab active karein jab slug match kare
                     if (currentSlug && linkSlug && currentSlug === linkSlug) {
                         isActive = true;
                     }
-                }
-                // CASE 2: Normal Pages (Home, Orders, Profile)
-                else {
-                    // Simple Path Match
+                } else {
                     if (linkPath === currentPath) {
                         isActive = true;
-                    }
-                    // Root / vs index.html handle
-                    else if ((currentPath === '/' && linkPath.endsWith('index.html')) || 
+                    } else if ((currentPath === '/' && linkPath.endsWith('index.html')) || 
                              (linkPath === '/' && currentPath.endsWith('index.html'))) {
                         isActive = true;
                     }
                 }
 
-                // Apply Active Class
                 if (isActive) {
                     link.classList.add('active');
-                    // Agar icon hai toh color set karein (CSS fallback)
                     if (icon && link.classList.contains('icon-link')) {
                         icon.style.color = 'var(--primary)';
                     }
@@ -119,9 +107,7 @@
         } catch(e) { console.error("Highlight error", e); }
     }
 
-    // ---------------------------------------------------------
-    // Location Rendering Logic (L1 vs L2)
-    // ---------------------------------------------------------
+    // 📍 YAHAN SVG ICON KA LOGIC UPDATE KIYA GAYA HAI 📍
     function renderNavbarLocation() {
         const el = document.getElementById("header-location");
         const box = document.getElementById("navbar-location-box");
@@ -130,10 +116,8 @@
         if (!window.LocationManager) return;
         const display = window.LocationManager.getDisplayLocation();
 
-        // Reset Classes
         box.classList.remove("active-delivery", "active-service");
 
-        // Render Text
         el.innerHTML = `
             <div class="d-flex flex-column" style="line-height:1.2; text-align:left;">
                 <span style="font-weight:600; font-size:0.95rem;">${display.label}</span>
@@ -141,7 +125,7 @@
             </div>
         `;
 
-        // 👉 YAHAN UPDATE KIYA GAYA HAI: SVG icon select aur set karne ka code
+        // Select the Modern Bouncing SVG Icon
         const icon = box.querySelector('.modern-location-icon');
 
         if (display.type === 'DELIVERY') {
@@ -154,6 +138,7 @@
             if (icon) icon.setAttribute('class', 'modern-location-icon text-muted');
         }
     }
+    // 📍 END UPDATE 📍
 
     function bindNavbarLocationClick() {
         if (document.body.dataset.navLocBound === "1") return;
@@ -295,7 +280,6 @@
         renderNavbarLocation();
         bindNavbarLocationClick();
 
-        // ✅ FIX 3B: डुप्लीकेट Cart API कॉल को हटा दिया गया है
         const tokenKey = (window.APP_CONFIG?.STORAGE_KEYS?.TOKEN) || 'access_token';
         if (!localStorage.getItem(tokenKey)) {
             document.querySelectorAll('.cart-count').forEach(el => el.style.display = 'none');
@@ -430,7 +414,6 @@
             localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.TOKEN);
             localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.REFRESH);
             
-            // --- 🔥 Cache clearing applied here already by you ---
             if (window.ApiService) { window.ApiService.clearCache(); } else { sessionStorage.clear(); }
 
             localStorage.removeItem(APP_CONFIG.STORAGE_KEYS.USER);
@@ -448,9 +431,9 @@
     };
 })();
 
-// frontend/assets/js/layout/main-layout.js ke end me update karein
 document.addEventListener('DOMContentLoaded', async () => {
     await checkStoreStatus();
+    await checkForAppUpdates(); 
 });
 
 async function checkStoreStatus() {
@@ -509,60 +492,331 @@ function showStoreOfflineUI(message) {
     document.body.appendChild(overlay);
 }
 
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.PullToRefresh) {
+        PullToRefresh.init({
+            mainElement: 'body',
+            
+            // Yahan hum condition laga rahe hain ki refresh kab allow karna hai
+            shouldPullToRefresh: function() {
+                // Un sabhi popups ya modals ki class/id check karein jo open ho sakte hain
+                const activePopups = document.querySelectorAll('.address-switcher-modal, #loc-picker-modal.active, .store-offline-overlay, .update-app-overlay, .modal.active');
+                
+                // Agar inmein se koi bhi popup exist karta hai (ya open hai), toh refresh rok do
+                if (activePopups.length > 0) {
+                    return false;
+                }
+                
+                // Agar user page ke bilkul top par hai, tabhi refresh allow karo
+                return window.scrollY === 0;
+            },
+
+            onRefresh: function() {
+                return new Promise((resolve) => {
+                    window.location.reload(); 
+                    resolve();
+                });
+            },
+            instructionsPullToRefresh: 'Pull down to refresh',
+            instructionsReleaseToRefresh: 'Release to refresh',
+            instructionsRefreshing: 'Refreshing...',
+        });
+    }
+});
+
+async function checkForAppUpdates() {
+    try {
+        const versionUrl = "https://raw.githubusercontent.com/Mdhelaluddin3391/APK/main/version.json?t=" + Date.now();
+        
+        const response = await fetch(versionUrl);
+        
+        if (response.ok) {
+            const data = await response.json();
+            
+            if (isUpdateAvailable(CURRENT_APP_VERSION, data.versionName)) {
+                showUpdatePopupUI(data);
+            }
+        }
+    } catch (error) {
+        console.error("Error checking for updates:", error);
+    }
+}
+
+function showUpdatePopupUI(updateData) {
+    if (document.querySelector('.update-app-overlay')) return;
+
+    document.body.classList.add('update-mode');
+    document.body.style.overflow = 'hidden'; 
+    
+    const overlay = document.createElement('div');
+    overlay.className = 'update-app-overlay';
+    overlay.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; display:flex; justify-content:center; align-items:center; padding:20px;';
+    
+    const modal = document.createElement('div');
+    modal.className = 'update-app-modal';
+    modal.style.cssText = 'background:#fff; width:100%; max-width:400px; padding:20px; border-radius:12px; text-align:center; box-shadow:0 4px 15px rgba(0,0,0,0.2);';
+    
+    const notesHtml = updateData.releaseNotes ? updateData.releaseNotes.replace(/\n/g, '<br>') : 'Performance improvements and bug fixes.';
+
+    modal.innerHTML = `
+        <h2 style="margin-top:0; color:#333;">New Update Available!</h2>
+        <p style="color:#666; font-size:14px; margin-bottom:10px;">Version ${updateData.versionName} is now available.</p>
+        <div style="background:#f8f9fa; padding:10px; border-radius:8px; text-align:left; font-size:13px; margin-bottom:20px; color:#555; max-height:150px; overflow-y:auto;">
+            <strong>What's New:</strong><br>
+            ${notesHtml}
+        </div>
+        
+        <div id="update-progress-container" style="display:none; margin-bottom: 15px; text-align: left;">
+            <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:5px; color:#555; font-weight: bold;">
+                <span id="update-progress-text">Downloading... 0%</span>
+                <span id="update-progress-bytes">0 MB / 0 MB</span>
+            </div>
+            <div style="width:100%; background:#e0e0e0; border-radius:6px; height:8px; overflow:hidden;">
+                <div id="update-progress-bar" style="width:0%; background:var(--primary, #007bff); height:100%; transition:width 0.2s ease;"></div>
+            </div>
+        </div>
+
+        <button id="download-update-btn" style="background:var(--primary, #007bff); color:#fff; border:none; padding:12px 20px; width:100%; border-radius:8px; font-size:16px; font-weight:bold; cursor:pointer;">
+            Update Now
+        </button>
+    `;
+    
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+
+    const downloadBtn = document.getElementById('download-update-btn');
+    const progressContainer = document.getElementById('update-progress-container');
+    const progressBar = document.getElementById('update-progress-bar');
+    const progressText = document.getElementById('update-progress-text');
+    const progressBytes = document.getElementById('update-progress-bytes');
+    
+    downloadBtn.addEventListener('click', async () => {
+        downloadBtn.innerText = "Downloading... Please wait";
+        downloadBtn.disabled = true; 
+        downloadBtn.style.opacity = '0.7';
+        downloadBtn.style.display = 'none'; 
+        progressContainer.style.display = 'block'; 
+
+        let progressListener;
+
+        try {
+            const fileName = 'quickdash-update.apk';
+            
+            progressListener = await Capacitor.Plugins.Filesystem.addListener('progress', (progress) => {
+                if (progress.url === updateData.apkUrl) {
+                    const percent = Math.round((progress.bytes / progress.contentLength) * 100);
+                    progressBar.style.width = percent + '%';
+                    progressText.innerText = `Downloading... ${percent}%`;
+                    
+                    const downloadedMB = (progress.bytes / (1024 * 1024)).toFixed(2);
+                    const totalMB = (progress.contentLength / (1024 * 1024)).toFixed(2);
+                    progressBytes.innerText = `${downloadedMB} MB / ${totalMB} MB`;
+                }
+            });
+
+            const downloadResult = await Capacitor.Plugins.Filesystem.downloadFile({
+                url: updateData.apkUrl,
+                path: fileName,
+                directory: 'CACHE',
+                progress: true 
+            });
+
+            if (progressListener) {
+                progressListener.remove();
+            }
+
+            progressText.innerText = "Download Complete!";
+            progressBar.style.width = '100%';
+            downloadBtn.style.display = 'block';
+            downloadBtn.innerText = "Installing...";
+
+            const apkPath = downloadResult.path || downloadResult.uri; 
+
+            cordova.plugins.fileOpener2.open(
+                apkPath, 
+                'application/vnd.android.package-archive', 
+                {
+                    error: function(e) { 
+                        console.error('Error opening APK:', e); 
+                        downloadBtn.innerText = "Install Failed. Try Again"; 
+                        downloadBtn.disabled = false;
+                        downloadBtn.style.opacity = '1';
+                    },
+                    success: function() { 
+                        console.log('Install prompt opened successfully'); 
+                        downloadBtn.innerText = "Installing..."; 
+                    }
+                }
+            );
+            
+        } catch (err) {
+            console.error("Download Error:", err);
+            if (progressListener) progressListener.remove();
+            progressContainer.style.display = 'none';
+            downloadBtn.style.display = 'block';
+            downloadBtn.innerText = "Download Failed. Try Again";
+            downloadBtn.disabled = false;
+            downloadBtn.style.opacity = '1';
+        }
+    });
+}
+
+// ======================================================================
+// 🔔 PUSH NOTIFICATION LOGIC (Added with null checks)
+// ======================================================================
 
 document.addEventListener("DOMContentLoaded", () => {
     const modal = document.getElementById('custom-notification-modal');
     const btnAccept = document.getElementById('btn-accept-notify');
     const btnReject = document.getElementById('btn-reject-notify');
 
-    // Function to check and show modal
-    function checkNotificationPermission() {
-        // Agar browser Notifications support nahi karta
-        if (!("Notification" in window)) {
-            console.log("This browser does not support desktop notification");
-            return;
-        }
+    const isNativeApp = window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() !== 'web';
 
-        // Agar user ne abhi tak yes ya no nahi bola hai ('default')
-        // Aur humne session mein save nahi kiya ki usne "Not Now" daba diya tha
-        if (Notification.permission === "default" && !sessionStorage.getItem('notificationModalDismissed')) {
-            // Thodi der baad dikhayein (e.g., 3 seconds after page load) so user is not instantly bombarded
-            setTimeout(() => {
-                modal.classList.remove('hidden');
-            }, 3000); 
+    window.subscribeToPushNotifications = async function () {
+        const tokenKey = window.APP_CONFIG?.STORAGE_KEYS?.TOKEN || 'access_token';
+        const accessToken = localStorage.getItem(tokenKey);
+        const apiBase = window.APP_CONFIG?.API_BASE_URL || "https://quickdash-front-back.onrender.com/api/v1";
+
+        if (isNativeApp) {
+            try {
+                const { PushNotifications } = Capacitor.Plugins;
+
+                let permStatus = await PushNotifications.checkPermissions();
+                if (permStatus.receive === 'prompt') {
+                    permStatus = await PushNotifications.requestPermissions();
+                }
+
+                if (permStatus.receive !== 'granted') {
+                    console.log('User denied native push permission');
+                    return;
+                }
+
+                await PushNotifications.register();
+
+                PushNotifications.addListener('registration', async (token) => {
+                    console.log('Native FCM Token: ', token.value);
+                    await sendTokenToServer(token.value, apiBase, accessToken);
+                });
+
+                PushNotifications.addListener('pushNotificationReceived', (notification) => {
+                    console.log('Native Push received: ', notification);
+                    if (window.Toast && typeof window.Toast.show === 'function') {
+                        window.Toast.show(`${notification.title}: ${notification.body}`, 'info');
+                    }
+                });
+
+            } catch (error) {
+                console.error("Native push error:", error);
+            }
+        } else {
+            if (!window.firebase || !firebase.messaging || !firebase.messaging.isSupported()) {
+                console.warn("Firebase Messaging is not supported or not initialized.");
+                return;
+            }
+
+            const messaging = firebase.messaging();
+            try {
+                const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+                const readyRegistration = await navigator.serviceWorker.ready;
+
+                const currentToken = await messaging.getToken({
+                    vapidKey: 'BALkEcuyf1AEXy2XiZs3_ZAmQNfzaBkyKN2Gze6OzG51SMtfZPJAS3SXPnWOvqY5Y4VQNfxtr8IP_chBJKZZBPI',
+                    serviceWorkerRegistration: readyRegistration
+                });
+
+                if (currentToken) {
+                    console.log("Web FCM Token generated:", currentToken);
+                    await sendTokenToServer(currentToken, apiBase, accessToken);
+                } else {
+                    console.log("No registration token available. Request permission to generate one.");
+                }
+
+                if (!window._fcmMessageListenerAdded) {
+                    messaging.onMessage((payload) => {
+                        console.log('[Foreground] Message received. ', payload);
+                        const title = payload.notification?.title || "New Alert!";
+                        const body = payload.notification?.body || "You have a new notification.";
+
+                        if (window.Toast && typeof window.Toast.show === 'function') {
+                            window.Toast.show(`${title}: ${body}`, 'info');
+                        }
+                    });
+                    window._fcmMessageListenerAdded = true;
+                }
+            } catch (error) {
+                console.error("Web Push Error:", error);
+            }
+        }
+    };
+
+    async function sendTokenToServer(token, apiBase, accessToken) {
+        if (!accessToken) return; 
+        try {
+            const response = await fetch(`${apiBase}/notifications/fcm/subscribe/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${accessToken}`
+                },
+                body: JSON.stringify({ token: token })
+            });
+
+            if (response.ok) {
+                console.log("Django Server Response: Token saved successfully.");
+            } else {
+                console.error("Failed to save token to server.", await response.text());
+            }
+        } catch (err) {
+            console.error("API Call error:", err);
         }
     }
 
-    // Reject button logic
-    btnReject.addEventListener('click', () => {
-        modal.classList.add('hidden');
-        // Session storage mein save kar lo taki is session mein wapas disturb na kare
-        sessionStorage.setItem('notificationModalDismissed', 'true');
-    });
+    if (modal) {
+        async function checkNotificationPermission() {
+            if (sessionStorage.getItem('notificationModalDismissed')) return;
 
-    // Accept button logic
-    btnAccept.addEventListener('click', async () => {
-        modal.classList.add('hidden');
-        
-        try {
-            // Asli browser popup ab yahan trigger hoga (kyunki user ne button click kiya hai)
-            const permission = await Notification.requestPermission();
-            
-            if (permission === "granted") {
-                console.log("Notification permission granted.");
-                // Yahan aap apna Firebase token generate karne ka code call kar sakte ho
-                // firebase.messaging().getToken().then(...)
-                
-                // Optional: Show a success toast
-                // showToast("Notifications enabled successfully!", "success");
-            } else {
-                console.log("Notification permission denied by user in default popup.");
+            if (isNativeApp) {
+                try {
+                    const { PushNotifications } = Capacitor.Plugins;
+                    const permStatus = await PushNotifications.checkPermissions();
+                    if (permStatus.receive !== 'granted') {
+                        setTimeout(() => modal.classList.remove('hidden'), 3000);
+                    }
+                } catch (error) {
+                    setTimeout(() => modal.classList.remove('hidden'), 3000);
+                }
+            } else if ("Notification" in window && Notification.permission === "default") {
+                setTimeout(() => modal.classList.remove('hidden'), 3000);
             }
-        } catch (error) {
-            console.error("Error asking for notification permission:", error);
         }
-    });
 
-    // Init process
-    checkNotificationPermission();
+        if (btnReject) {
+            btnReject.addEventListener('click', () => {
+                modal.classList.add('hidden');
+                sessionStorage.setItem('notificationModalDismissed', 'true');
+            });
+        }
+
+        if (btnAccept) {
+            btnAccept.addEventListener('click', async () => {
+                modal.classList.add('hidden');
+                sessionStorage.setItem('notificationModalDismissed', 'true');
+
+                if (!isNativeApp) {
+                    const permission = await Notification.requestPermission();
+                    if (permission !== "granted") {
+                        console.log("Permission denied by user.");
+                        return;
+                    }
+                }
+                await window.subscribeToPushNotifications();
+            });
+        }
+
+        checkNotificationPermission();
+    }
+
+    if (!isNativeApp && "Notification" in window && Notification.permission === "granted") {
+        window.subscribeToPushNotifications();
+    }
 });
