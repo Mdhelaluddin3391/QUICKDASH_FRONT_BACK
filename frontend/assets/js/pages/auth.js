@@ -63,28 +63,7 @@ async function handleSendOtp(e) {
     phoneNumber = `+91${rawInput}`;
 
     try {
-        // ==========================================
-        // 🔥 OLD PLAN A: Firebase SMS Attempt (COMMENTED OUT FOR SAFETY)
-        // ==========================================
-        /*
-        if (!window.recaptchaVerifier) {
-            window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('get-otp-btn', {
-                'size': 'invisible',
-                'callback': (response) => {
-                    console.log("reCAPTCHA verified");
-                }
-            });
-        }
-        console.log("Attempting Firebase SMS...");
-        window.confirmationResult = await window.firebaseAuth.signInWithPhoneNumber(phoneNumber, window.recaptchaVerifier);
-        isUsingFirebase = true; 
-        showOtpScreen(phoneNumber);
-        Toast.success("OTP Sent successfully via SMS");
-        */
-
-        // ==========================================
-        // 🛠️ NEW PLAN: Tumhara Local Backend / Twilio API
-        // ==========================================
+        
         isUsingFirebase = false; // Always force local validation now
         
         const res = await ApiService.post('/notifications/send-otp/', { phone: phoneNumber });
@@ -148,22 +127,7 @@ async function handleVerifyAndLogin(e) {
     try {
         let requestPayload = {};
 
-        // ==========================================
-        // 🔥 OLD FIREBASE VERIFY LOGIC (COMMENTED OUT FOR SAFETY)
-        // ==========================================
-        /*
-        if (isUsingFirebase) {
-            const result = await window.confirmationResult.confirm(otp);
-            const idToken = await result.user.getIdToken();
-            requestPayload = { login_type: 'firebase', token: idToken }; 
-        } else {
-            requestPayload = { login_type: 'local', phone: phoneNumber, otp: otp }; 
-        }
-        */
-
-        // ==========================================
-        // 🛠️ NEW LOCAL VERIFY LOGIC
-        // ==========================================
+        
         requestPayload = { login_type: 'local', phone: phoneNumber, otp: otp }; 
 
         // Call Tumhari Existing Backend API (Render)
@@ -199,13 +163,7 @@ async function handleVerifyAndLogin(e) {
         
         Toast.error(errorMsg); 
         
-        // Old Firebase reset logic kept safely commented
-        /*
-        if (isUsingFirebase && window.recaptchaVerifier) {
-            window.recaptchaVerifier.clear();
-            window.recaptchaVerifier = null;
-        }
-        */
+       
     } finally {
         btn.disabled = false;
         btn.innerText = originalText;
