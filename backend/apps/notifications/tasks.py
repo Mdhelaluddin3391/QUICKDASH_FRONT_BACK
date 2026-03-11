@@ -52,20 +52,24 @@ def send_otp_sms(self, phone, content):
         logger.error(f"Unexpected error in SMS sending: {e}")
         raise self.retry(exc=e)
 
-
 @shared_task
 def send_push_to_topic_task(topic, title, body, data=None):
     """
     Background task to send Firebase Push Notification to a topic.
     """
     try:
+        # 🔥 CHANGE: Data ko string mein convert karne ka logic
+        stringified_data = {}
+        if data:
+            stringified_data = {str(k): str(v) for k, v in data.items()}
+
         message = messaging.Message(
             notification=messaging.Notification(
                 title=title,
                 body=body,
             ),
             topic=topic,
-            data=data or {}
+            data=stringified_data # 🔥 CHANGE: Yahan stringified_data pass kiya hai
         )
         response = messaging.send(message)
         logger.info(f"[FCM] Successfully sent message to topic '{topic}': {response}")
@@ -83,13 +87,18 @@ def send_push_to_user_task(fcm_token, title, body, data=None):
         return "No FCM token provided"
         
     try:
+        # 🔥 CHANGE: Data ko string mein convert karne ka logic
+        stringified_data = {}
+        if data:
+            stringified_data = {str(k): str(v) for k, v in data.items()}
+
         message = messaging.Message(
             notification=messaging.Notification(
                 title=title,
                 body=body,
             ),
             token=fcm_token,
-            data=data or {}
+            data=stringified_data # 🔥 CHANGE: Yahan stringified_data pass kiya hai
         )
         response = messaging.send(message)
         logger.info(f"[FCM] Successfully sent message to token '{fcm_token}': {response}")
