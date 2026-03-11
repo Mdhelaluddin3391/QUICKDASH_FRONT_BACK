@@ -27,6 +27,19 @@ class User(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.phone
 
+# --- NAYA MODEL ADD KIYA GAYA HAI ---
+class UserDevice(models.Model):
+    """
+    Stores multiple FCM tokens for a user (e.g., Web, Android, iOS).
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="devices")
+    fcm_token = models.CharField(max_length=255, unique=True)
+    device_type = models.CharField(max_length=50, blank=True, null=True, default="unknown")
+    created_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"{self.user.phone} - {self.device_type}"
+# ------------------------------------
 
 class UserRole(models.Model):
     """

@@ -20,10 +20,9 @@ import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import auth as firebase_auth
 import json
+
 if not firebase_admin._apps:
-    
     firebase_creds_env = os.getenv('FIREBASE_JSON_CREDENTIALS')
-    
     if firebase_creds_env:
         cred_dict = json.loads(firebase_creds_env)
         cred = credentials.Certificate(cred_dict)
@@ -40,6 +39,7 @@ from .serializers import (
 )
 from .services import AccountService
 from apps.notifications.services import OTPService 
+from .models import UserDevice  # <-- NAYA IMPORT YAHAN HAI
 
 User = get_user_model()
 
@@ -64,7 +64,7 @@ class CustomerRegisterAPIView(APIView):
     def post(self, request):
         phone = request.data.get("phone")
         otp = request.data.get("otp")
-        fcm_token = request.data.get("fcm_token") # Push notifications ke liye fcm token chalega
+        fcm_token = request.data.get("fcm_token") 
 
         if not phone or not otp:
             return Response({"error": "Phone and OTP required"}, status=status.HTTP_400_BAD_REQUEST)
@@ -80,8 +80,16 @@ class CustomerRegisterAPIView(APIView):
 
         # Push notification token update karo agar aaya hai
         if fcm_token:
+            # Purana model update (fallback ke liye rakh diya hai)
             user.fcm_token = fcm_token
             user.save(update_fields=['fcm_token'])
+
+            # Naya model update (multiple devices ke liye)
+            UserDevice.objects.get_or_create(
+                user=user, 
+                fcm_token=fcm_token,
+                defaults={'device_type': 'app_or_web'} 
+            )
 
         refresh = RefreshToken.for_user(user)
         

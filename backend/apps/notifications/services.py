@@ -6,12 +6,9 @@ from django.conf import settings
 from django.utils import timezone
 from django.db import transaction
 from django.core.cache import cache
-from django.conf import settings  
 from apps.utils.exceptions import BusinessLogicException
 from .models import OTPAbuseLog, PhoneOTP, Notification
-from .tasks import send_otp_sms
-from .tasks import send_otp_sms, send_push_to_topic_task, send_push_to_user_task # imports update karein
-
+from .tasks import send_otp_sms, send_push_to_topic_task, send_push_to_user_task
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +25,6 @@ class NotificationService:
             message=message,
         )
         
-        
         if transaction.get_connection().in_atomic_block:
             transaction.on_commit(lambda: send_otp_sms.delay(user.phone, message))
         else:
@@ -37,7 +33,7 @@ class NotificationService:
     @staticmethod
     def send_push(user, title, message, extra_data=None):
         """
-        Persist notification and log Push. Phir background mein FCM send karega (bina Celery).
+        Persist notification and log Push. Sabhi devices par push bhejega.
         """
         Notification.objects.create(
             user=user,
@@ -46,29 +42,41 @@ class NotificationService:
             message=message,
         )
         
-        fcm_token = getattr(user, 'fcm_token', None) 
+        # NAYA LOGIC: User ke sabhi devices get karein
+        user_devices = user.devices.all()
         
-        if fcm_token:
-            # 🌟 FREE TIER HACK: Celery .delay() ki jagah Python Threading use karein
+        if user_devices.exists():
+            for device in user_devices:
+                thread = threading.Thread(
+                    target=send_push_to_user_task, 
+                    kwargs={
+                        'fcm_token': device.fcm_token,
+                        'title': title,
+                        'body': message,
+                        'data': extra_data
+                    }
+                )
+                thread.start()
+        # Fallback agar user_device me na ho, par user.fcm_token me ho
+        elif getattr(user, 'fcm_token', None):
             thread = threading.Thread(
                 target=send_push_to_user_task, 
                 kwargs={
-                    'fcm_token': fcm_token,
+                    'fcm_token': user.fcm_token,
                     'title': title,
                     'body': message,
                     'data': extra_data
                 }
             )
-            thread.start() # Ye background mein notification bhej dega
+            thread.start()
         else:
-            logger.warning(f"[PUSH] User {user.phone} has no FCM token. Notification saved to DB only.")
+            logger.warning(f"[PUSH] User {user.phone} has no active FCM devices. Notification saved to DB only.")
 
     @staticmethod
     def send_global_push(topic, title, message, extra_data=None):
         """
         Ye function sabhi users ko notification bhejega (bina Celery).
         """
-        # 🌟 FREE TIER HACK: Celery ki jagah Threading
         thread = threading.Thread(
             target=send_push_to_topic_task,
             kwargs={
@@ -207,8 +215,3 @@ class OTPAbuseService:
     @staticmethod
     def reset(phone):
         OTPAbuseLog.objects.filter(phone=phone).delete()
-
-
-
-
-    
