@@ -72,12 +72,9 @@ class NotificationService:
                 fcm_msg = messaging.MulticastMessage(
                     tokens=tokens,
                     data=stringified_data,
-                    # Sirf Android devices ko 'notification' block dikhega (System tray ke liye)
                     android=android_config,
-                    # Webpush config ko batao ki wo notification ko ignore kare ya sirf data padhe
                     webpush=messaging.WebpushConfig(
                         headers={"Urgency": "high"}
-                        # Web ke liye humne explicit notification block nahi diya, toh wo sirf data receive karega
                     )
                 )
                 
