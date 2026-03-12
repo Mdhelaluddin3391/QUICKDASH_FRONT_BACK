@@ -73,7 +73,6 @@ class NotificationService:
         execute_push_to_topic(topic, title, message, extra_data)
 
 
-# --- OTP SERVICES (No Changes) ---
 class OTPService:
     MAX_ATTEMPTS = 5
     RESEND_COOLDOWN_SECONDS = getattr(settings, "OTP_RESEND_COOLDOWN", 60)
