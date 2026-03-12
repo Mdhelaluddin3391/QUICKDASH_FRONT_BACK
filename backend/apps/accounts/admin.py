@@ -4,7 +4,7 @@ from django.contrib.auth.admin import UserAdmin
 from django.utils.html import format_html
 from django.utils.timezone import localtime
 from django.utils.translation import gettext_lazy as _
-
+from .models import User, UserRole, Address, UserDevice
 # Import Export Magic for Master Admin
 from import_export import resources, fields, widgets
 from import_export.admin import ImportExportModelAdmin
@@ -206,3 +206,36 @@ class AddressAdmin(ImportExportModelAdmin):
     @admin.action(description='❌ Remove Default Status')
     def unmark_as_default(self, request, queryset):
         queryset.update(is_default=False)
+
+# ==========================================
+# 3. USER DEVICE (FCM TOKENS) ADMIN
+# ==========================================
+
+@admin.register(UserDevice)
+class UserDeviceAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user_phone', 'device_type', 'fcm_token_preview', 'created_at_date')
+    list_filter = ('device_type', 'created_at')
+    search_fields = ('user__phone', 'fcm_token', 'device_type')
+    raw_id_fields = ('user',)
+    list_select_related = ('user',)
+    readonly_fields = ('created_at',)
+    list_per_page = 50
+
+    def user_phone(self, obj):
+        return obj.user.phone
+    user_phone.short_description = "User Phone"
+    user_phone.admin_order_field = "user__phone"
+
+    def fcm_token_preview(self, obj):
+        # Token bohot lamba hota hai, isliye sirf shuruwat ka hissa dikhayenge
+        if obj.fcm_token and len(obj.fcm_token) > 30:
+            return f"{obj.fcm_token[:30]}..."
+        return obj.fcm_token
+    fcm_token_preview.short_description = "FCM Token"
+
+    def created_at_date(self, obj):
+        if obj.created_at:
+            return localtime(obj.created_at).strftime('%d %b %Y, %H:%M')
+        return "N/A"
+    created_at_date.short_description = "Registered On"
+    created_at_date.admin_order_field = "created_at"
