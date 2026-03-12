@@ -17,23 +17,32 @@ firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
 // Background message handler
-// Background message handler
 messaging.onBackgroundMessage(function(payload) {
-    console.log('[firebase-messaging-sw.js] Received background message ', payload);
+    console.log('[firebase-messaging-sw.js] Received full payload: ', JSON.stringify(payload));
     
-    // Safety check: Agar galti se backend notification bhej de, toh manual code rok do
+    // Safety check
     if (payload.notification) {
-        console.log('Notification block detected, letting browser handle it to avoid duplicates.');
+        console.log('Notification block detected, letting browser handle it.');
         return;
     }
 
-    // Ab payload.data se title aur body nikalenge
-    const notificationTitle = payload.data?.title || "QuickDash Alert!";
+    // 🔴 BUG FIX YAHAN HAI: 
+    // Kabhi kabhi 'data' sidha payload mein hota hai, aur kabhi payload.data mein.
+    // Hum dono check karenge.
+    const messageData = payload.data || payload; 
+
+    // Ab title aur body nikalenge (Pehle object mein check, nahi toh default)
+    const notificationTitle = messageData.title || "QuickDash Alert!";
+    const notificationBody = messageData.body || messageData.message || "New order update!";
+
+    console.log('[firebase-messaging-sw.js] Showing notification -> Title:', notificationTitle, 'Body:', notificationBody);
+
     const notificationOptions = {
-        body: payload.data?.body || "New order update!",
+        body: notificationBody,
         icon: '/assets/images/logo.png', // Aapka QuickDash logo
-        data: payload.data
+        data: messageData // Pura data save kar lo taaki click par kaam aaye
     };
 
     self.registration.showNotification(notificationTitle, notificationOptions);
 });
+
