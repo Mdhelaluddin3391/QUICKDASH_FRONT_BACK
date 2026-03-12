@@ -13,21 +13,6 @@ from .tasks import send_otp_sms
 logger = logging.getLogger(__name__)
 
 # --- BACKGROUND PUSH FUNCTIONS (Bina Celery/Timer ke) ---
-def execute_push_to_user(fcm_token, title, body, data=None):
-    if not fcm_token:
-        return
-    try:
-        stringified_data = {str(k): str(v) for k, v in data.items()} if data else {}
-        message = messaging.Message(
-            notification=messaging.Notification(title=title, body=body),
-            token=fcm_token,
-            data=stringified_data
-        )
-        response = messaging.send(message)
-        logger.info(f"[FCM] Successfully sent to user: {response}")
-    except Exception as e:
-        logger.error(f"[FCM] Error sending to user: {e}")
-
 def execute_push_to_topic(topic, title, body, data=None):
     try:
         stringified_data = {str(k): str(v) for k, v in data.items()} if data else {}
@@ -45,6 +30,7 @@ def execute_push_to_topic(topic, title, body, data=None):
 class NotificationService:
     @staticmethod
     def send_sms(user, message):
+        # Ise BILKUL touch nahi kiya gaya hai, waisa hi hai
         Notification.objects.create(user=user, type="sms", title="SMS", message=message)
         if transaction.get_connection().in_atomic_block:
             transaction.on_commit(lambda: send_otp_sms.delay(user.phone, message))
@@ -53,28 +39,41 @@ class NotificationService:
 
     @staticmethod
     def send_push(user, title, message, extra_data=None):
-        """User ko notification bhejna (Order status ke liye) bina timer/Redis ke"""
+        """User ko notification bhejna - Multi-device support ke sath (Bina Timer/Celery)"""
         Notification.objects.create(user=user, type="push", title=title, message=message)
         
+        stringified_data = {str(k): str(v) for k, v in extra_data.items()} if extra_data else {}
+        
+        # Multi-device tokens collect karna
+        tokens = []
         user_devices = user.devices.all()
         if user_devices.exists():
-            for device in user_devices:
-                # Direct function call kiya gaya hai Timer hata kar
-                execute_push_to_user(device.fcm_token, title, message, extra_data)
+            tokens = [device.fcm_token for device in user_devices if device.fcm_token]
         elif getattr(user, 'fcm_token', None):
-            # Direct function call kiya gaya hai Timer hata kar
-            execute_push_to_user(user.fcm_token, title, message, extra_data)
+            tokens = [user.fcm_token]
+
+        # Agar token mila, toh sabko ek hi baari me bhej do (Multicast)
+        if tokens:
+            try:
+                fcm_msg = messaging.MulticastMessage(
+                    notification=messaging.Notification(title=title, body=message),
+                    tokens=tokens,
+                    data=stringified_data
+                )
+                response = messaging.send_each_for_multicast(fcm_msg)
+                logger.info(f"[FCM] Multicast sent. Success: {response.success_count}, Failure: {response.failure_count}")
+            except Exception as e:
+                logger.error(f"[FCM] Error sending push to user {user.phone}: {e}")
         else:
             logger.warning(f"[PUSH] User {user.phone} has no active FCM devices.")
 
     @staticmethod
     def send_global_push(topic, title, message, extra_data=None):
         """Sabhi users ko notification bhejna (Flash sale, promotions)"""
-        # Direct function call kiya gaya hai Timer hata kar
         execute_push_to_topic(topic, title, message, extra_data)
 
 
-# --- OTP SERVICES ---
+# --- OTP SERVICES (Yaha koi changes nahi kiye gaye hain) ---
 class OTPService:
     MAX_ATTEMPTS = 5
     RESEND_COOLDOWN_SECONDS = getattr(settings, "OTP_RESEND_COOLDOWN", 60)
