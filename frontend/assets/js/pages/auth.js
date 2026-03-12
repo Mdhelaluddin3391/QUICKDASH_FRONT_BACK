@@ -150,20 +150,27 @@ async function handleVerifyAndLogin(e) {
         }
 
     } catch (err) {
-        console.error("Verification Error Object:", err);
+        console.error("Local Error Object:", err);
         
-        let errorMsg = "Verification Failed! Wrong OTP.";
-        if (err.detail) {
-            errorMsg = err.detail; 
-        } else if (err.error) {
-            errorMsg = err.error;
-        } else if (err.message) {
-            errorMsg = typeof err.message === 'string' ? err.message : (err.message.detail || JSON.stringify(err.message));
+        let errorMsg = "Kuch galat ho gaya, kripya dobara koshish karein.";
+        
+        // 1. Agar ApiService ne data object bheja hai (DRF Throttle Response handle karne ke liye)
+        if (err.data && err.data.detail) {
+            errorMsg = err.data.detail;
+        } 
+        // 2. Agar message JSON string ban gaya hai toh usko parse karke message nikalenge
+        else if (err.message) {
+            try {
+                let parsedError = JSON.parse(err.message);
+                // Agar parsed JSON ke andar 'detail' ya 'error' field hai
+                errorMsg = parsedError.detail || parsedError.error || err.message;
+            } catch (e) {
+                // Agar JSON parse nahi hua, matlab normal string hai
+                errorMsg = err.message;
+            }
         }
         
-        Toast.error(errorMsg); 
-        
-       
+        Toast.error(errorMsg);
     } finally {
         btn.disabled = false;
         btn.innerText = originalText;
