@@ -2,11 +2,16 @@ import requests
 from celery import shared_task
 from celery.utils.log import get_task_logger
 from django.conf import settings
+from celery import shared_task
+from firebase_admin import messaging
+from celery.utils.log import get_task_logger
+from django.contrib.auth import get_user_model
 
 from celery import shared_task
 from firebase_admin import messaging
 import logging
 
+User = get_user_model()
 logger = get_task_logger(__name__)
 
 @shared_task(
@@ -77,32 +82,51 @@ def send_push_to_topic_task(topic, title, body, data=None):
     except Exception as e:
         logger.error(f"[FCM] Error sending message to topic '{topic}': {e}")
         return str(e)
-    
+
+
 @shared_task
-def send_push_to_user_task(fcm_token, title, body, data=None):
+def send_push_to_user_task(user_id, title, body, data=None):
     """
-    Background task to send Firebase Push Notification to a specific user.
+    Background task to send Firebase Push Notification to all devices of a user.
     """
-    if not fcm_token:
-        return "No FCM token provided"
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        logger.error(f"[FCM] User with id {user_id} does not exist.")
+        return "User not found"
+
+    # Multi-device tokens collect karna
+    tokens = []
+    user_devices = user.devices.all()
+    if user_devices.exists():
+        tokens = [device.fcm_token for device in user_devices if device.fcm_token]
+    elif getattr(user, 'fcm_token', None):
+        # Fallback agar UserDevice mein nahi mila toh purane fcm_token se le lo
+        tokens = [user.fcm_token]
+
+    if not tokens:
+        logger.warning(f"[PUSH] User {user.phone} has no active FCM devices.")
+        return "No FCM tokens provided"
         
     try:
-        # 🔥 CHANGE: Data ko string mein convert karne ka logic
+        # Data ko string mein convert karne ka logic
         stringified_data = {}
         if data:
             stringified_data = {str(k): str(v) for k, v in data.items()}
 
-        message = messaging.Message(
+        # MulticastMessage ka use karke ek sath sabhi devices par bhejna
+        message = messaging.MulticastMessage(
             notification=messaging.Notification(
                 title=title,
                 body=body,
             ),
-            token=fcm_token,
-            data=stringified_data # 🔥 CHANGE: Yahan stringified_data pass kiya hai
+            tokens=tokens,
+            data=stringified_data 
         )
-        response = messaging.send(message)
-        logger.info(f"[FCM] Successfully sent message to token '{fcm_token}': {response}")
-        return response
+        response = messaging.send_each_for_multicast(message)
+        logger.info(f"[FCM] Multicast sent to {len(tokens)} tokens. Success: {response.success_count}, Failure: {response.failure_count}")
+        return f"Success: {response.success_count}, Failure: {response.failure_count}"
+        
     except Exception as e:
-        logger.error(f"[FCM] Error sending message to token '{fcm_token}': {e}")
+        logger.error(f"[FCM] Error sending message to user '{user.phone}': {e}")
         return str(e)

@@ -1,6 +1,6 @@
 import logging
 from firebase_admin import messaging
-
+from apps.accounts.models import UserDevice
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -65,21 +65,32 @@ class MyNotificationListAPIView(generics.ListAPIView):
 
     def get_queryset(self):
         return Notification.objects.filter(user=self.request.user).order_by('-created_at')
-
+    
 class SubscribeFCMTokenView(APIView):
     permission_classes = [AllowAny] 
 
     def post(self, request):
         token = request.data.get('token')
+        device_type = request.data.get('device_type', 'unknown') # Front-end se device_type optional aayega
+        
         if not token:
             return Response({"error": "FCM Token is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             if request.user.is_authenticated:
+                # 1. Purane field mein save karna (purane code ki compatibility ke liye)
                 request.user.fcm_token = token
                 request.user.save(update_fields=['fcm_token'])
-                logger.info(f"FCM Token saved for user {request.user.phone}")
+                
+                # 2. 🔥 NAYA LOGIC: Naye UserDevice table mein bhi save karna
+                UserDevice.objects.get_or_create(
+                    user=request.user,
+                    fcm_token=token,
+                    defaults={'device_type': device_type}
+                )
+                logger.info(f"FCM Token saved in UserDevice for user {request.user.phone}")
 
+            # Topics subscribe karna
             topics = ['promotions', 'new_arrivals']
             for topic in topics:
                 response = messaging.subscribe_to_topic([token], topic)
