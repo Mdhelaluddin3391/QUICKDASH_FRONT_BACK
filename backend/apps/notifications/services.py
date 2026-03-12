@@ -12,12 +12,16 @@ from .tasks import send_otp_sms
 
 logger = logging.getLogger(__name__)
 
-# --- BACKGROUND PUSH FUNCTIONS ---
 def execute_push_to_topic(topic, title, body, data=None):
     try:
         stringified_data = {str(k): str(v) for k, v in data.items()} if data else {}
+        
+        # Data mein title aur body add kar rahe hain, notification block hata diya hai
+        stringified_data['title'] = str(title)
+        stringified_data['body'] = str(body)
+
         message = messaging.Message(
-            notification=messaging.Notification(title=title, body=body),
+            # notification block hata diya taaki browser double show na kare
             topic=topic,
             data=stringified_data
         )
@@ -43,6 +47,10 @@ class NotificationService:
         
         stringified_data = {str(k): str(v) for k, v in extra_data.items()} if extra_data else {}
         
+        # Data mein title aur body add kar rahe hain
+        stringified_data['title'] = str(title)
+        stringified_data['body'] = str(message)
+        
         # Multi-device tokens collect karna (PC Browser + App dono aayenge)
         tokens = []
         user_devices = user.devices.all()
@@ -55,11 +63,10 @@ class NotificationService:
         if tokens:
             try:
                 fcm_msg = messaging.MulticastMessage(
-                    notification=messaging.Notification(title=title, body=message),
+                    # notification block hata diya taaki duplicate na aaye
                     tokens=tokens,
                     data=stringified_data
                 )
-                # 🔥 YAHAN CHANGE KAREIN: send_multicast ko hata kar send_each_for_multicast likhein
                 response = messaging.send_each_for_multicast(fcm_msg)
                 logger.info(f"[FCM] Multicast sent. Success: {response.success_count}, Failure: {response.failure_count}")
             except Exception as e:

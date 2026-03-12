@@ -17,13 +17,21 @@ firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
 // Background message handler
+// Background message handler
 messaging.onBackgroundMessage(function(payload) {
     console.log('[firebase-messaging-sw.js] Received background message ', payload);
     
-    const notificationTitle = payload.notification?.title || "QuickDash Alert!";
+    // Safety check: Agar galti se backend notification bhej de, toh manual code rok do
+    if (payload.notification) {
+        console.log('Notification block detected, letting browser handle it to avoid duplicates.');
+        return;
+    }
+
+    // Ab payload.data se title aur body nikalenge
+    const notificationTitle = payload.data?.title || "QuickDash Alert!";
     const notificationOptions = {
-        body: payload.notification?.body || "Aapke liye ek naya update hai!",
-        icon: '/assets/images/logo.png', // Apna QuickDash logo yahan set karein
+        body: payload.data?.body || "New order update!",
+        icon: '/assets/images/logo.png', // Aapka QuickDash logo
         data: payload.data
     };
 
