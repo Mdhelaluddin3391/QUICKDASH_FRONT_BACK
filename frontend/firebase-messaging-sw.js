@@ -12,24 +12,23 @@ const firebaseConfig = {
   measurementId: "G-JFB92V2QG3"
 };
 
-// Initialize Firebase App in Service Worker
+// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
 // Background message handler
 messaging.onBackgroundMessage(function(payload) {
-    console.log('[firebase-messaging-sw.js] Received full payload: ', JSON.stringify(payload));
-    
-    // Safety check
+    console.log('[firebase-messaging-sw.js] Received payload:', payload);
+
+    // Agar notification block aaya ho to browser handle karega
     if (payload.notification) {
         console.log('Notification block detected, letting browser handle it.');
         return;
     }
 
-    // Backend sab kuch 'data' ke andar bhej raha hai
-    const messageData = payload.data || {}; 
+    // Kabhi payload.data me data hota hai aur kabhi direct payload me
+    const messageData = payload.data || payload || {};
 
-    // Yahan directly messageData se title aur body nikalenge
     const notificationTitle = messageData.title || "QuickDash Alert!";
     const notificationBody = messageData.body || messageData.message || "New order update!";
 
@@ -37,8 +36,8 @@ messaging.onBackgroundMessage(function(payload) {
 
     const notificationOptions = {
         body: notificationBody,
-        icon: '/assets/images/logo.png', // Aapka QuickDash logo
-        data: messageData // Pura data save kar lo taaki click par kaam aaye
+        icon: '/assets/images/logo.png',
+        data: messageData
     };
 
     self.registration.showNotification(notificationTitle, notificationOptions);
