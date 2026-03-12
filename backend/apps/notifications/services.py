@@ -47,11 +47,10 @@ class NotificationService:
         
         stringified_data = {str(k): str(v) for k, v in extra_data.items()} if extra_data else {}
         
-        # Data mein title aur body add kar rahe hain
+        # Data payload sabke paas jayega (Browser isse Toast show karega)
         stringified_data['title'] = str(title)
         stringified_data['body'] = str(message)
         
-        # Multi-device tokens collect karna (PC Browser + App dono aayenge)
         tokens = []
         user_devices = user.devices.all()
         if user_devices.exists():
@@ -59,14 +58,29 @@ class NotificationService:
         elif getattr(user, 'fcm_token', None):
             tokens = [user.fcm_token]
 
-        # Agar token mila, toh sabko ek hi baari me bhej do (Multicast)
         if tokens:
             try:
-                fcm_msg = messaging.MulticastMessage(
-                    # notification block hata diya taaki duplicate na aaye
-                    tokens=tokens,
-                    data=stringified_data
+                # 🚀 FINAL FIX: Android Configuration Use Karein
+                android_config = messaging.AndroidConfig(
+                    notification=messaging.AndroidNotification(
+                        title=title,
+                        body=message,
+                        sound='default'
+                    )
                 )
+
+                fcm_msg = messaging.MulticastMessage(
+                    tokens=tokens,
+                    data=stringified_data,
+                    # Sirf Android devices ko 'notification' block dikhega (System tray ke liye)
+                    android=android_config,
+                    # Webpush config ko batao ki wo notification ko ignore kare ya sirf data padhe
+                    webpush=messaging.WebpushConfig(
+                        headers={"Urgency": "high"}
+                        # Web ke liye humne explicit notification block nahi diya, toh wo sirf data receive karega
+                    )
+                )
+                
                 response = messaging.send_each_for_multicast(fcm_msg)
                 logger.info(f"[FCM] Multicast sent. Success: {response.success_count}, Failure: {response.failure_count}")
             except Exception as e:
