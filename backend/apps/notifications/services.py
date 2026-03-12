@@ -59,8 +59,8 @@ class NotificationService:
                     tokens=tokens,
                     data=stringified_data
                 )
-                # 🔥 YAHAN MAIN CHANGE HAI: send_each_for_multicast ki jagah send_multicast
-                response = messaging.send_multicast(fcm_msg)
+                # 🔥 YAHAN CHANGE KAREIN: send_multicast ko hata kar send_each_for_multicast likhein
+                response = messaging.send_each_for_multicast(fcm_msg)
                 logger.info(f"[FCM] Multicast sent. Success: {response.success_count}, Failure: {response.failure_count}")
             except Exception as e:
                 logger.error(f"[FCM] Error sending push to user {user.phone}: {e}")
