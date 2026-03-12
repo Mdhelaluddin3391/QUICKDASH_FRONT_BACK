@@ -107,8 +107,9 @@ document.addEventListener("DOMContentLoaded", () => {
     messaging.onMessage((payload) => {
         console.log('[Foreground] Message received. ', payload);
 
-        const title = payload.notification?.title || "New Alert!";
-        const body = payload.notification?.body || "You have a new notification.";
+        // FIX: Pehle payload.data check karein, agar na mile toh notification, warn default
+        const title = payload.data?.title || payload.notification?.title || "QuickDash Alert!";
+        const body = payload.data?.body || payload.data?.message || payload.notification?.body || "New order update!";
 
         // Show Browser Notification if allowed
         if (Notification.permission === 'granted') {
