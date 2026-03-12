@@ -70,34 +70,23 @@ class SubscribeFCMTokenView(APIView):
     permission_classes = [AllowAny] 
 
     def post(self, request):
-        token = request.data.get('token')
-        device_type = request.data.get('device_type', 'unknown') # Front-end se device_type optional aayega
+        fcm_token = request.data.get('token') or request.data.get('fcm_token')
+
+        if not fcm_token:
+            return Response({"error": "FCM Token required"}, status=400)
+
+        # 🔥 NAYA CODE: Agar kisi purane user par ye token chipka hai toh usko delete kar do
+        UserDevice.objects.filter(fcm_token=fcm_token).exclude(user=request.user).delete()
+
+        # Ab securely is current user ke paas save kar do
+        UserDevice.objects.get_or_create(
+            user=request.user,
+            fcm_token=fcm_token,
+            defaults={'device_type': 'app_or_web'}
+        )
         
-        if not token:
-            return Response({"error": "FCM Token is required"}, status=status.HTTP_400_BAD_REQUEST)
+        # Fallback ke liye purane model par bhi update kar sakte hain
+        request.user.fcm_token = fcm_token
+        request.user.save(update_fields=['fcm_token'])
 
-        try:
-            if request.user.is_authenticated:
-                # 1. Purane field mein save karna (purane code ki compatibility ke liye)
-                request.user.fcm_token = token
-                request.user.save(update_fields=['fcm_token'])
-                
-                # 2. 🔥 NAYA LOGIC: Naye UserDevice table mein bhi save karna
-                UserDevice.objects.get_or_create(
-                    user=request.user,
-                    fcm_token=token,
-                    defaults={'device_type': device_type}
-                )
-                logger.info(f"FCM Token saved in UserDevice for user {request.user.phone}")
-
-            # Topics subscribe karna
-            topics = ['promotions', 'new_arrivals']
-            for topic in topics:
-                response = messaging.subscribe_to_topic([token], topic)
-                logger.info(f"Subscribed token to {topic}: {response.success_count} success")
-
-            return Response({"message": "Successfully subscribed to notifications!"}, status=status.HTTP_200_OK)
-            
-        except Exception as e:
-            logger.error(f"Error subscribing token: {e}")
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"message": "Successfully subscribed to push notifications."})
