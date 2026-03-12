@@ -2,7 +2,6 @@ from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from apps.inventory.models import InventoryTransaction
 from apps.catalog.models import FlashSale, Product, Category, Banner
-from apps.orders.models import Order
 from apps.notifications.services import NotificationService
 
 # =========================================================
@@ -90,39 +89,3 @@ def notify_new_banner(sender, instance, created, **kwargs):
             message=message,
             extra_data={"target_url": instance.target_url, "type": "banner", "position": instance.position}
         )
-
-# =========================================================
-# 4. ORDER STATUS UPDATES
-# =========================================================
-@receiver(pre_save, sender=Order)
-def track_order_status_change(sender, instance, **kwargs):
-    if instance.pk:
-        try:
-            old_order = Order.objects.get(pk=instance.pk)
-            instance._old_status = old_order.status
-        except Order.DoesNotExist:
-            instance._old_status = None
-    else:
-        instance._old_status = None
-
-@receiver(post_save, sender=Order)
-def notify_order_updates(sender, instance, created, **kwargs):
-    status_messages = {
-        'confirmed': ("Order Confirmed! 🛍️", "Your order has been confirmed successfully and is being processed."),
-        'packed': ("Order Packed! 📦", "Your order has been packed and is ready for the next steps."),
-        'packed_at_hub': ("Packed at Mega Hub! 🏢", "Your order has been safely packed at our mega hub and will transit soon."),
-        'out_for_delivery': ("Out for Delivery! 🚚", "Your order is out for delivery today! Be ready to receive it."),
-        'delivered': ("Delivered! 🎉", "Your order has been delivered successfully. Thank you so much for shopping with us!"),
-    }
-    current_status = getattr(instance, 'status', None)
-    old_status = getattr(instance, '_old_status', None)
-
-    if not created and current_status != old_status and current_status in status_messages:
-        if instance.user:
-            title, msg = status_messages[current_status]
-            NotificationService.send_push(
-                user=instance.user, 
-                title=title, 
-                message=msg, 
-                extra_data={"order_id": str(instance.id), "type": "order"}
-            )
