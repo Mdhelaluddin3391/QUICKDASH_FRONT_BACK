@@ -24,9 +24,6 @@ def notify_new_stock(sender, instance, created, **kwargs):
             extra_data={"sku": inventory_item.sku, "type": "inventory"}
         )
 
-# =========================================================
-# 2. PRODUCT PRICE DROP & NEW ARRIVALS
-# =========================================================
 @receiver(pre_save, sender=Product)
 def track_product_price_change(sender, instance, **kwargs):
     if instance.pk:
