@@ -16,20 +16,28 @@ def execute_push_to_topic(topic, title, body, data=None):
     try:
         stringified_data = {str(k): str(v) for k, v in data.items()} if data else {}
         
-        # Data mein title aur body add kar rahe hain, notification block hata diya hai
+        # Data mein title aur body add kar rahe hain (Web ke liye)
         stringified_data['title'] = str(title)
         stringified_data['body'] = str(body)
 
+        # Android device ke liye AndroidConfig add karein taaki APK mein properly show ho
+        android_config = messaging.AndroidConfig(
+            notification=messaging.AndroidNotification(
+                title=title,
+                body=body,
+                sound='default'
+            )
+        )
+
         message = messaging.Message(
-            # notification block hata diya taaki browser double show na kare
             topic=topic,
-            data=stringified_data
+            data=stringified_data,
+            android=android_config  # <-- Yeh line add ki gayi hai
         )
         response = messaging.send(message)
         logger.info(f"[FCM] Successfully sent to topic '{topic}': {response}")
     except Exception as e:
         logger.error(f"[FCM] Error sending to topic '{topic}': {e}")
-
 
 class NotificationService:
     @staticmethod
