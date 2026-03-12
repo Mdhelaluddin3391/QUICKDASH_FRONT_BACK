@@ -12,7 +12,7 @@ from .tasks import send_otp_sms
 
 logger = logging.getLogger(__name__)
 
-# --- BACKGROUND PUSH FUNCTIONS (Bina Celery/Timer ke) ---
+# --- BACKGROUND PUSH FUNCTIONS ---
 def execute_push_to_topic(topic, title, body, data=None):
     try:
         stringified_data = {str(k): str(v) for k, v in data.items()} if data else {}
@@ -30,7 +30,6 @@ def execute_push_to_topic(topic, title, body, data=None):
 class NotificationService:
     @staticmethod
     def send_sms(user, message):
-        # Ise BILKUL touch nahi kiya gaya hai, waisa hi hai
         Notification.objects.create(user=user, type="sms", title="SMS", message=message)
         if transaction.get_connection().in_atomic_block:
             transaction.on_commit(lambda: send_otp_sms.delay(user.phone, message))
@@ -39,12 +38,12 @@ class NotificationService:
 
     @staticmethod
     def send_push(user, title, message, extra_data=None):
-        """User ko notification bhejna - Multi-device support ke sath (Bina Timer/Celery)"""
+        """User ko notification bhejna - Multi-device support ke sath"""
         Notification.objects.create(user=user, type="push", title=title, message=message)
         
         stringified_data = {str(k): str(v) for k, v in extra_data.items()} if extra_data else {}
         
-        # Multi-device tokens collect karna
+        # Multi-device tokens collect karna (PC Browser + App dono aayenge)
         tokens = []
         user_devices = user.devices.all()
         if user_devices.exists():
@@ -60,7 +59,8 @@ class NotificationService:
                     tokens=tokens,
                     data=stringified_data
                 )
-                response = messaging.send_each_for_multicast(fcm_msg)
+                # 🔥 YAHAN MAIN CHANGE HAI: send_each_for_multicast ki jagah send_multicast
+                response = messaging.send_multicast(fcm_msg)
                 logger.info(f"[FCM] Multicast sent. Success: {response.success_count}, Failure: {response.failure_count}")
             except Exception as e:
                 logger.error(f"[FCM] Error sending push to user {user.phone}: {e}")
@@ -69,11 +69,11 @@ class NotificationService:
 
     @staticmethod
     def send_global_push(topic, title, message, extra_data=None):
-        """Sabhi users ko notification bhejna (Flash sale, promotions)"""
+        """Sabhi users ko notification bhejna"""
         execute_push_to_topic(topic, title, message, extra_data)
 
 
-# --- OTP SERVICES (Yaha koi changes nahi kiye gaye hain) ---
+# --- OTP SERVICES (No Changes) ---
 class OTPService:
     MAX_ATTEMPTS = 5
     RESEND_COOLDOWN_SECONDS = getattr(settings, "OTP_RESEND_COOLDOWN", 60)
