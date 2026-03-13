@@ -1,126 +1,107 @@
-window.Toast = {
-    show: function(message, type = 'info', duration = 3000) {
-        let container = document.getElementById('toast-container');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'toast-container';
-            document.body.appendChild(container);
-        }
+/* assets/js/utils/toast.js */
+(function() {
+    const Toast = {
+        timeout1: null,
+        timeout2: null,
 
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        
-        const icons = {
-            success: 'fa-check-circle',
-            error: 'fa-exclamation-circle',
-            warning: 'fa-exclamation-triangle',
-            info: 'fa-info-circle'
-        };
-
-        // UI Structure
-        const content = document.createElement('div');
-        content.className = 'toast-content';
-
-        const iconWrap = document.createElement('span');
-        iconWrap.className = 'toast-icon';
-        iconWrap.innerHTML = `<i class="fas ${icons[type] || icons.info}"></i>`;
-
-        const msgWrap = document.createElement('span');
-        msgWrap.className = 'toast-msg';
-        msgWrap.innerText = message; // SECURITY FIX: Use innerText instead of innerHTML
-
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'toast-close';
-        closeBtn.innerHTML = '&times;';
-        closeBtn.onclick = () => toast.remove();
-
-        content.appendChild(iconWrap);
-        content.appendChild(msgWrap);
-        toast.appendChild(content);
-        toast.appendChild(closeBtn);
-        container.appendChild(toast);
-
-        setTimeout(() => toast.classList.add('show'), 10);
-        setTimeout(() => {
-            toast.classList.remove('show');
-            setTimeout(() => toast.remove(), 300);
-        }, duration);
-    },
-
-    devOTP: function(otp) {
-        let container = document.getElementById('dev-toast-container');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'dev-toast-container';
+        init() {
+            // Agar pehle se island exist karta hai, toh waise hi rehne do
+            if (document.getElementById('dynamic-island-toast')) return;
             
-            // --- NAYA FIX: OTP Container ko screen ke center mein laane ke liye ---
-            container.style.position = 'fixed';
-            container.style.top = '40%'; // Screen par upar se 40% niche
-            container.style.left = '50%';
-            container.style.transform = 'translate(-50%, -50%)';
-            container.style.zIndex = '99999'; // Sabse upar dikhne ke liye
-            container.style.width = '90%'; // Mobile screen ke hisaab se
-            container.style.maxWidth = '400px';
-            container.style.display = 'flex';
-            container.style.flexDirection = 'column';
-            container.style.alignItems = 'center';
-            // ---------------------------------------------------------------------
+            const island = document.createElement('div');
+            island.id = 'dynamic-island-toast';
+            island.className = 'dynamic-island';
             
-            document.body.appendChild(container);
+            island.innerHTML = `
+                <div class="island-icon" id="island-icon">🔔</div>
+                <div class="island-text">
+                    <div class="island-title" id="island-title">Notification</div>
+                    <div class="island-message" id="island-message">Message</div>
+                </div>
+            `;
+            
+            document.body.appendChild(island);
+        },
+
+        show(title, message, type = 'info') {
+            this.init(); // DOM injection check
+            
+            const island = document.getElementById('dynamic-island-toast');
+            const iconEl = document.getElementById('island-icon');
+            const titleEl = document.getElementById('island-title');
+            const messageEl = document.getElementById('island-message');
+
+            // Text Set Karein
+            titleEl.textContent = title || 'Notification';
+            messageEl.textContent = message || '';
+
+            // Type ke hisaab se color aur icon change karein
+            let bgColor, icon;
+            switch(type) {
+                case 'success':
+                    bgColor = '#2ecc71'; // Green theme color
+                    icon = '✅'; // Aap yaha FontAwesome icons bhi use kar sakte ho jaise '<i class="fas fa-check"></i>'
+                    break;
+                case 'error':
+                    bgColor = '#e74c3c'; // Red
+                    icon = '❌';
+                    break;
+                case 'warning':
+                    bgColor = '#f1c40f'; // Yellow
+                    icon = '⚠️';
+                    break;
+                default:
+                    bgColor = '#3498db'; // Blue
+                    icon = '🔔';
+            }
+
+            iconEl.style.background = bgColor;
+            iconEl.innerHTML = icon;
+
+            // Purani animations hatayein
+            island.classList.remove('show', 'expand');
+            
+            // Reflow trigger karein animation restart karne ke liye
+            void island.offsetWidth;
+            
+            // Island dikhayein
+            island.classList.add('show');
+            
+            // Thodi der baad text expand karein
+            setTimeout(() => {
+                island.classList.add('expand');
+            }, 200);
+
+            // Purane timeout clear karein agar naya message aa gaya
+            if (this.timeout1) clearTimeout(this.timeout1);
+            if (this.timeout2) clearTimeout(this.timeout2);
+            
+            // Message ko 3-4 second baad wapas hide kar dein
+            this.timeout1 = setTimeout(() => {
+                island.classList.remove('expand'); // Pehle shrink karo
+                this.timeout2 = setTimeout(() => {
+                    island.classList.remove('show'); // Phir gayab karo
+                }, 300); 
+            }, 3500); 
+        },
+
+        // Project ke existing methods jisse baaki code break na ho
+        success(message, title = 'Success') {
+            this.show(title, message, 'success');
+        },
+
+        error(message, title = 'Error') {
+            this.show(title, message, 'error');
+        },
+
+        info(message, title = 'Info') {
+            this.show(title, message, 'info');
+        },
+
+        warning(message, title = 'Warning') {
+            this.show(title, message, 'warning');
         }
+    };
 
-        const toast = document.createElement('div');
-        toast.className = 'toast toast-dev show'; // 'show' class तुरंत जोड़ें
-        
-        // --- NAYA FIX: Toast ki thodi designing taaki center me achha lage ---
-        toast.style.pointerEvents = "auto";
-        toast.style.width = "100%";
-        toast.style.boxShadow = "0 10px 25px rgba(0,0,0,0.2)"; // Thoda shadow jisse pop-up jaisa lage
-        toast.style.border = "2px solid #7209b7";
-        // ---------------------------------------------------------------------
-
-        const content = document.createElement('div');
-        content.className = 'toast-content';
-
-        // Icon
-        const iconWrap = document.createElement('span');
-        iconWrap.className = 'toast-icon';
-        iconWrap.innerHTML = '<i class="fas fa-tools"></i>';
-
-        // Message HTML
-        const msgWrap = document.createElement('div');
-        msgWrap.className = 'toast-msg';
-        msgWrap.style.display = 'flex';
-        msgWrap.style.flexDirection = 'column';
-        msgWrap.innerHTML = `
-            <span style="font-weight:bold; color:#555; font-size:0.9rem;">SMS Service Unavailable</span>
-            <span style="margin-top:4px;">
-                Use Temporary OTP: 
-                <b style="background:#7209b7; color:#fff; padding:2px 6px; border-radius:4px; letter-spacing:1px; font-size: 1.1rem;">${otp}</b>
-            </span>
-        `;
-
-        // Close Button
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'toast-close';
-        closeBtn.innerHTML = '&times;';
-        closeBtn.onclick = () => toast.remove();
-
-        content.appendChild(iconWrap);
-        content.appendChild(msgWrap);
-        toast.appendChild(content);
-        toast.appendChild(closeBtn);
-        container.appendChild(toast);
-
-        // 20 सेकंड का टाइमर (20000 ms)
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => toast.remove(), 300);
-        }, 20000);
-    },
-
-    success: function(msg) { this.show(msg, 'success'); },
-    error: function(msg) { this.show(msg, 'error'); },
-    warning: function(msg) { this.show(msg, 'warning'); },
-    info: function(msg) { this.show(msg, 'info'); }
-};
+    window.Toast = Toast;
+})();

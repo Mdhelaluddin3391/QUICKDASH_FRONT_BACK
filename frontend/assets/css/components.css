@@ -273,20 +273,71 @@
 /* =========================================
    8. TOAST NOTIFICATIONS
    ========================================= */
-#toast-container { position: fixed; top: 20px; right: 20px; z-index: 10000; display: flex; flex-direction: column; gap: 15px; pointer-events: none; }
-.toast { background: #fff; min-width: 300px; max-width: 400px; padding: 16px 20px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); display: flex; align-items: flex-start; justify-content: space-between; pointer-events: auto; overflow: hidden; position: relative; transform: translateX(120%); opacity: 0; transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); border-left: 5px solid #ccc; }
-.toast.show { transform: translateX(0); opacity: 1; }
-.toast-content { display: flex; align-items: center; gap: 12px; }
-.toast-icon { font-size: 1.4rem; display: flex; align-items: center; }
-.toast-msg { font-size: 0.95rem; font-weight: 500; color: #333; line-height: 1.4; }
-.toast-close { background: transparent; border: none; font-size: 1.5rem; line-height: 1; color: #aaa; cursor: pointer; margin-left: 10px; margin-top: -5px; transition: color 0.2s; }
-.toast-close:hover { color: #333; }
+/* Dynamic Island Toast Notification */
+.dynamic-island {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    /* Start with scale(0) center top */
+    transform: translateX(-50%) scale(0);
+    background: #000;
+    color: #fff;
+    border-radius: 40px;
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 120px;
+    max-width: 90%;
+    /* Smooth bouncy transition */
+    transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); 
+    box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+    z-index: 99999; /* Sabse upar dikhane ke liye */
+    opacity: 0;
+    pointer-events: none;
+}
 
-/* Toast Colors */
-.toast-success { border-left-color: #22c55e; } .toast-success .toast-icon { color: #22c55e; }
-.toast-error { border-left-color: #ef4444; } .toast-error .toast-icon { color: #ef4444; }
-.toast-warning { border-left-color: #f59e0b; } .toast-warning .toast-icon { color: #f59e0b; }
-.toast-info { border-left-color: #3b82f6; } .toast-info .toast-icon { color: #3b82f6; }
+.dynamic-island.show {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+}
+
+.dynamic-island.expand {
+    padding: 14px 22px;
+    border-radius: 25px;
+    min-width: 250px; /* Text ke liye jagah expand hogi */
+}
+
+.island-icon {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    border-radius: 50%;
+    background: #25D366; /* Default color */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 14px;
+}
+
+.island-text {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.island-title {
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.island-message {
+    font-size: 12px;
+    opacity: 0.8;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
 
 /* Dev OTP Toast */
 #dev-toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 10001; display: flex; flex-direction: column; gap: 10px; width: 90%; max-width: 400px; pointer-events: none; }
