@@ -271,14 +271,12 @@
 .notification-actions button { flex: 1; padding: 12px 15px; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
 
 /* =========================================
-   8. TOAST NOTIFICATIONS
+   8. TOAST NOTIFICATIONS (Dynamic Island)
    ========================================= */
-/* Dynamic Island Toast Notification */
 .dynamic-island {
     position: fixed;
     top: 20px;
     left: 50%;
-    /* Start with scale(0) center top */
     transform: translateX(-50%) scale(0);
     background: #000;
     color: #fff;
@@ -289,10 +287,9 @@
     gap: 10px;
     min-width: 120px;
     max-width: 90%;
-    /* Smooth bouncy transition */
     transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55); 
     box-shadow: 0 8px 25px rgba(0,0,0,0.4);
-    z-index: 99999; /* Sabse upar dikhane ke liye */
+    z-index: 99999; 
     opacity: 0;
     pointer-events: none;
 }
@@ -300,12 +297,13 @@
 .dynamic-island.show {
     transform: translateX(-50%) scale(1);
     opacity: 1;
+    pointer-events: auto; /* Clickable when shown */
 }
 
 .dynamic-island.expand {
     padding: 14px 22px;
     border-radius: 25px;
-    min-width: 250px; /* Text ke liye jagah expand hogi */
+    min-width: 250px; 
 }
 
 .island-icon {
@@ -313,7 +311,6 @@
     height: 28px;
     min-width: 28px;
     border-radius: 50%;
-    background: #25D366; /* Default color */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -339,14 +336,10 @@
     overflow: hidden;
 }
 
-/* Dev OTP Toast */
+/* =========================================
+   Dev OTP Toast (Purana wala safe rakha hai)
+   ========================================= */
 #dev-toast-container { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 10001; display: flex; flex-direction: column; gap: 10px; width: 90%; max-width: 400px; pointer-events: none; }
 .toast-dev { background: #fff; border-left: 5px solid #7209b7; box-shadow: 0 10px 40px rgba(0,0,0,0.2); animation: slideDown 0.5s ease forwards; }
 .toast-dev .toast-icon { color: #7209b7; font-size: 1.5rem; }
 @keyframes slideDown { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-/* Mobile Responsive */
-@media (max-width: 480px) {
-    #toast-container { right: 10px; left: 10px; top: 10px; align-items: center; }
-    .toast { width: 100%; min-width: auto; }
-}
