@@ -125,10 +125,7 @@ async function handleVerifyAndLogin(e) {
     btn.innerText = "Verifying...";
     
     try {
-        let requestPayload = {};
-
-        
-        requestPayload = { login_type: 'local', phone: phoneNumber, otp: otp }; 
+        let requestPayload = { login_type: 'local', phone: phoneNumber, otp: otp }; 
 
         // Call Tumhari Existing Backend API (Render)
         const res = await ApiService.post('/auth/register/customer/', requestPayload);
@@ -140,6 +137,32 @@ async function handleVerifyAndLogin(e) {
             try {
                 const user = await ApiService.get('/auth/me/');
                 localStorage.setItem(APP_CONFIG.STORAGE_KEYS.USER, JSON.stringify(user));
+
+                // 🔥 NAYA CODE YAHAN HAI: Login hote hi address fetch karke L2 set karna 🔥
+                try {
+                    const addrRes = await ApiService.get('/customers/addresses/'); 
+                    const addresses = addrRes.results || addrRes || [];
+                    
+                    if (addresses.length > 0) {
+                        const defAddr = addresses.find(a => a.is_default) || addresses[0];
+                        
+                        if (window.LocationManager) {
+                            window.LocationManager.setDeliveryAddress({
+                                id: defAddr.id,
+                                lat: defAddr.latitude || defAddr.lat,
+                                lng: defAddr.longitude || defAddr.lng,
+                                address_line: defAddr.address_line_1 || defAddr.address_line || 'Saved Address',
+                                city: defAddr.city || '',
+                                label: defAddr.address_type || 'Delivery'
+                            });
+                            console.log("[Auth] Existing L2 Address Auto-Set!");
+                        }
+                    }
+                } catch (addrErr) {
+                    console.warn("Silently failed to fetch addresses on login", addrErr);
+                }
+                // 🔥 NAYA CODE KHATAM 🔥
+
             } catch(e) { console.warn("Profile fetch failed", e); }
             
             Toast.success("Login Successful");
