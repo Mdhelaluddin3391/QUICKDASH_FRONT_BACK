@@ -4,8 +4,17 @@
 if (!window.ServiceCheck) {
     window.ServiceCheck = {
         async init() {
-            // 1. Check if Service Location (Layer 2) exists
-            if (localStorage.getItem(APP_CONFIG.STORAGE_KEYS.SERVICE_CONTEXT)) {
+            // 1. Check via LocationManager (Supports both L1 & L2)
+            if (window.LocationManager && window.LocationManager.hasLocation()) {
+                console.log("[InitialServiceCheck] Location Context (L1 or L2) Found. Skipping modal.");
+                return; // Good to go
+            }
+
+            // Fallback: Agar LocationManager load nahi hua hai, toh manually storage check karein
+            const serviceKey = (window.APP_CONFIG && window.APP_CONFIG.STORAGE_KEYS && window.APP_CONFIG.STORAGE_KEYS.SERVICE_CONTEXT) || 'app_service_context';
+            const deliveryKey = 'app_delivery_context'; // Check for L2 directly
+
+            if (localStorage.getItem(serviceKey) || localStorage.getItem(deliveryKey)) {
                 return; // Good to go
             }
 
