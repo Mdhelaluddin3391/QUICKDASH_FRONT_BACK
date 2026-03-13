@@ -39,22 +39,22 @@ class ManualPushNotificationAdmin(admin.ModelAdmin):
         
         obj = form.instance
         if not obj.sent:
+            # 🔥 NAYA LOGIC: Topic ki jagah seedha users ko fetch karenge
             if obj.target_audience == 'all':
-                NotificationService.send_global_push(
-                    topic="promotions",
+                users_to_send = User.objects.filter(
+                    models.Q(devices__isnull=False) | models.Q(fcm_token__isnull=False)
+                ).distinct()
+            else:
+                users_to_send = obj.selected_users.all()
+
+            # Sabhi valid users ko loop karke notification bhej do
+            for user in users_to_send:
+                NotificationService.send_push(
+                    user=user,
                     title=obj.title,
                     message=obj.message,
                     extra_data={"type": "admin_announcement"}
                 )
-            else:
-                users_to_send = obj.selected_users.all()
-                for user in users_to_send:
-                    NotificationService.send_push(
-                        user=user,
-                        title=obj.title,
-                        message=obj.message,
-                        extra_data={"type": "admin_announcement"}
-                    )
 
             obj.sent = True
             obj.save(update_fields=['sent'])
