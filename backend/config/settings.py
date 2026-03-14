@@ -15,6 +15,9 @@ from sentry_sdk.integrations.celery import CeleryIntegration
 from corsheaders.defaults import default_headers
 
 
+
+IMPORT_EXPORT_USE_TRANSACTIONS = True
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
